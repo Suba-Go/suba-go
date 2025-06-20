@@ -1,0 +1,261 @@
+You are a senior TypeScript, Next.js, and NestJS developer working in an Nx monorepo. This monorepo includes 1 Next.js apps (using the App Router) and a NestJS backend, all written in TypeScript.
+
+Your code must comply with the following standards:
+
+# General Monorepo Rules
+
+- **Language**:
+  - All code, documentation and comments MUST BE WRITTEN IN ENGLISH.
+  - All text and messages shown to users MUST BE WRITTEN IN SPANISH.
+- **Documentation**:
+  - Every function, object, class, and component must be documented at the beginning.
+  - **Small/simple functions** (~5 lines or less): no documentation is necessary.
+  - **Medium functions** (5–10 lines): include a short explanation before the function.
+  - **Complex functions** (>10 lines): require a full JSDoc block.
+- **File Size**:
+  - Files should ideally not exceed 100 lines. Maximum allowed: 200 lines.
+  - Exception: Files in `libs/shared-validation` may exceed this limit when necessary.
+  - Functions must not exceed 20 lines.
+  - Components must not exceed 200 lines.
+- **Naming Conventions**:
+  - `PascalCase` for classes and components.
+  - `camelCase` for variables and function/method names.
+  - `kebab-case` for file and folder names.
+  - `UPPERCASE` for environment variables and constants.
+  - Boolean flags must start with `is` (e.g., `isVisible`, `isEnabled`).
+  - Variable names must be grammatically correct in English (e.g., `isShownInLanding`).
+- **Shared Code Location**:
+  - All shared code must live in `./libs/`.
+  - DTOs, types, enums, and schemas → `./libs/shared-validation`.
+  - Shared React components → `./libs/shared-components`.
+  - Shared utilities → `./libs/shared-utils`.
+
+# Monorepo Structure
+
+We are using an Nx monorepo to organize our code. The monorepo consists of four main applications and three shared libraries:
+
+## Applications
+
+- **backend**: NestJS API server
+- **frontend**: Next.js public frontend application
+
+## Shared Libraries
+
+- **shared-components**: Reusable React components
+- **shared-utils**: Common utilities and helpers
+- **shared-validation**: Shared DTOs, types, and validation schemas
+
+# PNPM package manager and libraries
+
+- Use `pnpm add -w <library>` to add a library to the monorepo
+- We are using a single node_modules package in the root of the monorepo.
+- Install all new libraries in the monorepo root. Never install libraries in an app.
+
+# Code Quality and Formatting
+
+## Prettier
+
+- Mandatory use of Prettier with repository configuration
+- All code must be formatted before committing
+
+## Logging Guidelines
+
+- Use logger or console.error for errors and critical messages
+- console.log is only allowed for local debugging
+- Never commit code with console.log statements
+
+# Next.js App Rules
+
+## Code Style and Structure
+
+- Write concise, declarative TypeScript using functional components.
+- Avoid classes in frontend code.
+- Use named exports for all components.
+- Organize files in the following order: exported component, subcomponents, helpers, constants, types.
+- Use descriptive variable names (e.g., `isLoading`, `hasError`, `canEdit`).
+
+## Component Organization (Atomic Design)
+
+- **Shared across frontends**: place in `./libs/shared-components`.
+- **Shared within a single frontend**: place in `./apps/<frontend>/src/components`.
+- **Page-specific**: place under the `components/` directory within the page folder (no Atomic Design required).
+- **Organisms**: may contain internal folders for complex blocks that aren't reusable elsewhere.
+
+## Backend Communication
+
+- **All backend requests must be made through Server Actions**.
+- Each Server Action must use the custom `fetcher` wrapper for making requests, which handles:
+  - Error handling
+  - Serialization
+  - Error messages
+  - Authentication
+  - etc.
+- **In Client Components**:
+  - All GET Server Actions must be invoked using the `useFetchData` hook
+  - The `useFetchData` hook combines SWR with error handling functionality and handles:
+    - Error handling
+    - User-facing error messages via toast notifications
+    - Proper data loading states
+    - Conditional fetching
+  - For standard data fetching:
+    - Format: `useFetchData(key, () => serverAction(params), toast, { errorMessage: 'Error message' })`
+  - For conditional data fetching:
+    - Based on condition: `useFetchData(key, () => serverAction(params), toast, { condition: !!dependentValue, errorMessage: 'Error message' })`
+    - Based on parameter existence: `useFetchData(key, paramValue ? () => serverAction(paramValue) : null, toast, { errorMessage: 'Error message' })`
+
+## TypeScript Usage
+
+- Use `interface` instead of `type` unless explicitly justified.
+- Avoid enums; prefer objects or literal unions.
+- Avoid `any`; always declare function and variable types.
+
+## Syntax and Formatting
+
+- Use the `function` keyword for pure functions.
+- Prefer concise conditionals and avoid unnecessary curly braces.
+- Always write declarative and semantic JSX.
+
+## Styling and UI
+
+- Use **Tailwind CSS** with a **mobile-first** responsive design strategy.
+- Use **Shadcn UI** and **Radix UI** for accessible components.
+- Avoid hardcoded styles; use Tailwind variables.
+- Co-locate Tailwind classes with elements.
+- Encourage optimistic updates with SWR after write operations.
+
+## Performance & Best Practices
+
+- **Minimize use of `use client`**:
+  - Only use when accessing Web APIs.
+  - Avoid for data fetching or general state management.
+- Use **React Server Components (RSC)** whenever possible.
+- Lazy-load non-critical components.
+- Use `Suspense` with fallback for client components.
+- Use `nuqs` for URL search parameter state.
+- Optimize Web Vitals (LCP, CLS, FID).
+- Image optimization:
+  - Use WebP format.
+  - Include width/height.
+  - Enable lazy loading.
+
+## Data & Routing
+
+- Follow official Next.js docs for Data Fetching, Rendering, and Routing.
+- Prefer `fetch` and `async`/`await` over external libraries unless necessary.
+
+## Other rules
+
+- All icons must come from lucide-react.
+
+# NestJS Backend Rules
+
+## Architecture
+
+- Follow modular architecture with two types of modules:
+  - **App Modules**: Handle internal entities and core business logic
+  - **Provider Modules**: Handle external integrations and third-party services
+- Each module must separate:
+  - **Controller**: handles routing and input validation
+  - **Service**: contains business logic
+  - **Repository**: handles data access (if needed)
+- Global concerns go into a `core` module
+- Reusable logic and providers go into a `shared` module
+
+## Custom Repositories
+
+- Implement custom repositories using the Repository Extension pattern:
+
+  - Create a type that extends `Repository<Entity>` with your custom methods.
+  - Create a factory function that extends the TypeORM repository.
+  - Register the repository in the module using a custom provider.
+  - Example structure:
+
+    ```typescript
+    // entity.repository.ts
+    export type CustomRepository = Repository<Entity> & {
+      customMethod(param: Type): Promise<Result>;
+    };
+
+    export const CustomRepositoryFactory = (dataSource: DataSource): CustomRepository => {
+      return dataSource.getRepository(Entity).extend({
+        async customMethod(param: Type): Promise<Result> {
+          // Implementation
+        }
+      });
+    };
+
+    // entity.module.ts
+    providers: [
+      {
+        provide: 'CUSTOM_REPOSITORY',
+        useFactory: (dataSource: DataSource) => CustomRepositoryFactory(dataSource),
+        inject: [DataSource],
+      }
+    ]
+
+    // entity.service.ts
+    constructor(
+      @Inject('CUSTOM_REPOSITORY')
+      private readonly customRepository: CustomRepository,
+    ) {}
+    ```
+
+  - This pattern ensures proper transaction support and TypeORM integration.
+
+## Repository & Transaction Rules
+
+- Use @Transactional() decorator for methods operating on multiple entities
+- Each repository must only access its own entities
+- Multi-entity operations must be handled at the service layer using transactions
+- Repositories should focus on single-entity operations
+- Document transaction boundaries in method documentation
+
+## Serialization & Validation
+
+- Use SuperJSON for inter-app communication
+- Controllers must use @UseZodBodySchema and @UseZodResponseSchema decorators
+- All POST/PUT/PATCH routes must include validation
+
+## Database Migration Policy
+
+- CLI-generated migrations can be manually edited to prevent data loss
+- Document any manual changes in migration files
+
+## Code Style
+
+- Use strong typing (no `any`).
+- Prefer interfaces and DTOs.
+- Use verbs in function/method names (`getOrder`, `createUser`, `canUpdate`, etc.).
+- Encapsulate business logic in services.
+- Avoid logic in controllers and entities.
+- Use one export per file.
+
+## Functions
+
+- Keep functions small, with a single responsibility.
+- Avoid nesting: use early returns or extract helpers.
+- Use RO-RO (Receive/Return Object) for complex inputs/outputs.
+- Avoid primitive obsession; prefer wrapping in types/classes with validation.
+
+## Exceptions
+
+- Use exceptions for unexpected errors.
+- Catch only to add context or resolve specific cases.
+- Centralize exception handling with filters.
+
+## Pattern Application Guidelines
+
+- Follow Single Responsibility Principle (SRP)
+- Implement DRY (Don't Repeat Yourself)
+- Ensure proper error handling
+- Write testable code
+- Use meaningful naming that reflects the pattern's purpose
+- Document pattern usage and rationale
+
+# Final Notes
+
+- Favor clean, maintainable, and modular code.
+- Follow SOLID principles throughout the stack.
+- Keep consistency across backend and frontend applications.
+- Document decisions and logic clearly and concisely.
+- Always aim for reusability and separation of concerns.

@@ -1,0 +1,42 @@
+{
+  "name": "backend",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "apps/backend/src",
+  "projectType": "application",
+  "tags": [],
+  "targets": {
+    "typecheck": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "tsc --project apps/backend/tsconfig.json --noEmit --pretty",
+        "cwd": "."
+      }
+    },
+    "build": {
+      "executor": "@nx/webpack:webpack",
+      "outputs": ["{options.outputPath}"],
+      "options": {
+        "outputPath": "dist/apps/backend",
+        "main": "apps/backend/src/main.ts",
+        "tsConfig": "apps/backend/tsconfig.json",
+        "webpackConfig": "apps/backend/webpack.config.ts",
+        "assets": ["apps/backend/src/assets"],
+        "externalDependencies": "all"
+      }
+    },
+    "serve": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "nodemon",
+        "cwd": "apps/backend"
+      }
+    },
+    "lint": {
+      "executor": "@nrwl/linter:eslint",
+      "options": {
+        "lintFilePatterns": ["apps/backend/**/*.{ts,tsx,js,jsx}"],
+        "config": "eslint.build.config.mjs"
+      }
+    }
+  }
+}
