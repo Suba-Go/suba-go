@@ -5,6 +5,9 @@ on:
     branches:
       - main
       - development
+  push:
+    branches:
+      - '*'
 
 jobs:
   validate-typescript:
