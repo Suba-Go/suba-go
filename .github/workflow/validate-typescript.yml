@@ -1,4 +1,4 @@
-name: Validate TypeScript
+name: Validate and Build Nx Monorepo
 
 on:
   pull_request:
