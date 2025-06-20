@@ -4,13 +4,16 @@ import { fileURLToPath } from 'url';
 import js from '@eslint/js';
 import { fixupConfigRules } from '@eslint/compat';
 import nx from '@nx/eslint-plugin';
-import baseConfig from '../eslint.config.mjs';
+import baseConfig from '../../eslint.config.mjs';
+import tseslint from 'typescript-eslint';
+
 const compat = new FlatCompat({
   baseDirectory: dirname(fileURLToPath(import.meta.url)),
   recommendedConfig: js.configs.recommended,
 });
 
 export default [
+  tseslint.configs.base,
   ...fixupConfigRules(compat.extends('next')),
   ...fixupConfigRules(compat.extends('next/core-web-vitals')),
   ...baseConfig,

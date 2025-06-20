@@ -1,8 +1,8 @@
 {
   "$schema": "./node_modules/nx/schemas/nx-schema.json",
   "npmScope": "suba-and-go",
-  "affected": {
-    "defaultBase": "master"
+  "nx affected": {
+    "defaultBase": "main"
   },
   "tasksRunnerOptions": {
     "default": {
@@ -17,6 +17,13 @@
     "build": {
       "dependsOn": ["^build"],
       "inputs": ["production", "^production"]
+    },
+    "lint": {
+      "inputs": [
+        "default",
+        "{workspaceRoot}/eslint.config.mjs",
+        "{workspaceRoot}/tools/eslint-rules/**/*"
+      ]
     }
   },
   "namedInputs": {

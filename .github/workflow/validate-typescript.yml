@@ -1,0 +1,60 @@
+name: Validate TypeScript
+
+on:
+  pull_request:
+    branches:
+      - main
+      - development
+
+jobs:
+  validate-typescript:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+        with:
+          # Fetch more history for affected projects detection
+          fetch-depth: 0
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: '10.12.1'
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'pnpm'
+          cache-dependency-path: '**/pnpm-lock.yaml'
+
+      - name: Cache TypeScript builds
+        uses: actions/cache@v3
+        with:
+          path: |
+            **/tsconfig.tsbuildinfo
+            **/.next/cache
+            **/node_modules/.cache
+          key: ${{ runner.os }}-ts-${{ hashFiles('**/pnpm-lock.yaml', '**/tsconfig*.json') }}
+          restore-keys: |
+            ${{ runner.os }}-ts-
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile --ignore-scripts
+
+      - name: Run TypeScript type checking (affected projects for PRs)
+        if: github.event_name == 'pull_request'
+        run: |
+          # Try affected projects first, fallback to all if it fails
+          pnpm nx affected --target=typecheck --base=${{ github.event.pull_request.base.sha }} || \
+          pnpm nx run-many --target=typecheck --all
+
+      - name: Run TypeScript type checking (all projects for main/dev)
+        if: github.event_name != 'pull_request'
+        run: pnpm nx run-many --target=typecheck --all
+
+      - name: Run Eslint
+        run: pnpm nx run-many --target=lint
+
+      - name: Run Build
+        run: pnpm nx run-many --target=build
