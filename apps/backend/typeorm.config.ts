@@ -1,20 +1,22 @@
-import { DataSource, DataSourceOptions } from 'typeorm';
+import { DataSource } from 'typeorm';
 import * as dotenv from 'dotenv';
-import * as path from 'path';
 
-dotenv.config({ path: path.resolve(__dirname, './.env') });
+dotenv.config({
+  path: process.env.NODE_ENV !== 'test' ? '.env.development' : '.env.test',
+});
 
-const dataSourceOptions: DataSourceOptions = {
+// Crear el DataSource con variables de entorno o valores por defecto
+const AppDataSource = new DataSource({
   type: 'postgres',
-  host: process.env.DB_HOST,
-  port: parseInt(process.env.DB_PORT || '5432', 10),
-  username: process.env.DB_USER,
-  password: process.env.DB_PASSWORD,
-  database: process.env.DB_NAME,
-  entities: [path.join(__dirname, 'src/**/!(*.view).entity{.ts,.js}')],
-  migrations: [path.join(__dirname, 'src/database/migrations/*{.ts,.js}')],
-};
-
-const AppDataSource = new DataSource(dataSourceOptions);
+  host: process.env.DB_HOST || 'localhost',
+  port: parseInt(process.env.DB_PORT || '5433', 10),
+  username: process.env.DB_USER || 'postgres',
+  password: process.env.DB_PASSWORD || 'pasword',
+  database: process.env.DB_NAME || 'suba_go',
+  entities: ['apps/backend/src/**/*.entity.ts'],
+  migrations: ['apps/backend/src/database/migrations/*.ts'],
+  synchronize: false,
+  dropSchema: false,
+});
 
 export default AppDataSource;
