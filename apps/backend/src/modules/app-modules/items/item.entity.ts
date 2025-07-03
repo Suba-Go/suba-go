@@ -1,5 +1,5 @@
 import { Entity, Column, ManyToOne } from 'typeorm';
-import { Tenant } from '../tenant/tenant.entity';
+import { Tenant } from '../tenants/tenant.entity';
 import {
   ItemStateEnum,
   LegalStatusEnum,

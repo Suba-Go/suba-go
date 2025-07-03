@@ -56,7 +56,7 @@ async function bootstrap() {
         logger.warn(
           `Too many requests to the API from IP: ${req.ip}, URL: ${req.originalUrl}`
         );
-        res.status(429).send('Muchas peticiones, por favor intenta más tarde.');
+        res.status(415).send('Muchas peticiones, por favor intenta más tarde.');
       },
     })
   );

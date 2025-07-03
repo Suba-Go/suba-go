@@ -1,15 +1,16 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ConfigModule } from '@nestjs/config';
-import { User } from './modules/user/user.entity';
-import { Tenant } from './modules/tenant/tenant.entity';
-import { Company } from './modules/company/company.entity';
-import { Auction } from './modules/auction/auction.entity';
-import { AuctionItem } from './modules/auction-item/auction_item.entity';
-import { Item } from './modules/item/item.entity';
-import { Bid } from './modules/bid/bid.entity';
-import { AuditLog } from './modules/audit-log/audit-log.entity';
-import { Observation } from './modules/observation/observation.entity';
+import { User } from './modules/app-modules/users/user.entity';
+import { Tenant } from './modules/app-modules/tenants/tenant.entity';
+import { Company } from './modules/app-modules/companies/company.entity';
+import { Auction } from './modules/app-modules/auctions/auction.entity';
+import { AuctionItem } from './modules/app-modules/auction-items/auction_item.entity';
+import { Item } from './modules/app-modules/items/item.entity';
+import { Bid } from './modules/app-modules/bids/bids.entity';
+import { AuditLog } from './modules/app-modules/audits-logs/audit-log.entity';
+import { Observation } from './modules/app-modules/observations/observation.entity';
+import { AuthModule } from './modules/providers-modules/auth/auth.module';
 
 @Module({
   imports: [
@@ -38,6 +39,7 @@ import { Observation } from './modules/observation/observation.entity';
       synchronize: process.env.NODE_ENV !== 'production',
       logging: process.env.NODE_ENV === 'development',
     }),
+    AuthModule,
   ],
   controllers: [],
   providers: [],

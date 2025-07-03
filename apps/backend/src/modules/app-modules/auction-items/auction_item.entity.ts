@@ -1,7 +1,7 @@
 import { Entity, Column, ManyToOne } from 'typeorm';
-import { Auction } from '../auction/auction.entity';
-import { Item } from '../item/item.entity';
-import { Tenant } from '../tenant/tenant.entity';
+import { Auction } from '../auctions/auction.entity';
+import { Item } from '../items/item.entity';
+import { Tenant } from '../tenants/tenant.entity';
 import { AuctionItemStateEnum } from '@suba-go/shared-validation/lib/enums/auction-item';
 import { BaseEntity } from '@/common/entities/base.enity';
 import { AuctionItemDto } from '@suba-go/shared-validation/lib/schemas/auction-item.schema';

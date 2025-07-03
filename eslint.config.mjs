@@ -15,7 +15,13 @@ const compat = new FlatCompat({
 
 export default [
   {
-    ignores: ['**/node_modules/', 'dist/*', '**/.next/', '**/.nx/'],
+    ignores: [
+      '**/node_modules/',
+      'dist/*',
+      '**/.next/',
+      '**/.nx/',
+      'libs/shared-components/src/components/ui/**/*',
+    ],
   },
   {
     plugins: {

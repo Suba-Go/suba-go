@@ -33,9 +33,7 @@
   "include": [
     "src/**/*.ts",
     "../../libs/shared-validation/src/**/*.ts",
-    "typeorm.config.ts",
-    "../frontend-suppliers/event-source-polyfill.d.ts",
-    "../../libs/shared-utils/src/lib/supplier-spares-filters-utils.ts"
+    "typeorm.config.ts"
   ],
   "exclude": ["jest.config.ts", "src/**/*.spec.ts", "src/**/*.test.ts"]
 }

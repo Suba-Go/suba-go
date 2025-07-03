@@ -1,7 +1,7 @@
 import { Column } from 'typeorm';
 import { Entity, ManyToOne } from 'typeorm';
-import { Tenant } from '../tenant/tenant.entity';
-import { User } from '../user/user.entity';
+import { Tenant } from '../tenants/tenant.entity';
+import { User } from '../users/user.entity';
 import { AuditLogActionEnum } from '@suba-go/shared-validation/lib/enums/auction-log';
 import { AuditLogDto } from '@suba-go/shared-validation/lib/schemas/audit-log.schema';
 import { BaseEntity } from '@/common/entities/base.enity';

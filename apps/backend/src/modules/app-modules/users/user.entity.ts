@@ -1,6 +1,6 @@
 import { Entity, Column, ManyToOne, Index } from 'typeorm';
-import { Company } from '../company/company.entity';
-import { Tenant } from '../tenant/tenant.entity';
+import { Company } from '../companies/company.entity';
+import { Tenant } from '../tenants/tenant.entity';
 import { BaseEntity } from '@/common/entities/base.enity';
 import { UserDto } from '@suba-go/shared-validation/lib/schemas/user.schema';
 import { UserRolesEnum } from '@suba-go/shared-validation/lib/enums/user';
@@ -9,7 +9,7 @@ import { UserRolesEnum } from '@suba-go/shared-validation/lib/enums/user';
 @Index(['email'], { unique: true, where: '"isDeleted" IS TRUE' })
 @Index(['rut'], { unique: true, where: '"isDeleted" IS TRUE' })
 export class User extends BaseEntity implements UserDto {
-  @ManyToOne(() => Tenant, { nullable: false, onDelete: 'CASCADE' })
+  @ManyToOne(() => Tenant, { nullable: true, onDelete: 'CASCADE' })
   tenant: Tenant;
 
   @ManyToOne(() => Company, { nullable: true })

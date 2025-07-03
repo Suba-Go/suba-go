@@ -6,15 +6,15 @@ import {
 } from '@nestjs/common';
 import { Observable } from 'rxjs';
 import { map } from 'rxjs/operators';
-import { plainToClass } from 'class-transformer';
+import { plainToClass, ClassConstructor } from 'class-transformer';
 
 @Injectable()
 export class SerializeInterceptor implements NestInterceptor {
-  constructor(private dto?: any) {}
+  constructor(private dto?: ClassConstructor<object>) {}
 
-  intercept(context: ExecutionContext, next: CallHandler): Observable<any> {
+  intercept(context: ExecutionContext, next: CallHandler): Observable<object> {
     return next.handle().pipe(
-      map((data: any) => {
+      map((data: object) => {
         if (!this.dto || !data) return data;
         return plainToClass(this.dto, data, {
           excludeExtraneousValues: true,
@@ -26,19 +26,19 @@ export class SerializeInterceptor implements NestInterceptor {
 
 @Injectable()
 export class Serialize implements NestInterceptor {
-  intercept(context: ExecutionContext, next: CallHandler): Observable<any> {
+  intercept(context: ExecutionContext, next: CallHandler): Observable<object> {
     return next.handle();
   }
 }
 
-export function SerializeDecorator(dto?: any) {
+export function SerializeDecorator(dto?: ClassConstructor<object>) {
   return function (
-    target: any,
+    target: object,
     propertyKey: string,
     descriptor: PropertyDescriptor
   ) {
     const originalMethod = descriptor.value;
-    descriptor.value = function (...args: any[]) {
+    descriptor.value = function (...args: unknown[]) {
       const result = originalMethod.apply(this, args);
       if (result instanceof Observable) {
         return result.pipe(

@@ -1,22 +1,22 @@
 import useSWR from 'swr';
 import { useEffect } from 'react';
 
-interface ApiResponse<T = any> {
+interface ApiResponse<T = unknown> {
   success: boolean;
   data?: T;
   error?: string;
   statusCode?: number;
 }
 
-export function useSWRWithRefetch(
+export function useSWRWithRefetch<T = unknown>(
   path: string,
-  serverAction: () => Promise<ApiResponse<any>>,
-  refetchInterval: number,
+  serverAction: () => Promise<ApiResponse<T>>,
+  refetchInterval: number
 ): {
-  data: ApiResponse<any> | undefined;
+  data: ApiResponse<T> | undefined;
   isLoading: boolean;
-  mutate: (data: any) => void;
-  error: any;
+  mutate: (data?: ApiResponse<T>) => void;
+  error: unknown;
 } {
   const { data, isLoading, mutate, error } = useSWR(path, serverAction);
 
@@ -25,7 +25,7 @@ export function useSWRWithRefetch(
       mutate();
     }, refetchInterval);
     return () => clearInterval(interval);
-  }, [path]);
+  }, [path, mutate, refetchInterval]);
 
   return { data, isLoading, mutate, error };
 }

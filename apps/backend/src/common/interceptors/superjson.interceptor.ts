@@ -10,7 +10,7 @@ import superjson from 'superjson';
 
 @Injectable()
 export class SuperJsonInterceptor implements NestInterceptor {
-  intercept(context: ExecutionContext, next: CallHandler): Observable<any> {
+  intercept(context: ExecutionContext, next: CallHandler): Observable<unknown> {
     return next.handle().pipe(
       map((data) => {
         if (data === undefined || data === null) {

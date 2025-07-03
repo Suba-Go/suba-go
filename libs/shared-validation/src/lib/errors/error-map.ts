@@ -1,6 +1,6 @@
 import { z, ZodErrorMap } from 'zod';
 
-export const errorMap: ZodErrorMap = (issue, _ctx) => {
+export const errorMap: ZodErrorMap = (issue) => {
   switch (issue.code) {
     case z.ZodIssueCode.invalid_type:
       return {
@@ -23,7 +23,7 @@ export const errorMessages = {
   too_small: 'Debes ingresar un valor',
   custom: {
     phone:
-      'Debes ingresar un número en formato +56 9 1234 5678 o +56 2 2123 4567',
+      'Debes ingresar un número en formato +56 91234 5678 o +56 2 2123 4567',
     rut: 'Debes ingresar un RUT válido',
     name: 'Debes ingresar un nombre válido',
     email: 'Debes ingresar un email valido',
