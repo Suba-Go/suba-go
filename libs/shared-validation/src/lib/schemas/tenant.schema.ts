@@ -19,8 +19,12 @@ export const tenantCreateSchema = tenantSchema
     updatedAt: true,
     deletedAt: true,
     is_deleted: true,
+    domain: true,
   })
-  .strict();
+  .strict()
+  .extend({
+    subdomain: z.string().min(3).max(20),
+  });
 
 export type TenantDto = z.infer<typeof tenantSchema>;
 export type TenantCreateDto = z.infer<typeof tenantCreateSchema>;

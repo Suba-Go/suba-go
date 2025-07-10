@@ -28,7 +28,7 @@ import { useToast } from '@suba-go/shared-components/components/ui/toaster';
 
 export default function MultiStepForm() {
   const { toast } = useToast();
-  const [currentStep, setCurrentStep] = useState(1);
+  const [currentStep, setCurrentStep] = useState(2);
   const [userData, setUserData] = useState<UserCreateDto>({
     name: '',
     email: '',
@@ -38,16 +38,16 @@ export default function MultiStepForm() {
   const [createdUser, setCreatedUser] = useState<UserSafeDto | null>(null);
   const [tenantData, setTenantData] = useState<TenantCreateDto>({
     name: '',
-    domain: '',
+    subdomain: '',
   });
   const [companyData, setCompanyData] = useState<CompanyCreateDto>({
     name: '',
-    logo: '',
-    principal_color: '',
-    principal_color2: '',
-    secondary_color: '',
-    secondary_color2: '',
-    secondary_color3: '',
+    logo: null,
+    principal_color: null,
+    principal_color2: null,
+    secondary_color: null,
+    secondary_color2: null,
+    secondary_color3: null,
   });
   const [isLoading, setIsLoading] = useState(false);
 
@@ -60,7 +60,6 @@ export default function MultiStepForm() {
         setUserData(data);
         setCurrentStep(2);
       } else {
-        console.log('result', result);
         toast({
           title: 'Error al crear usuario',
           description: result.error,
@@ -68,7 +67,6 @@ export default function MultiStepForm() {
         });
       }
     } catch (error) {
-      console.log('error', error);
       toast({
         title: 'Error al crear usuario',
         description: (error as Error).message,
@@ -97,7 +95,13 @@ export default function MultiStepForm() {
       if (!tenantResult.success) {
         throw new Error(tenantResult.error);
       }
-      setTenantData(tenantResult.data as TenantDto);
+      const tenant = {
+        ...tenantResult.data,
+        domain: `https://${data.tenantData.subdomain}.subago.com`,
+        name: data.tenantData.name,
+        subdomain: data.tenantData.subdomain,
+      };
+      setTenantData(tenant);
 
       // Conectar usuario con empresa
       if (createdUser) {
@@ -159,7 +163,7 @@ export default function MultiStepForm() {
           <FormResult
             userData={createdUser as UserDto}
             companyData={companyData as CompanyDto}
-            tenantData={tenantData as TenantDto}
+            tenantData={tenantData as unknown as TenantDto}
           />
         )}
       </CardContent>
