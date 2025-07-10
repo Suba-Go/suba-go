@@ -12,4 +12,15 @@ export const tenantSchema = baseSchema
   })
   .strict();
 
+export const tenantCreateSchema = tenantSchema
+  .omit({
+    id: true,
+    createdAt: true,
+    updatedAt: true,
+    deletedAt: true,
+    is_deleted: true,
+  })
+  .strict();
+
 export type TenantDto = z.infer<typeof tenantSchema>;
+export type TenantCreateDto = z.infer<typeof tenantCreateSchema>;

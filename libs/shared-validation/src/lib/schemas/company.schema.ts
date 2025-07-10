@@ -17,4 +17,15 @@ export const companySchema = baseSchema
   })
   .strict();
 
+export const companyCreateSchema = companySchema
+  .omit({
+    id: true,
+    createdAt: true,
+    updatedAt: true,
+    deletedAt: true,
+    is_deleted: true,
+  })
+  .strict();
+
 export type CompanyDto = z.infer<typeof companySchema>;
+export type CompanyCreateDto = z.infer<typeof companyCreateSchema>;

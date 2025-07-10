@@ -11,6 +11,9 @@ import { Bid } from './modules/app-modules/bids/bids.entity';
 import { AuditLog } from './modules/app-modules/audits-logs/audit-log.entity';
 import { Observation } from './modules/app-modules/observations/observation.entity';
 import { AuthModule } from './modules/providers-modules/auth/auth.module';
+import { UsersModule } from './modules/app-modules/users/users.module';
+import { CompaniesModule } from './modules/app-modules/companies/companies.module';
+import { TenantsModule } from './modules/app-modules/tenants/tenants.module';
 
 @Module({
   imports: [
@@ -42,6 +45,9 @@ import { AuthModule } from './modules/providers-modules/auth/auth.module';
       migrationsRun: false,
     }),
     AuthModule,
+    UsersModule,
+    CompaniesModule,
+    TenantsModule,
   ],
   controllers: [],
   providers: [],
