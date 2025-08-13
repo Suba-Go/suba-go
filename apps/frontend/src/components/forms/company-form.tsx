@@ -6,21 +6,54 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { Button } from '@suba-go/shared-components/components/ui/button';
 import { Input } from '@suba-go/shared-components/components/ui/input';
 import { Label } from '@suba-go/shared-components/components/ui/label';
-import {
-  CompanyCreateDto,
-  TenantCreateDto,
-  companyCreateSchema,
-  tenantCreateSchema,
-} from '@suba-go/shared-validation';
+import { CompanyCreateDto, TenantCreateDto } from '@suba-go/shared-validation';
 import { z } from 'zod';
+import { useEffect } from 'react';
 
-// Combined schema for both company and tenant data
-const combinedSchema = z.object({
-  companyData: companyCreateSchema,
-  tenantData: tenantCreateSchema,
+// Simplified schema for company name and auto-generated subdomain
+const simplifiedCompanySchema = z.object({
+  companyName: z
+    .string()
+    .min(3, 'El nombre de la empresa debe tener al menos 3 caracteres'),
+  subdomain: z
+    .string()
+    .min(3, 'El subdominio debe tener al menos 3 caracteres'),
+  principal_color: z.string().optional(),
 });
 
-type CombinedFormData = z.infer<typeof combinedSchema>;
+type SimplifiedFormData = z.infer<typeof simplifiedCompanySchema>;
+
+// Cache keys for localStorage
+const CACHE_KEYS = {
+  COMPANY_FORM: 'multiStepForm_companyData',
+} as const;
+
+// Helper functions for cache management
+const saveToCache = (data: SimplifiedFormData) => {
+  try {
+    localStorage.setItem(CACHE_KEYS.COMPANY_FORM, JSON.stringify(data));
+  } catch (error) {
+    console.warn('Failed to save form data to cache:', error);
+  }
+};
+
+const loadFromCache = (): SimplifiedFormData | null => {
+  try {
+    const cached = localStorage.getItem(CACHE_KEYS.COMPANY_FORM);
+    return cached ? JSON.parse(cached) : null;
+  } catch (error) {
+    console.warn('Failed to load form data from cache:', error);
+    return null;
+  }
+};
+
+const clearCache = () => {
+  try {
+    localStorage.removeItem(CACHE_KEYS.COMPANY_FORM);
+  } catch (error) {
+    console.warn('Failed to clear form cache:', error);
+  }
+};
 
 interface CompanyFormProps {
   onSubmit: (data: {
@@ -38,250 +71,134 @@ export default function CompanyForm({
   initialData,
   onBack,
 }: CompanyFormProps) {
+  // Load cached data or use initial data
+  const getCachedOrInitialData = (): SimplifiedFormData => {
+    const cached = loadFromCache();
+    if (cached) {
+      return cached;
+    }
+    return {
+      companyName: initialData.name || '',
+      subdomain: '',
+      principal_color: initialData.principal_color || '#3B82F6',
+    };
+  };
+
   const {
     register,
     handleSubmit,
     formState: { errors, isValid },
     setValue,
     watch,
-  } = useForm<CombinedFormData>({
-    resolver: zodResolver(combinedSchema),
-    defaultValues: {
-      companyData: {
-        name: initialData.name || '',
-        logo: initialData.logo || null,
-        principal_color: initialData.principal_color || null,
-        principal_color2: initialData.principal_color2 || null,
-        secondary_color: initialData.secondary_color || null,
-        secondary_color2: initialData.secondary_color2 || null,
-        secondary_color3: initialData.secondary_color3 || null,
-      },
-      tenantData: {
-        name: '',
-        subdomain: '',
-      },
-    },
+    getValues,
+  } = useForm<SimplifiedFormData>({
+    resolver: zodResolver(simplifiedCompanySchema),
+    defaultValues: getCachedOrInitialData(),
     mode: 'onChange',
   });
 
-  const onFormSubmit = (data: CombinedFormData) => {
-    onSubmit(data);
+  // Auto-generate subdomain from company name
+  const companyName = watch('companyName');
+  const principal_color = watch('principal_color');
+
+  // Auto-generate subdomain when company name changes
+  useEffect(() => {
+    if (companyName) {
+      const subdomain = companyName
+        .toLowerCase()
+        .replace(/[^a-z0-9]/g, '')
+        .substring(0, 20);
+      setValue('subdomain', subdomain);
+    }
+  }, [companyName, setValue]);
+
+  // Save form data to cache whenever form values change
+  useEffect(() => {
+    const currentData = getValues();
+    if (currentData.companyName || currentData.principal_color) {
+      saveToCache(currentData);
+    }
+  }, [companyName, principal_color, getValues]);
+
+  // Handle back button with cache save
+  const handleBack = () => {
+    const currentData = getValues();
+    saveToCache(currentData);
+    onBack();
   };
 
-  const clearColor = (colorField: keyof CompanyCreateDto) => {
-    setValue(`companyData.${colorField}`, null);
+  const onFormSubmit = (data: SimplifiedFormData) => {
+    const companyData: CompanyCreateDto = {
+      name: data.companyName,
+      logo: null,
+      principal_color: data.principal_color || null,
+      principal_color2: null,
+      secondary_color: null,
+      secondary_color2: null,
+      secondary_color3: null,
+    };
+
+    const tenantData: TenantCreateDto = {
+      name: data.companyName,
+      subdomain: data.subdomain,
+    };
+
+    // Clear cache on successful submit
+    clearCache();
+
+    onSubmit({ companyData, tenantData });
   };
 
   return (
-    <form onSubmit={handleSubmit(onFormSubmit)} className="space-y-4">
-      <div className="space-y-2">
-        <Label htmlFor="companyName">Nombre de la Empresa</Label>
-        <Input
-          id="companyName"
-          type="text"
-          {...register('companyData.name')}
-          className={`border-gray-300 focus:border-primary ${
-            errors.companyData?.name
-              ? 'border-red-500 focus:border-red-500'
-              : ''
-          }`}
-        />
-        {errors.companyData?.name && (
-          <p className="text-sm text-red-600 mt-1">
-            {errors.companyData.name.message}
-          </p>
-        )}
-      </div>
-
-      {(() => {
-        return (
-          <div className="space-y-2">
-            <Label htmlFor="domain">Dominio</Label>
-            <div className="flex items-center">
-              <p className="text-lg text-black-500 mt-1">www.</p>
-              <Input
-                id="domain"
-                type="text"
-                {...register('tenantData.subdomain')}
-                placeholder={'subdominio'}
-                className={`border-gray-300 focus:border-primary ${
-                  errors.tenantData?.subdomain
-                    ? 'border-red-500 focus:border-red-500'
-                    : ''
-                }`}
-              />
-              <p className="text-lg text-black-500 mt-1">.subago.com</p>
-            </div>
-            {errors.tenantData?.subdomain && (
-              <p className="text-sm text-red-600 mt-1">
-                {errors.tenantData.subdomain.message}
-              </p>
-            )}
+    <form onSubmit={handleSubmit(onFormSubmit)} className="space-y-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="space-y-2">
+          <Label htmlFor="companyName">Nombre de la Empresa</Label>
+          <Input
+            id="companyName"
+            type="text"
+            {...register('companyName')}
+            placeholder="Ingresa el nombre de tu empresa"
+            className={`border-gray-300 focus:border-primary ${
+              errors.companyName ? 'border-red-500 focus:border-red-500' : ''
+            }`}
+          />
+          {errors.companyName && (
+            <p className="text-sm text-red-600 mt-1">
+              {errors.companyName.message}
+            </p>
+          )}
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="principal_color">Color Principal</Label>
+          <div className="flex items-center space-x-2">
+            <Input
+              id="principal_color"
+              {...register('principal_color')}
+              type="color"
+              className="w-16 h-10 border border-gray-300 rounded cursor-pointer"
+            />
+            <p className="text-sm text-gray-500">
+              Este color se usará como color principal de tu empresa
+            </p>
           </div>
-        );
-      })()}
-
-      <div className="space-y-2">
-        <Label htmlFor="logo">Logo (opcional)</Label>
-        <Input
-          id="logo"
-          type="file"
-          accept="image/*"
-          onChange={(e) => {
-            const file = e.target.files?.[0];
-            if (file) {
-              const reader = new FileReader();
-              reader.onloadend = () => {
-                setValue('companyData.logo', reader.result as string);
-              };
-              reader.readAsDataURL(file);
-            } else {
-              setValue('companyData.logo', null);
-            }
-          }}
-          className="border-gray-300 focus:border-primary"
-        />
-      </div>
-
-      {/* Color Principal */}
-      <div className="space-y-2">
-        <div className="flex items-center justify-between">
-          <Label htmlFor="principal_color">Color Principal (opcional)</Label>
-          {watch('companyData.principal_color') && (
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={() => clearColor('principal_color')}
-              className="text-red-600 hover:text-red-700"
-            >
-              Quitar color
-            </Button>
-          )}
         </div>
-        <Input
-          id="principal_color"
-          type="color"
-          {...register('companyData.principal_color')}
-          className="border-gray-300 focus:border-primary h-12"
-        />
       </div>
 
-      {/* Color Principal 2 */}
-      <div className="space-y-2">
-        <div className="flex items-center justify-between">
-          <Label htmlFor="principal_color2">Color Principal 2 (opcional)</Label>
-          {watch('companyData.principal_color2') && (
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={() => clearColor('principal_color2')}
-              className="text-red-600 hover:text-red-700"
-            >
-              Quitar color
-            </Button>
-          )}
-        </div>
-        <Input
-          id="principal_color2"
-          type="color"
-          {...register('companyData.principal_color2')}
-          className="border-gray-300 focus:border-primary h-12"
-        />
+      <div className="hidden">
+        <Input id="subdomain" type="hidden" {...register('subdomain')} />
       </div>
 
-      {/* Color Secundario */}
-      <div className="space-y-2">
-        <div className="flex items-center justify-between">
-          <Label htmlFor="secondary_color">Color Secundario (opcional)</Label>
-          {watch('companyData.secondary_color') && (
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={() => clearColor('secondary_color')}
-              className="text-red-600 hover:text-red-700"
-            >
-              Quitar color
-            </Button>
-          )}
-        </div>
-        <Input
-          id="secondary_color"
-          type="color"
-          {...register('companyData.secondary_color')}
-          className="border-gray-300 focus:border-primary h-12"
-        />
-      </div>
-
-      {/* Color Secundario 2 */}
-      <div className="space-y-2">
-        <div className="flex items-center justify-between">
-          <Label htmlFor="secondary_color2">
-            Color Secundario 2 (opcional)
-          </Label>
-          {watch('companyData.secondary_color2') && (
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={() => clearColor('secondary_color2')}
-              className="text-red-600 hover:text-red-700"
-            >
-              Quitar color
-            </Button>
-          )}
-        </div>
-        <Input
-          id="secondary_color2"
-          type="color"
-          {...register('companyData.secondary_color2')}
-          className="border-gray-300 focus:border-primary h-12"
-        />
-      </div>
-
-      {/* Color Secundario 3 */}
-      <div className="space-y-2">
-        <div className="flex items-center justify-between">
-          <Label htmlFor="secondary_color3">
-            Color Secundario 3 (opcional)
-          </Label>
-          {watch('companyData.secondary_color3') && (
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={() => clearColor('secondary_color3')}
-              className="text-red-600 hover:text-red-700"
-            >
-              Quitar color
-            </Button>
-          )}
-        </div>
-        <Input
-          id="secondary_color3"
-          type="color"
-          {...register('companyData.secondary_color3')}
-          className="border-gray-300 focus:border-primary h-12"
-        />
-      </div>
-
-      <div className="flex space-x-4">
+      <div className="flex justify-between pt-4">
         <Button
           type="button"
           variant="outline"
-          onClick={onBack}
-          className="flex-1 border-gray-300 text-dark hover:bg-gray-50 bg-transparent"
-          disabled={isLoading}
+          onClick={handleBack}
+          className="px-6"
         >
           Atrás
         </Button>
-        <Button
-          type="submit"
-          className="flex-1 bg-primary hover:bg-primary/90 text-dark"
-          disabled={isLoading || !isValid}
-        >
+        <Button type="submit" disabled={!isValid || isLoading} className="px-6">
           {isLoading ? 'Creando empresa...' : 'Crear Empresa'}
         </Button>
       </div>

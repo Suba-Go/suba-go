@@ -8,10 +8,9 @@ export class TenantCreatorService {
   constructor(private readonly tenantRepository: TenantRepository) {}
 
   async createTenant(tenantData: TenantCreateDto): Promise<Tenant> {
+    const domain = `https://${tenantData.subdomain}.subago.com`;
     // Check if tenant with same domain already exists
-    const existingTenant = await this.tenantRepository.findByDomain(
-      tenantData.domain
-    );
+    const existingTenant = await this.tenantRepository.findByDomain(domain);
 
     if (existingTenant) {
       throw new ConflictException('Ya existe un tenant con este dominio');
@@ -29,7 +28,7 @@ export class TenantCreatorService {
     // Create tenant
     return await this.tenantRepository.create({
       name: tenantData.name,
-      domain: tenantData.domain,
+      domain: domain,
     });
   }
 

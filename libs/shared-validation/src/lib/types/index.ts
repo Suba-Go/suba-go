@@ -3,3 +3,4 @@
  */
 
 export * from './auth.types';
+export * from './trpc.types';

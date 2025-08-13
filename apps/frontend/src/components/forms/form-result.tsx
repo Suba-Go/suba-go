@@ -1,26 +1,13 @@
-import { CompanyDto, TenantDto, UserDto } from '@suba-go/shared-validation';
+import { TenantDto } from '@suba-go/shared-validation';
+import Link from 'next/link';
 
-interface FormResultProps {
-  userData: UserDto;
-  companyData: CompanyDto;
-  tenantData: TenantDto;
-}
-
-export default function FormResult({
-  userData,
-  companyData,
-  tenantData,
-}: FormResultProps) {
+export default function FormResult({ tenantData }: { tenantData: TenantDto }) {
   return (
     <div>
-      <h1>FormResult</h1>
-      <p>User: {userData.name}</p>
-      <p>
-        Company: {companyData.name}, {companyData.logo}
-      </p>
-      <p>
-        Tenant: {tenantData.name}, {tenantData.domain}
-      </p>
+      <h1>Se a creado correctamente tu empresa</h1>
+      <Link href={`${tenantData.domain}`} className="underline text-blue-500">
+        {tenantData.domain}
+      </Link>
     </div>
   );
 }

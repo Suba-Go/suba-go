@@ -4,16 +4,22 @@ import { CompanyCreateDto } from '@suba-go/shared-validation';
 
 @Controller('companies')
 export class CompaniesController {
-  constructor(
-    private readonly companyCreatorService: CompanyCreatorService,
-  ) {}
+  constructor(private readonly companyCreatorService: CompanyCreatorService) {}
+
+  @Post()
+  async createCompanyStandalone(@Body() companyData: CompanyCreateDto) {
+    return await this.companyCreatorService.createCompany(companyData);
+  }
 
   @Post('tenant/:tenantId')
   async createCompany(
     @Body() companyData: CompanyCreateDto,
-    @Param('tenantId') tenantId: string,
+    @Param('tenantId') tenantId: string
   ) {
-    return await this.companyCreatorService.createCompany(companyData, tenantId);
+    return await this.companyCreatorService.createCompany(
+      companyData,
+      tenantId
+    );
   }
 
   @Get('tenant/:tenantId')

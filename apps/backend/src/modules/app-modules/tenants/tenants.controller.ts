@@ -4,9 +4,7 @@ import { TenantCreateDto } from '@suba-go/shared-validation';
 
 @Controller('tenants')
 export class TenantsController {
-  constructor(
-    private readonly tenantCreatorService: TenantCreatorService,
-  ) {}
+  constructor(private readonly tenantCreatorService: TenantCreatorService) {}
 
   @Post()
   async createTenant(@Body() tenantData: TenantCreateDto) {

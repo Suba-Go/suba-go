@@ -10,6 +10,38 @@ import { Input } from '@suba-go/shared-components/components/ui/input';
 import { Label } from '@suba-go/shared-components/components/ui/label';
 import { UserCreateDto, userCreateSchema } from '@suba-go/shared-validation';
 
+// Cache keys for localStorage
+const CACHE_KEYS = {
+  USER_FORM: 'multiStepForm_userData',
+} as const;
+
+// Helper functions for cache management
+const saveUserToCache = (data: UserCreateDto) => {
+  try {
+    localStorage.setItem(CACHE_KEYS.USER_FORM, JSON.stringify(data));
+  } catch (error) {
+    console.warn('Failed to save user form data to cache:', error);
+  }
+};
+
+const loadUserFromCache = (): UserCreateDto | null => {
+  try {
+    const cached = localStorage.getItem(CACHE_KEYS.USER_FORM);
+    return cached ? JSON.parse(cached) : null;
+  } catch (error) {
+    console.warn('Failed to load user form data from cache:', error);
+    return null;
+  }
+};
+
+const clearUserCache = () => {
+  try {
+    localStorage.removeItem(CACHE_KEYS.USER_FORM);
+  } catch (error) {
+    console.warn('Failed to clear user form cache:', error);
+  }
+};
+
 interface UserFormProps {
   onSubmit: (data: UserCreateDto) => void;
   isLoading: boolean;
@@ -21,8 +53,19 @@ export default function UserForm({
   isLoading,
   initialData,
 }: UserFormProps) {
+  // Load cached data or use initial data
+  const getCachedOrInitialData = (): UserCreateDto => {
+    const cached = loadUserFromCache();
+    if (cached) {
+      return cached;
+    }
+    return initialData;
+  };
+
+  const defaultData = getCachedOrInitialData();
+
   const [showConfirmPassword, setShowConfirmPassword] = useState(
-    !!initialData.password
+    !!defaultData.password
   );
 
   const {
@@ -30,19 +73,32 @@ export default function UserForm({
     handleSubmit,
     formState: { errors, isValid },
     watch,
+    getValues,
   } = useForm<UserCreateDto>({
     resolver: zodResolver(userCreateSchema),
-    defaultValues: initialData,
+    defaultValues: defaultData,
     mode: 'onChange', // Enable real-time validation
   });
 
   const passwordValue = watch('password');
+  const nameValue = watch('name');
+  const emailValue = watch('email');
 
   useEffect(() => {
     setShowConfirmPassword(!!passwordValue && passwordValue.length > 0);
   }, [passwordValue]);
 
+  // Save form data to cache whenever form values change
+  useEffect(() => {
+    const currentData = getValues();
+    if (currentData.name || currentData.email || currentData.password) {
+      saveUserToCache(currentData);
+    }
+  }, [nameValue, emailValue, passwordValue, getValues]);
+
   const onFormSubmit = (data: UserCreateDto) => {
+    // Clear cache on successful submit
+    clearUserCache();
     onSubmit(data);
   };
 

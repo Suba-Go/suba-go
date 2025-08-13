@@ -17,25 +17,29 @@ export class CompanyCreatorService {
 
   async createCompany(
     companyData: CompanyCreateDto,
-    tenantId: string
+    tenantId?: string
   ): Promise<Company> {
-    // Validate tenant exists
-    const tenant = await this.tenantRepository.findById(tenantId);
+    let tenant = null;
 
-    if (!tenant) {
-      throw new BadRequestException('El tenant especificado no existe');
-    }
+    if (tenantId) {
+      // Validate tenant exists
+      tenant = await this.tenantRepository.findById(tenantId);
 
-    // Check if company with same name already exists for this tenant
-    const existingCompany = await this.companyRepository.findByNameAndTenant(
-      companyData.name,
-      tenantId
-    );
+      if (!tenant) {
+        throw new BadRequestException('El tenant especificado no existe');
+      }
 
-    if (existingCompany) {
-      throw new ConflictException(
-        'Ya existe una empresa con este nombre en el tenant'
+      // Check if company with same name already exists for this tenant
+      const existingCompany = await this.companyRepository.findByNameAndTenant(
+        companyData.name,
+        tenantId
       );
+
+      if (existingCompany) {
+        throw new ConflictException(
+          'Ya existe una empresa con este nombre en el tenant'
+        );
+      }
     }
 
     // Create company
