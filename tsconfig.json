@@ -1,0 +1,10 @@
+{
+  "compilerOptions": {
+    "baseUrl": ".",
+    "paths": {
+      "@suba-go/shared-components": ["libs/shared-components/src/index.ts"],
+      "@suba-go/shared-components/*": ["libs/shared-components/src/*"]
+    }
+  },
+  "extends": "expo/tsconfig.base"
+}

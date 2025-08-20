@@ -23,8 +23,8 @@ import useSWR from 'swr';
 export const fetchData = async <T>(
   key: string,
   fetchFunction: () => Promise<ApiResponse<T>>,
-  toast: (options: any) => void,
-  errorMessage?: string,
+  toast: (options: unknown) => void,
+  errorMessage?: string
 ): Promise<T> => {
   const response = await fetchFunction();
   if (response.success && response.data !== undefined) {
@@ -63,7 +63,7 @@ export const fetchData = async <T>(
 export const useFetchData = <T>(
   key: string | null,
   fetchFunction: (() => Promise<ApiResponse<T>>) | null,
-  toast: (options: any) => void,
+  toast: (options: unknown) => void,
   options?: {
     errorMessage?: string;
     condition?: boolean | string | null;
@@ -73,7 +73,7 @@ export const useFetchData = <T>(
     dedupingInterval?: number;
     revalidateOnMount?: boolean;
     refreshInterval?: number;
-  },
+  }
 ) => {
   // If condition is explicitly provided, use it, otherwise check if key and fetchFunction exist
   const shouldFetch =
@@ -96,6 +96,6 @@ export const useFetchData = <T>(
       refreshInterval: options?.refreshInterval
         ? options.refreshInterval * 1000
         : undefined,
-    },
+    }
   );
 };
