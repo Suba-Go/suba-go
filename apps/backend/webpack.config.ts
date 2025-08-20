@@ -19,7 +19,7 @@ module.exports = {
       target: 'node',
       compiler: 'tsc',
       main: './src/main.ts',
-      tsConfig: './tsconfig.json',
+      tsConfig: './tsconfig.app.json',
       optimization: false,
       outputHashing: 'none',
       generatePackageJson: true,

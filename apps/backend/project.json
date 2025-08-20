@@ -8,20 +8,16 @@
     "typecheck": {
       "executor": "nx:run-commands",
       "options": {
-        "command": "tsc --project apps/backend/tsconfig.json --noEmit --pretty",
+        "command": "tsc --project apps/backend/tsconfig.app.json --noEmit --pretty",
         "cwd": "."
       }
     },
     "build": {
-      "executor": "@nx/webpack:webpack",
-      "outputs": ["{options.outputPath}"],
+      "executor": "nx:run-commands",
+      "outputs": ["{workspaceRoot}/dist/apps/backend"],
       "options": {
-        "outputPath": "dist/apps/backend",
-        "main": "apps/backend/src/main.ts",
-        "tsConfig": "apps/backend/tsconfig.json",
-        "webpackConfig": "apps/backend/webpack.config.ts",
-        "assets": ["apps/backend/src/assets"],
-        "externalDependencies": "all"
+        "command": "tsc --project apps/backend/tsconfig.app.json --outDir dist/apps/backend",
+        "cwd": "."
       }
     },
     "serve": {

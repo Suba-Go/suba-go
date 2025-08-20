@@ -1,6 +1,5 @@
 //@ts-check
 
- 
 const { composePlugins, withNx } = require('@nx/next');
 
 /**
@@ -28,10 +27,14 @@ const nextConfig = {
   experimental: {
     externalDir: true,
   },
+  compiler: {
+    styledComponents: true,
+  },
   env: {
     BACKEND_URL: process.env.BACKEND_URL,
     AUTH_SECRET: process.env.AUTH_SECRET,
     NEXTAUTH_URL: process.env.NEXTAUTH_URL,
+    NEXTAUTH_SECRET: process.env.NEXTAUTH_SECRET,
   },
 };
 

@@ -12,6 +12,13 @@ on:
 jobs:
   validate-typescript:
     runs-on: ubuntu-latest
+    env:
+      BACKEND_URL: https://dummy-backend-url.com
+      AUTH_SECRET: dummy-secret
+      NEXTAUTH_URL: https://dummy-nextauth-url.com
+      NEXTAUTH_SECRET: dummy-secret
+      AUTH_TRUST_HOST: 'true'
+      NX_NO_CLOUD: 'true'
     steps:
       - name: Checkout repository
         uses: actions/checkout@v3
@@ -27,7 +34,7 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '20.19.2'
           cache: 'pnpm'
           cache-dependency-path: '**/pnpm-lock.yaml'
 
@@ -57,7 +64,7 @@ jobs:
         run: pnpm nx run-many --target=typecheck --all
 
       - name: Run Eslint
-        run: pnpm nx run-many --target=lint
+        run: pnpm nx run-many --target=lint --all
 
       - name: Run Build
-        run: pnpm nx run-many --target=build
+        run: pnpm nx run-many --target=build --all

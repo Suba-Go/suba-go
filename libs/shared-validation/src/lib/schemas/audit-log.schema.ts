@@ -10,7 +10,7 @@ export const auditLogSchema = baseSchema
     entity: z.string(),
     entity_id: z.string(),
     action: z.nativeEnum(AuditLogActionEnum).default(AuditLogActionEnum.CREATE),
-    changes: z.record(z.unknown()),
+    changes: z.any(),
     timestamp: z.date(),
     auction_id: z.string(),
     auction_item_id: z.string(),

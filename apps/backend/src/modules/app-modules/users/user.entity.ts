@@ -21,6 +21,10 @@ export class User extends BaseEntity implements UserDto {
   @Column({ nullable: false }) password: string;
   @Column({ nullable: true }) rut: string;
   @Column({ nullable: true }) public_name: string;
-  @Column({ type: 'enum', enum: UserRolesEnum, default: UserRolesEnum.USER })
+  @Column({
+    type: 'enum',
+    enum: UserRolesEnum,
+    default: UserRolesEnum.AUCTION_MANAGER,
+  })
   role: UserRolesEnum;
 }
