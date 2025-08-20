@@ -64,26 +64,8 @@ async function refreshToken(token: JWT): Promise<JWT | null> {
 }
 
 export const { handlers, signIn, signOut, auth } = NextAuth({
-  trustHost: true,
   pages: {
     signIn: '/login',
-  },
-  callbacks: {
-    async signIn({ user, account, profile, email, credentials }) {
-      // Allow sign in
-      return true;
-    },
-    async session({ session, token }) {
-      // Add custom properties to session if needed
-      return session;
-    },
-    async jwt({ token, user, account, profile, isNewUser }) {
-      // Persist the OAuth access_token to the token right after signin
-      if (user) {
-        token.id = user.id;
-      }
-      return token;
-    },
   },
   secret: AUTH_SECRET,
   providers: [

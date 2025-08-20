@@ -116,7 +116,9 @@ export default function MultiStepForm() {
 
               // Redirect to the user's company domain
               setTimeout(() => {
-                window.location.href = domainResult.data.domain;
+                if (domainResult.data?.domain) {
+                  window.location.href = domainResult.data.domain;
+                }
               }, 1500);
             } else {
               // Show success step if domain not found

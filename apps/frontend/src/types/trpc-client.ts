@@ -24,6 +24,11 @@ export interface AppRouterClient {
     connectToCompanyAndTenant: {
       mutate: (input: ConnectUserInput) => Promise<ApiResponse<UserDto>>;
     };
+    getCompanyDomain: {
+      query: (input: {
+        email: string;
+      }) => Promise<ApiResponse<{ domain: string }>>;
+    };
   };
   company: {
     create: {
