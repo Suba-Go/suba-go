@@ -13,6 +13,11 @@ jobs:
   validate-typescript:
     runs-on: ubuntu-latest
     env:
+      BACKEND_URL: https://dummy-backend-url.com
+      AUTH_SECRET: dummy-secret
+      NEXTAUTH_URL: https://dummy-nextauth-url.com
+      NEXTAUTH_SECRET: dummy-secret
+      AUTH_TRUST_HOST: 'true'
       NX_NO_CLOUD: 'true'
     steps:
       - name: Checkout repository
