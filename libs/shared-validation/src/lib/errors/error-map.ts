@@ -1,7 +1,5 @@
-import { z } from 'zod';
-
 // Error messages for different issue codes
-const MESSAGES: Record<string, string> = {
+export const MESSAGES: Record<string, string> = {
   invalid_type: 'Debes ingresar un valor adecuado',
   too_small: 'Debes ingresar un valor',
   too_big: 'El valor es demasiado grande',

@@ -46,7 +46,7 @@ export class FixTenantDomains1750551000000 implements MigrationInterface {
     }
   }
 
-  public async down(queryRunner: QueryRunner): Promise<void> {
+  public async down(): Promise<void> {
     // This migration is a data cleanup, so we don't need to reverse it
     // The down migration would be complex and not necessary for this fix
     console.log('Down migration not implemented for domain cleanup');

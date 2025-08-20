@@ -28,7 +28,7 @@ export async function generateMetadata({
       title: 'Perfil',
       description: 'Gestiona tu perfil',
     };
-  } catch (error) {
+  } catch {
     return {
       title: 'Perfil',
       description: 'Gestiona tu perfil',

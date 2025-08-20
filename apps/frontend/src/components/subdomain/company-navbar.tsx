@@ -7,17 +7,13 @@ import { Button } from '@suba-go/shared-components/components/ui/button';
 import { useSession, signOut } from 'next-auth/react';
 import { useEffect, useState } from 'react';
 import { User, LogOut, ChevronDown } from 'lucide-react';
-import Link from 'next/link';
 
 interface CompanyNavbarProps {
   company: CompanyDto;
   subdomain: string;
 }
 
-export default function CompanyNavbar({
-  company,
-  subdomain,
-}: CompanyNavbarProps) {
+export default function CompanyNavbar({ company }: CompanyNavbarProps) {
   const primaryColor = company.principal_color || '#3B82F6';
   const { data: session, status } = useSession();
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);

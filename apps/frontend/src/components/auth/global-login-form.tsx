@@ -7,13 +7,7 @@ import { Label } from '@suba-go/shared-components/components/ui/label';
 import { useToast } from '@suba-go/shared-components/components/ui/toaster';
 import Link from 'next/link';
 
-interface GlobalLoginFormProps {
-  onEmailSubmit?: (email: string) => void;
-}
-
-export default function GlobalLoginForm({
-  onEmailSubmit,
-}: GlobalLoginFormProps) {
+export default function GlobalLoginForm() {
   const [email, setEmail] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [errors, setErrors] = useState<{ email?: string }>({});
