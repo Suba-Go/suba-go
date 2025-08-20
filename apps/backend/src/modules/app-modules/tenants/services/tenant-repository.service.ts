@@ -33,6 +33,17 @@ export class TenantRepository {
     });
   }
 
+  async findByCompanyId(companyId: string): Promise<Tenant | null> {
+    // Since Company has ManyToOne to Tenant, we need to find the tenant through the company
+    const result = await this.tenantsRepository
+      .createQueryBuilder('tenant')
+      .innerJoin('company', 'company', 'company.tenantId = tenant.id')
+      .where('company.id = :companyId', { companyId })
+      .getOne();
+
+    return result;
+  }
+
   async findAll(): Promise<Tenant[]> {
     return await this.tenantsRepository.find();
   }

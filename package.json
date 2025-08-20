@@ -102,6 +102,7 @@
     "reflect-metadata": "^0.1.13",
     "rxjs": "^7.8.0",
     "shadcn": "^2.7.0",
+    "styled-jsx": "^5.1.7",
     "superjson": "^2.2.2",
     "swr": "^2.3.3",
     "tailwind-merge": "^3.3.1",

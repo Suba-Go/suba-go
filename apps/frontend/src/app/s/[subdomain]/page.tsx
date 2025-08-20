@@ -1,6 +1,8 @@
 import type { Metadata } from 'next';
-import { protocol, rootDomain } from '@suba-go/shared-components/lib/utils';
-import { CustomLink } from '@suba-go/shared-components/components/ui/link';
+import { rootDomain } from '@suba-go/shared-components/lib/utils';
+import { getCompanyBySubdomainServerAction } from '@/domain/server-actions/company/get-company-by-subdomain-server-action';
+import { notFound } from 'next/navigation';
+import CompanyBrandedPage from '@/components/subdomain/company-branded-page';
 
 export async function generateMetadata({
   params,
@@ -22,20 +24,14 @@ export default async function SubdomainPage({
 }) {
   const { subdomain } = await params;
 
-  return (
-    <div>
-      <div>
-        <CustomLink href={`${protocol}://${rootDomain}`}>Home</CustomLink>
-      </div>
+  // Get company data for this subdomain
+  const companyResult = await getCompanyBySubdomainServerAction(subdomain);
 
-      <div>
-        <div>
-          <h1>
-            Welcome to {subdomain}.{rootDomain}
-          </h1>
-          <p>This is your custom subdomain page</p>
-        </div>
-      </div>
-    </div>
-  );
+  if (!companyResult.success || !companyResult.data) {
+    notFound();
+  }
+
+  const company = companyResult.data;
+
+  return <CompanyBrandedPage company={company} subdomain={subdomain} />;
 }

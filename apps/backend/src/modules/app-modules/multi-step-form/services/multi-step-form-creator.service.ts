@@ -4,6 +4,7 @@ import {
   UserCreateDto,
   CompanyCreateDto,
   TenantCreateDto,
+  UserRolesEnum,
 } from '@suba-go/shared-validation';
 import { User } from '../../users/user.entity';
 import { Company } from '../../companies/company.entity';
@@ -58,11 +59,11 @@ export class MultiStepFormCreatorService {
       }
 
       // Step 3: Create tenant first (within transaction)
-      const baseDomain =
+      // Build domain based on environment
+      const domain =
         process.env.NODE_ENV === 'development'
-          ? `${process.env.FRONTEND_URL}`
-          : 'subago.com';
-      const domain = `https://${data.tenantData.subdomain}.${baseDomain}`;
+          ? `http://${data.tenantData.subdomain}.localhost:3000` // Development: subdomain.localhost:3000
+          : `https://www.${data.tenantData.subdomain}.subago.cl`; // Production: www.subdomain.subago.cl
 
       // Check if tenant with same domain already exists
       const existingTenant = await this.tenantRepository.findByDomain(domain);
@@ -126,7 +127,7 @@ export class MultiStepFormCreatorService {
         password: hashedPassword,
         rut: data.userData.rut,
         public_name: data.userData.public_name,
-        role: data.userData.role,
+        role: UserRolesEnum.AUCTION_MANAGER, // Force AUCTION_MANAGER role
         tenant: savedTenant,
         company: savedCompany,
       });

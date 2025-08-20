@@ -1,29 +1,26 @@
 import { rootDomain } from '@suba-go/shared-components/lib/utils';
 import { NextRequest, NextResponse } from 'next/server';
+import { auth } from './auth';
 
 function extractSubdomain(request: NextRequest): string | null {
   const url = request.url;
   const host = request.headers.get('host') || '';
-  const hostname = host.split(':')[0];
+  const hostname = host.split(':')[0]; // Remove port if present
 
-  // Local development environment
+  // Local development environment (nombre.localhost:3000)
   if (url.includes('localhost') || url.includes('127.0.0.1')) {
-    // Try to extract subdomain from the full URL
-    const fullUrlMatch = url.match(/http:\/\/([^.]+)\.localhost/);
-    if (fullUrlMatch && fullUrlMatch[1]) {
-      return fullUrlMatch[1];
-    }
-
-    // Fallback to host header approach
+    // Extract subdomain from hostname like "nombre.localhost"
     if (hostname.includes('.localhost')) {
-      return hostname.split('.')[0];
+      const subdomain = hostname.split('.localhost')[0];
+      // Exclude 'www' as it's not a tenant subdomain
+      return subdomain !== 'www' ? subdomain : null;
     }
 
     return null;
   }
 
-  // Production environment
-  const rootDomainFormatted = rootDomain.split(':')[0];
+  // Production environment (subago.cl)
+  const rootDomainFormatted = rootDomain.split(':')[0]; // Remove port if present
 
   // Handle preview deployment URLs (tenant---branch-name.vercel.app)
   if (hostname.includes('---') && hostname.endsWith('.vercel.app')) {
@@ -31,7 +28,18 @@ function extractSubdomain(request: NextRequest): string | null {
     return parts.length > 0 ? parts[0] : null;
   }
 
-  // Regular subdomain detection
+  // Handle www.nombre.subago.cl format
+  if (
+    hostname.startsWith('www.') &&
+    hostname.endsWith(`.${rootDomainFormatted}`)
+  ) {
+    const withoutWww = hostname.replace('www.', '');
+    const subdomain = withoutWww.replace(`.${rootDomainFormatted}`, '');
+    // If subdomain is empty, it means it's www.subago.cl (main domain)
+    return subdomain || null;
+  }
+
+  // Handle nombre.subago.cl format (without www)
   const isSubdomain =
     hostname !== rootDomainFormatted &&
     hostname !== `www.${rootDomainFormatted}` &&
@@ -40,13 +48,50 @@ function extractSubdomain(request: NextRequest): string | null {
   return isSubdomain ? hostname.replace(`.${rootDomainFormatted}`, '') : null;
 }
 
-export default async function middleware(request: NextRequest) {
+export default auth(async function middleware(request) {
   const { pathname } = request.nextUrl;
+  const host = request.headers.get('host') || '';
   const subdomain = extractSubdomain(request);
 
+  // Debug logging in development
+  if (process.env.NODE_ENV === 'development') {
+    console.log(
+      `[Middleware] Host: ${host}, Pathname: ${pathname}, Subdomain: ${subdomain}`
+    );
+  }
+
   if (subdomain) {
+    // Check if user is authenticated for subdomain access
+    const session = request.auth;
+
+    // Define public routes that don't require authentication
+    const publicRoutes = ['/api', '/_next', '/favicon.ico', '/login'];
+    const isPublicRoute = publicRoutes.some((route) =>
+      pathname.startsWith(route)
+    );
+
+    // Handle company login page
+    if (pathname === '/login') {
+      // Rewrite /login to /s/[subdomain]/login and preserve query parameters
+      const rewriteUrl = new URL(`/s/${subdomain}/login`, request.url);
+      rewriteUrl.search = request.nextUrl.search; // Preserve query params like ?email=...
+      return NextResponse.rewrite(rewriteUrl);
+    }
+
+    // If not authenticated and not a public route, redirect to company login
+    if (!session && !isPublicRoute) {
+      // Redirect to the company's login page
+      const companyLoginUrl = new URL('/login', request.url);
+      return NextResponse.redirect(companyLoginUrl);
+    }
+
     // Block access to admin page from subdomains
     if (pathname.startsWith('/admin')) {
+      return NextResponse.redirect(new URL('/', request.url));
+    }
+
+    // Block access to global auth pages from subdomains, but allow company login
+    if (pathname.startsWith('/auth') || pathname.startsWith('/register')) {
       return NextResponse.redirect(new URL('/', request.url));
     }
 
@@ -54,11 +99,17 @@ export default async function middleware(request: NextRequest) {
     if (pathname === '/') {
       return NextResponse.rewrite(new URL(`/s/${subdomain}`, request.url));
     }
+
+    // For any other path on a subdomain, redirect to the subdomain root
+    // This ensures that subdomain.domain.com/anything goes to subdomain.domain.com
+    if (pathname !== '/' && !pathname.startsWith('/s/') && !isPublicRoute) {
+      return NextResponse.redirect(new URL('/', request.url));
+    }
   }
 
   // On the root domain, allow normal access
   return NextResponse.next();
-}
+});
 
 export const config = {
   matcher: [

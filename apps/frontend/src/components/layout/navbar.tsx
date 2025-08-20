@@ -42,6 +42,24 @@ export default function Navbar() {
             Estadísticas
           </Button>
         </Link>
+        <Link href="/login">
+          <Button
+            variant="outline"
+            className="text-dark border-soft-white hover:border-primary border-2"
+          >
+            Iniciar Sesión
+          </Button>
+        </Link>
+        {process.env.NODE_ENV === 'development' && (
+          <Link href="/debug-session">
+            <Button
+              variant="ghost"
+              className="text-soft-white hover:text-primary hover:bg-dark/80 text-xs"
+            >
+              Debug
+            </Button>
+          </Link>
+        )}
       </nav>
     </header>
   );

@@ -1,5 +1,4 @@
 import { z } from 'zod';
-import { errorMap } from '../errors/error-map';
 import {
   confirmation_password,
   email,
@@ -13,8 +12,6 @@ import { baseSchema } from './base.schema';
 import { companySchema } from './company.schema';
 import { tenantSchema } from './tenant.schema';
 
-z.setErrorMap(errorMap);
-
 export const userSchema = baseSchema
   .extend({
     name: name,
@@ -23,7 +20,15 @@ export const userSchema = baseSchema
     password: password,
     rut: rut.optional().nullable(),
     public_name: name.optional().nullable(),
-    role: z.nativeEnum(UserRolesEnum).optional().nullable(),
+    role: z
+      .enum([
+        UserRolesEnum.ADMIN,
+        UserRolesEnum.USER,
+        UserRolesEnum.AUCTION_MANAGER,
+      ])
+      .default(UserRolesEnum.AUCTION_MANAGER)
+      .optional()
+      .nullable(),
   })
   .strict();
 

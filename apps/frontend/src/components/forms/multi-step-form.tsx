@@ -19,6 +19,8 @@ import {
   UserDto,
 } from '@suba-go/shared-validation';
 import { createCompleteTrpcAction } from '@/domain/trpc-actions/multi-step-form/create-complete-trpc-action';
+import { getUserCompanyDomainTrpcAction } from '@/domain/trpc-actions/user/get-user-company-domain-trpc-action';
+import { signIn } from 'next-auth/react';
 
 // Cache management for multi-step form
 const clearAllFormCache = () => {
@@ -87,11 +89,58 @@ export default function MultiStepForm() {
 
         toast({
           title: 'Cuenta creada exitosamente',
-          description:
-            'Usuario, empresa y tenant han sido creados correctamente',
+          description: 'Iniciando sesión automáticamente...',
           variant: 'default',
         });
-        setCurrentStep(3);
+
+        // Auto sign-in the user
+        try {
+          const signInResult = await signIn('credentials', {
+            email: userData.email,
+            password: userData.password,
+            redirect: false,
+          });
+
+          if (signInResult?.ok) {
+            // Get user's company domain and redirect
+            const domainResult = await getUserCompanyDomainTrpcAction(
+              userData.email
+            );
+
+            if (domainResult.success && domainResult.data?.domain) {
+              toast({
+                title: 'Bienvenido a tu empresa',
+                description: 'Redirigiendo a tu página personalizada...',
+                variant: 'default',
+              });
+
+              // Redirect to the user's company domain
+              setTimeout(() => {
+                window.location.href = domainResult.data.domain;
+              }, 1500);
+            } else {
+              // Show success step if domain not found
+              setCurrentStep(3);
+            }
+          } else {
+            // Show success step if auto-login fails
+            toast({
+              title: 'Cuenta creada exitosamente',
+              description: 'Puedes iniciar sesión desde la página de login',
+              variant: 'default',
+            });
+            setCurrentStep(3);
+          }
+        } catch (autoLoginError) {
+          console.error('Auto-login failed:', autoLoginError);
+          // Show success step if auto-login fails
+          toast({
+            title: 'Cuenta creada exitosamente',
+            description: 'Puedes iniciar sesión desde la página de login',
+            variant: 'default',
+          });
+          setCurrentStep(3);
+        }
       } else {
         throw new Error(result.error || 'Error desconocido');
       }

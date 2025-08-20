@@ -8,7 +8,11 @@ export class TenantCreatorService {
   constructor(private readonly tenantRepository: TenantRepository) {}
 
   async createTenant(tenantData: TenantCreateDto): Promise<Tenant> {
-    const domain = `https://${tenantData.subdomain}.subago.com`;
+    // Build domain based on environment
+    const domain =
+      process.env.NODE_ENV === 'development'
+        ? `http://${tenantData.subdomain}.localhost:3000` // Development: subdomain.localhost:3000
+        : `https://www.${tenantData.subdomain}.subago.cl`; // Production: www.subdomain.subago.cl
     // Check if tenant with same domain already exists
     const existingTenant = await this.tenantRepository.findByDomain(domain);
 

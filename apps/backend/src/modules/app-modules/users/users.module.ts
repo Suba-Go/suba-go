@@ -6,16 +6,21 @@ import { Company } from '../companies/company.entity';
 import { UsersController } from './users.controller';
 import { UserCreatorService } from './services/user-creator.service';
 import { UserGettersService } from './services/user-getter.service';
+import { UserCompanyGetterService } from './services/user-company-getter.service';
 import { UserRepository } from './services/user-repository.service';
+import { UserLookupService } from './services/user-lookup.service';
+import { UserLookupController } from './controllers/user-lookup.controller';
 import { TenantRepository } from '../tenants/services/tenant-repository.service';
 import { CompanyRepository } from '../companies/services/company-repository.service';
 
 @Module({
   imports: [TypeOrmModule.forFeature([User, Tenant, Company])],
-  controllers: [UsersController],
+  controllers: [UsersController, UserLookupController],
   providers: [
     UserCreatorService,
     UserGettersService,
+    UserCompanyGetterService,
+    UserLookupService,
     UserRepository,
     TenantRepository,
     CompanyRepository,
@@ -23,6 +28,7 @@ import { CompanyRepository } from '../companies/services/company-repository.serv
   exports: [
     UserCreatorService,
     UserGettersService,
+    UserCompanyGetterService,
     UserRepository,
     TenantRepository,
     CompanyRepository,

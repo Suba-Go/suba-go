@@ -28,6 +28,13 @@ export class UserRepository {
     });
   }
 
+  async findByEmailWithRelations(email: string): Promise<User | null> {
+    return await this.usersRepository.findOne({
+      where: { email: Equal(email) },
+      relations: ['tenant', 'company', 'company.tenant'],
+    });
+  }
+
   async findByRut(rut: string): Promise<User | null> {
     return await this.usersRepository.findOne({
       where: { rut },
