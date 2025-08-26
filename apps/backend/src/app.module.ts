@@ -25,11 +25,7 @@ import { TrpcModule } from './trpc/trpc.module';
     }),
     TypeOrmModule.forRoot({
       type: 'postgres',
-      host: process.env.DB_HOST || 'localhost',
-      port: parseInt(process.env.DB_PORT) || 5432,
-      username: process.env.DB_USERNAME || 'postgres',
-      password: process.env.DB_PASSWORD || 'postgres',
-      database: process.env.DB_NAME || 'suba_go',
+      url: process.env.DB_URL,
       entities: [
         User,
         Tenant,
@@ -42,9 +38,21 @@ import { TrpcModule } from './trpc/trpc.module';
         Observation,
       ],
       synchronize: false,
-      logging: false,
+      logging: true, // Enable logging to see connection details
       migrations: ['dist/apps/backend/src/database/migrations/*.js'],
       migrationsRun: false,
+      ssl: { rejectUnauthorized: false }, // Force SSL for Supabase
+      extra: {
+        // Optimized for auction app - high concurrency and real-time features
+        connectionTimeoutMillis: 10000, // Faster timeout for auctions
+        idleTimeoutMillis: 60000, // Keep connections alive during auctions
+        max: 50, // Higher pool size for concurrent bidders
+        min: 5, // Maintain minimum connections
+        acquireTimeoutMillis: 10000, // Quick connection acquisition
+        createTimeoutMillis: 10000,
+        destroyTimeoutMillis: 5000,
+        reapIntervalMillis: 1000, // Frequent cleanup
+      },
     }),
     AuthModule,
     UsersModule,
