@@ -8,7 +8,7 @@ import helmet from 'helmet';
 // import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import * as bodyParser from 'body-parser';
 import { NestExpressApplication } from '@nestjs/platform-express';
-import { initializeTransactionalContext } from 'typeorm-transactional';
+
 import { Serialize } from './common/interceptors/serialize.interceptor';
 import { SuperJsonInterceptor } from './common/interceptors/superjson.interceptor';
 dotenv.config({
@@ -18,7 +18,7 @@ const PORT = parseInt(process.env.PORT) || 3333;
 
 async function bootstrap() {
   const logger = new Logger();
-  initializeTransactionalContext();
+
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
   app.use(helmet());
   //limit 2mb

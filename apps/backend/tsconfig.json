@@ -16,9 +16,7 @@
     "esModuleInterop": true,
     "baseUrl": ".",
     "paths": {
-      "@suba-go/shared-validation": [
-        "../../libs/shared-validation/src/index.ts"
-      ],
+      "@suba-go/shared-validation": ["../../libs/shared-validation/src"],
       "@suba-go/shared-validation/*": ["../../libs/shared-validation/src/*"],
       "@suba-go/shared-components": ["libs/shared-components/src/index.ts"],
       "@suba-go/shared-components/*": ["../../libs/shared-components/src/*"],
@@ -33,10 +31,6 @@
     "emitDecoratorMetadata": true,
     "target": "es2021"
   },
-  "include": [
-    "src/**/*.ts",
-    "../../libs/shared-validation/src/**/*.ts",
-    "typeorm.config.ts"
-  ],
+  "include": ["src/**/*.ts", "../../libs/shared-validation/src/**/*.ts"],
   "exclude": ["jest.config.ts", "src/**/*.spec.ts", "src/**/*.test.ts"]
 }

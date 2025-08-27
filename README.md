@@ -3,7 +3,7 @@
 Suba\&Go es una aplicación fullstack multi-tenant construida con:
 
 - **Frontend:** Next.js + React + Tailwind CSS + shadcn/ui
-- **Backend:** NestJS + TypeORM
+- **Backend:** NestJS + Prisma
 - **Monorepo:** Nx + pnpm
 - **Base de datos:** PostgreSQL 18 con esquemas por inquilino
 
