@@ -45,12 +45,16 @@ jobs:
             **/tsconfig.tsbuildinfo
             **/.next/cache
             **/node_modules/.cache
-          key: ${{ runner.os }}-ts-${{ hashFiles('**/pnpm-lock.yaml', '**/tsconfig*.json') }}
+            **/node_modules/@prisma/client
+          key: ${{ runner.os }}-ts-${{ hashFiles('**/pnpm-lock.yaml', '**/tsconfig*.json', '**/schema.prisma') }}
           restore-keys: |
             ${{ runner.os }}-ts-
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile --ignore-scripts
+
+      - name: Generate Prisma Client
+        run: pnpm prisma generate --schema=apps/backend/prisma/schema.prisma
 
       - name: Run TypeScript type checking (affected projects for PRs)
         if: github.event_name == 'pull_request'
