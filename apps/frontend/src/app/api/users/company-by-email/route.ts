@@ -14,17 +14,15 @@ export async function GET(request: NextRequest) {
   try {
     // Forward request to backend
     const backendUrl = process.env.BACKEND_URL || 'http://localhost:3001';
-    const response = await fetch(
-      `${backendUrl}/api/users/company-by-email?email=${encodeURIComponent(
-        email
-      )}`,
-      {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      }
-    );
+    const fullUrl = `${backendUrl}/api/users/company-by-email?email=${encodeURIComponent(
+      email
+    )}`;
+    const response = await fetch(fullUrl, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    });
 
     if (!response.ok) {
       // Forward the error response from backend
