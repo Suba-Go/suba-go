@@ -6,6 +6,6 @@ moduleAlias.addAliases({
   '@': path.join(__dirname),
   '@suba-go/shared-validation': path.join(
     __dirname,
-    '../../../libs/shared-validation' // <-- sin /src
+    '../../../libs/shared-validation/src'
   ),
 });
