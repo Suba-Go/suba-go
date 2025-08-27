@@ -92,6 +92,7 @@
     "helmet": "^8.1.0",
     "jest": "^30.0.2",
     "lucide-react": "^0.519.0",
+    "module-alias": "^2.2.3",
     "next": "~15.2.4",
     "next-auth": "^5.0.0-beta.19",
     "next-nprogress-bar": "^2.4.7",

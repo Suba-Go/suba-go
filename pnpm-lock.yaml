@@ -89,6 +89,9 @@ importers:
       lucide-react:
         specifier: ^0.519.0
         version: 0.519.0(react@19.0.0)
+      module-alias:
+        specifier: ^2.2.3
+        version: 2.2.3
       next:
         specifier: ~15.2.4
         version: 15.2.5(@babel/core@7.27.4)(babel-plugin-macros@3.1.0)(react-dom@19.0.0(react@19.0.0))(react@19.0.0)(sass@1.89.2)
@@ -6126,6 +6129,9 @@ packages:
     resolution: {integrity: sha512-+hEnITedc8LAtIP9u3HJDFIdcLV2vXP33sqLLIzkv1Db1zO/1OxbvYf0Y1OC/S/Qo5dxHXepofhmxL02PsKe+A==}
     engines: {node: '>=10'}
     hasBin: true
+
+  module-alias@2.2.3:
+    resolution: {integrity: sha512-23g5BFj4zdQL/b6tor7Ji+QY4pEfNH784BMslY9Qb0UnJWRAt+lQGLYmRaM0KDBwIG23ffEBELhZDP2rhi9f/Q==}
 
   ms@2.0.0:
     resolution: {integrity: sha512-Tpp60P6IUJDTuOq/5Z8cdskzJujfwqfOTkrwIwj7IRISpnkJnT6SyJ4PCPnGMoFjC9ddhal5KVIYtAt97ix05A==}
@@ -15671,6 +15677,8 @@ snapshots:
       minimist: 1.2.8
 
   mkdirp@2.1.6: {}
+
+  module-alias@2.2.3: {}
 
   ms@2.0.0: {}
 
