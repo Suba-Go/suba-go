@@ -1,13 +1,13 @@
 import { Injectable } from '@nestjs/common';
-import { User } from '@/modules/app-modules/users/user.entity';
-import { UserRepository } from './user-repository.service';
+import type { User } from '@prisma/client';
+import { UserPrismaRepository } from './user-prisma-repository.service';
 
 /**
  * Service responsible for retrieving user information from the database
  */
 @Injectable()
 export class UserGettersService {
-  constructor(private readonly userRepository: UserRepository) {}
+  constructor(private readonly userRepository: UserPrismaRepository) {}
 
   async getUserWithPasswordByEmail(email: string): Promise<User> {
     return await this.userRepository.findWithPasswordByEmail(email);

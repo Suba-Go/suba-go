@@ -4,7 +4,7 @@ import {
   ItemStateEnum,
   LegalStatusEnum,
 } from '@suba-go/shared-validation/lib/enums/item';
-import { BaseEntity } from '@/common/entities/base.enity';
+import { BaseEntity } from '@/common/entities/base.entity';
 import { ItemDto } from '@suba-go/shared-validation/lib/schemas/item.schema';
 
 @Entity()

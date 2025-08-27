@@ -1,7 +1,7 @@
 import { Entity, Column, ManyToOne, Index } from 'typeorm';
 import { Company } from '../companies/company.entity';
 import { Tenant } from '../tenants/tenant.entity';
-import { BaseEntity } from '@/common/entities/base.enity';
+import { BaseEntity } from '@/common/entities/base.entity';
 import { UserDto } from '@suba-go/shared-validation/lib/schemas/user.schema';
 import { UserRolesEnum } from '@suba-go/shared-validation/lib/enums/user';
 

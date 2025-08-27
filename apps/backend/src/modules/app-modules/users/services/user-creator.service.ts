@@ -4,21 +4,21 @@ import {
   BadRequestException,
 } from '@nestjs/common';
 import * as bcrypt from 'bcrypt';
-import { User } from '../user.entity';
+import type { User } from '@prisma/client';
 import {
   UserCreateDto,
   UserSafeWithCompanyAndTenantDto,
 } from '@suba-go/shared-validation';
-import { UserRepository } from './user-repository.service';
-import { TenantRepository } from '../../tenants/services/tenant-repository.service';
-import { CompanyRepository } from '../../companies/services/company-repository.service';
+import { UserPrismaRepository } from './user-prisma-repository.service';
+import { TenantPrismaRepository } from '../../tenants/services/tenant-prisma-repository.service';
+import { CompanyPrismaRepository } from '../../companies/services/company-prisma-repository.service';
 
 @Injectable()
 export class UserCreatorService {
   constructor(
-    private readonly userRepository: UserRepository,
-    private readonly tenantRepository: TenantRepository,
-    private readonly companyRepository: CompanyRepository
+    private readonly userRepository: UserPrismaRepository,
+    private readonly tenantRepository: TenantPrismaRepository,
+    private readonly companyRepository: CompanyPrismaRepository
   ) {}
 
   async createUser(
@@ -87,9 +87,9 @@ export class UserCreatorService {
       password: hashedPassword,
       rut: userData.rut,
       public_name: userData.public_name,
-      role: userData.role,
-      tenant: tenant,
-      company: company,
+      role: (userData.role as any) || 'AUCTION_MANAGER',
+      tenant: tenant ? { connect: { id: tenant.id } } : undefined,
+      company: company ? { connect: { id: company.id } } : undefined,
     });
   }
 

@@ -4,15 +4,15 @@ import {
   BadRequestException,
 } from '@nestjs/common';
 import { CompanyCreateDto } from '@suba-go/shared-validation';
-import { Company } from '../company.entity';
-import { CompanyRepository } from './company-repository.service';
-import { TenantRepository } from '../../tenants/services/tenant-repository.service';
+import type { Company } from '@prisma/client';
+import { CompanyPrismaRepository } from './company-prisma-repository.service';
+import { TenantPrismaRepository } from '../../tenants/services/tenant-prisma-repository.service';
 
 @Injectable()
 export class CompanyCreatorService {
   constructor(
-    private readonly companyRepository: CompanyRepository,
-    private readonly tenantRepository: TenantRepository
+    private readonly companyRepository: CompanyPrismaRepository,
+    private readonly tenantRepository: TenantPrismaRepository
   ) {}
 
   async createCompany(
@@ -51,7 +51,9 @@ export class CompanyCreatorService {
       secondary_color: companyData.secondary_color,
       secondary_color2: companyData.secondary_color2,
       secondary_color3: companyData.secondary_color3,
-      tenant: tenant,
+      tenant: tenant
+        ? { connect: { id: tenant.id } }
+        : { connect: { id: tenantId } },
     });
   }
 

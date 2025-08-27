@@ -2,7 +2,12 @@
   "extends": "./tsconfig.json",
   "compilerOptions": {
     "outDir": "../../dist/out-tsc",
+    "rootDir": "./src",
+    "baseUrl": ".",
     "module": "commonjs",
+    "paths": {
+      "@/*": ["./src/*"]
+    },
     "types": ["node"],
     "composite": true,
     "declaration": true
@@ -12,9 +17,5 @@
     "../../libs/shared-validation/src/**/*.ts",
     "typeorm.config.ts"
   ],
-  "exclude": [
-    "jest.config.ts",
-    "src/**/*.spec.ts",
-    "src/**/*.test.ts"
-  ]
+  "exclude": ["jest.config.ts", "src/**/*.spec.ts", "src/**/*.test.ts"]
 }

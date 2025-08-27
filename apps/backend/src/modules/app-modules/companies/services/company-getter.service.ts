@@ -1,13 +1,13 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { CompanyRepository } from './company-repository.service';
-import { TenantRepository } from '../../tenants/services/tenant-repository.service';
-import { Company } from '../company.entity';
+import { CompanyPrismaRepository } from './company-prisma-repository.service';
+import { TenantPrismaRepository } from '../../tenants/services/tenant-prisma-repository.service';
+import type { Company } from '@prisma/client';
 
 @Injectable()
 export class CompanyGetterService {
   constructor(
-    private readonly companyRepository: CompanyRepository,
-    private readonly tenantRepository: TenantRepository
+    private readonly companyRepository: CompanyPrismaRepository,
+    private readonly tenantRepository: TenantPrismaRepository
   ) {}
 
   async getCompanyBySubdomain(subdomain: string): Promise<Company> {

@@ -1,6 +1,6 @@
 import { Column, Entity, ManyToOne } from 'typeorm';
 import { User } from '../users/user.entity';
-import { BaseEntity } from '@/common/entities/base.enity';
+import { BaseEntity } from '@/common/entities/base.entity';
 import { Tenant } from '../tenants/tenant.entity';
 import { AuctionItem } from '../auction-items/auction_item.entity';
 import { BidDto } from '@suba-go/shared-validation/lib/schemas/bid.schema';

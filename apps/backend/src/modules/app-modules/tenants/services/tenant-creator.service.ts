@@ -1,11 +1,11 @@
 import { Injectable, ConflictException } from '@nestjs/common';
 import { TenantCreateDto } from '@suba-go/shared-validation';
-import { Tenant } from '../tenant.entity';
-import { TenantRepository } from './tenant-repository.service';
+import type { Tenant } from '@prisma/client';
+import { TenantPrismaRepository } from './tenant-prisma-repository.service';
 
 @Injectable()
 export class TenantCreatorService {
-  constructor(private readonly tenantRepository: TenantRepository) {}
+  constructor(private readonly tenantRepository: TenantPrismaRepository) {}
 
   async createTenant(tenantData: TenantCreateDto): Promise<Tenant> {
     // Build domain based on environment

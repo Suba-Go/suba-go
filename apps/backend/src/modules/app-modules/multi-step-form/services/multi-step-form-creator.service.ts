@@ -1,17 +1,15 @@
 import { Injectable, BadRequestException } from '@nestjs/common';
-import { DataSource } from 'typeorm';
 import {
   UserCreateDto,
   CompanyCreateDto,
   TenantCreateDto,
   UserRolesEnum,
 } from '@suba-go/shared-validation';
-import { User } from '../../users/user.entity';
-import { Company } from '../../companies/company.entity';
-import { Tenant } from '../../tenants/tenant.entity';
-import { UserRepository } from '../../users/services/user-repository.service';
-import { CompanyRepository } from '../../companies/services/company-repository.service';
-import { TenantRepository } from '../../tenants/services/tenant-repository.service';
+import type { User, Company, Tenant } from '@prisma/client';
+import { UserPrismaRepository } from '../../users/services/user-prisma-repository.service';
+import { CompanyPrismaRepository } from '../../companies/services/company-prisma-repository.service';
+import { TenantPrismaRepository } from '../../tenants/services/tenant-prisma-repository.service';
+import { PrismaService } from '../../../providers-modules/prisma/prisma.service';
 import * as bcrypt from 'bcrypt';
 
 export interface MultiStepFormData {
@@ -29,17 +27,17 @@ export interface MultiStepFormResult {
 @Injectable()
 export class MultiStepFormCreatorService {
   constructor(
-    private readonly dataSource: DataSource,
-    private readonly userRepository: UserRepository,
-    private readonly companyRepository: CompanyRepository,
-    private readonly tenantRepository: TenantRepository
+    private readonly prisma: PrismaService,
+    private readonly userRepository: UserPrismaRepository,
+    private readonly companyRepository: CompanyPrismaRepository,
+    private readonly tenantRepository: TenantPrismaRepository
   ) {}
 
   async createCompleteAccount(
     data: MultiStepFormData
   ): Promise<MultiStepFormResult> {
-    // Use a database transaction to ensure atomicity
-    return await this.dataSource.transaction(async (manager) => {
+    // Use Prisma transaction to ensure atomicity
+    return await this.prisma.executeTransaction(async (prisma) => {
       // Step 1: Validate that user doesn't already exist
       const existingUser = await this.userRepository.findByEmail(
         data.userData.email
@@ -79,18 +77,20 @@ export class MultiStepFormCreatorService {
         throw new BadRequestException('Ya existe un tenant con este nombre');
       }
 
-      const tenant = manager.create(Tenant, {
-        name: data.tenantData.name,
-        domain: domain,
+      // Step 4: Create tenant (within transaction)
+      const savedTenant = await prisma.tenant.create({
+        data: {
+          name: data.tenantData.name,
+          domain: domain,
+        },
       });
-      const savedTenant = await manager.save(tenant);
 
-      // Step 4: Create company with tenant reference (within transaction)
+      // Step 5: Create company with tenant reference (within transaction)
       // Check if company with same name already exists for this tenant
-      const existingCompany = await manager.findOne(Company, {
+      const existingCompany = await prisma.company.findFirst({
         where: {
           name: data.companyData.name,
-          tenant: { id: savedTenant.id },
+          tenantId: savedTenant.id,
           isDeleted: false,
         },
       });
@@ -101,37 +101,39 @@ export class MultiStepFormCreatorService {
         );
       }
 
-      const company = manager.create(Company, {
-        name: data.companyData.name,
-        logo: data.companyData.logo,
-        principal_color: data.companyData.principal_color,
-        principal_color2: data.companyData.principal_color2,
-        secondary_color: data.companyData.secondary_color,
-        secondary_color2: data.companyData.secondary_color2,
-        secondary_color3: data.companyData.secondary_color3,
-        tenant: savedTenant,
+      const savedCompany = await prisma.company.create({
+        data: {
+          name: data.companyData.name,
+          logo: data.companyData.logo,
+          principal_color: data.companyData.principal_color,
+          principal_color2: data.companyData.principal_color2,
+          secondary_color: data.companyData.secondary_color,
+          secondary_color2: data.companyData.secondary_color2,
+          secondary_color3: data.companyData.secondary_color3,
+          tenantId: savedTenant.id,
+        },
       });
-      const savedCompany = await manager.save(company);
 
-      // Step 5: Create user with tenant and company references (within transaction)
+      // Step 6: Create user with tenant and company references (within transaction)
       const saltRounds = 10;
       const hashedPassword = await bcrypt.hash(
         data.userData.password,
         saltRounds
       );
 
-      const user = manager.create(User, {
-        name: data.userData.name,
-        email: data.userData.email,
-        phone: data.userData.phone,
-        password: hashedPassword,
-        rut: data.userData.rut,
-        public_name: data.userData.public_name,
-        role: UserRolesEnum.AUCTION_MANAGER, // Force AUCTION_MANAGER role
-        tenant: savedTenant,
-        company: savedCompany,
+      const savedUser = await prisma.user.create({
+        data: {
+          name: data.userData.name,
+          email: data.userData.email,
+          phone: data.userData.phone,
+          password: hashedPassword,
+          rut: data.userData.rut,
+          public_name: data.userData.public_name,
+          role: 'AUCTION_MANAGER', // Force AUCTION_MANAGER role
+          tenantId: savedTenant.id,
+          companyId: savedCompany.id,
+        },
       });
-      const savedUser = await manager.save(user);
 
       return {
         user: savedUser,

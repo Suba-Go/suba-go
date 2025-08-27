@@ -1,5 +1,13 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { UserRepository } from './user-repository.service';
+import { UserPrismaRepository } from './user-prisma-repository.service';
+
+// Define User with relations type for this service
+type UserWithRelations = {
+  id: string;
+  email: string;
+  tenant?: { domain: string };
+  company?: { name: string; tenant?: { domain: string } };
+};
 
 interface CompanyLookupResult {
   companyDomain: string;
@@ -9,14 +17,16 @@ interface CompanyLookupResult {
 
 @Injectable()
 export class UserLookupService {
-  constructor(private readonly userRepository: UserRepository) {}
+  constructor(private readonly userRepository: UserPrismaRepository) {}
 
   async findCompanyByUserEmail(
     email: string
   ): Promise<CompanyLookupResult | null> {
     try {
       // Find user by email with company and tenant relations
-      const user = await this.userRepository.findByEmailWithRelations(email);
+      const user = (await this.userRepository.findByEmailWithRelations(
+        email
+      )) as UserWithRelations;
 
       if (!user) {
         return null;

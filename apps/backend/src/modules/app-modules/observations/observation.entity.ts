@@ -1,6 +1,6 @@
 import { Entity, Column, ManyToOne } from 'typeorm';
 import { Tenant } from '../tenants/tenant.entity';
-import { BaseEntity } from '@/common/entities/base.enity';
+import { BaseEntity } from '@/common/entities/base.entity';
 import { ObservationDto } from '@suba-go/shared-validation/lib/schemas/observation.schema';
 
 @Entity()

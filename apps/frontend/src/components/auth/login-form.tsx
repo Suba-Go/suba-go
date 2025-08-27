@@ -80,7 +80,6 @@ export default function LoginForm() {
         'authjs.csrf-token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/; domain=.localhost;';
       document.cookie =
         'authjs.callback-url=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/; domain=.localhost;';
-      console.log('[LoginForm] Cleared existing cookies for all domains');
     }
 
     try {
@@ -97,16 +96,6 @@ export default function LoginForm() {
           variant: 'destructive',
         });
       } else if (result?.ok) {
-        console.log('[LoginForm] Login successful, checking cookies...');
-
-        // Check if cookies were set correctly
-        if (process.env.NODE_ENV === 'development') {
-          const cookies = document.cookie;
-          console.log('[LoginForm] Cookies after login:', cookies);
-          const hasSessionToken = cookies.includes('authjs.session-token');
-          console.log('[LoginForm] Session token set:', hasSessionToken);
-        }
-
         toast({
           title: 'Inicio de sesión exitoso',
           description: 'Redirigiendo a tu empresa...',

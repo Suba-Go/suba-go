@@ -8,7 +8,7 @@ import {
 } from '@nestjs/common';
 import { ExtractJwt } from 'passport-jwt';
 import { AuthService } from './services/auth.service';
-import { User } from '@/modules/app-modules/users/user.entity';
+import type { User } from '@prisma/client';
 import { Tokens } from '@suba-go/shared-validation';
 import { LocalAuthGuard } from '@/common/guards/local-auth.guard';
 import { PublicGuard } from '@/common/guards/public.guard';

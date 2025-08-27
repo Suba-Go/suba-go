@@ -1,6 +1,6 @@
 import { Entity, Column, ManyToOne, Index } from 'typeorm';
 import { Tenant } from '../tenants/tenant.entity';
-import { BaseEntity } from '@/common/entities/base.enity';
+import { BaseEntity } from '@/common/entities/base.entity';
 import { CompanyDto } from '@suba-go/shared-validation/lib/schemas/company.schema';
 
 @Entity()

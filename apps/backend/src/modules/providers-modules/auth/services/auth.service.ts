@@ -1,5 +1,5 @@
 import { UserGettersService } from '@/modules/app-modules/users/services/user-getter.service';
-import { User } from '@/modules/app-modules/users/user.entity';
+import type { User } from '@prisma/client';
 import { Injectable, Logger, UnauthorizedException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';

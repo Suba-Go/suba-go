@@ -8,11 +8,7 @@ export default function DebugSessionPage() {
   const [cookies, setCookies] = useState('');
 
   useEffect(() => {
-    // Get all cookies
     setCookies(document.cookie);
-
-    // Log cookies to console for debugging
-    console.log('[DebugSession] All cookies:', document.cookie);
   }, []);
 
   return (

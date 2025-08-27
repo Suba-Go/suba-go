@@ -45,7 +45,6 @@ export default function GlobalLoginForm() {
       const response = await fetch(
         `/api/users/company-by-email?email=${encodeURIComponent(email)}`
       );
-      console.log('response', response);
 
       if (!response.ok) {
         if (response.status === 404) {

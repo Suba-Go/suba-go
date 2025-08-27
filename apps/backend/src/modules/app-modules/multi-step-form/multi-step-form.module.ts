@@ -1,20 +1,16 @@
 import { Module } from '@nestjs/common';
-import { TypeOrmModule } from '@nestjs/typeorm';
-import { User } from '../users/user.entity';
-import { Company } from '../companies/company.entity';
-import { Tenant } from '../tenants/tenant.entity';
 import { MultiStepFormCreatorService } from './services/multi-step-form-creator.service';
-import { UserRepository } from '../users/services/user-repository.service';
-import { CompanyRepository } from '../companies/services/company-repository.service';
-import { TenantRepository } from '../tenants/services/tenant-repository.service';
+import { UserPrismaRepository } from '../users/services/user-prisma-repository.service';
+import { CompanyPrismaRepository } from '../companies/services/company-prisma-repository.service';
+import { TenantPrismaRepository } from '../tenants/services/tenant-prisma-repository.service';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([User, Company, Tenant])],
+  imports: [],
   providers: [
     MultiStepFormCreatorService,
-    UserRepository,
-    CompanyRepository,
-    TenantRepository,
+    UserPrismaRepository,
+    CompanyPrismaRepository,
+    TenantPrismaRepository,
   ],
   exports: [MultiStepFormCreatorService],
 })

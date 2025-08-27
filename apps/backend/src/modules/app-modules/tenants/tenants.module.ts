@@ -1,14 +1,12 @@
 import { Module } from '@nestjs/common';
-import { TypeOrmModule } from '@nestjs/typeorm';
-import { Tenant } from './tenant.entity';
 import { TenantsController } from './tenants.controller';
 import { TenantCreatorService } from './services/tenant-creator.service';
-import { TenantRepository } from './services/tenant-repository.service';
+import { TenantPrismaRepository } from './services/tenant-prisma-repository.service';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([Tenant])],
+  imports: [],
   controllers: [TenantsController],
-  providers: [TenantCreatorService, TenantRepository],
-  exports: [TenantCreatorService, TenantRepository],
+  providers: [TenantCreatorService, TenantPrismaRepository],
+  exports: [TenantCreatorService, TenantPrismaRepository],
 })
 export class TenantsModule {}

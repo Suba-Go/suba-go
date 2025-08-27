@@ -9,7 +9,7 @@ dotenv.config({
 const AppDataSource = new DataSource({
   type: 'postgres',
   url:
-    process.env.DB_URL ||
+    process.env.POSTGRES_URL ||
     'postgresql://postgres:postgres@localhost:5432/suba_go',
   entities: ['apps/backend/src/**/*.entity.ts'],
   migrations: ['apps/backend/src/database/migrations/*.ts'],

@@ -4,7 +4,7 @@ import { Tenant } from '../tenants/tenant.entity';
 import { User } from '../users/user.entity';
 import { AuditLogActionEnum } from '@suba-go/shared-validation/lib/enums/auction-log';
 import { AuditLogDto } from '@suba-go/shared-validation/lib/schemas/audit-log.schema';
-import { BaseEntity } from '@/common/entities/base.enity';
+import { BaseEntity } from '@/common/entities/base.entity';
 
 @Entity()
 export class AuditLog extends BaseEntity implements AuditLogDto {
