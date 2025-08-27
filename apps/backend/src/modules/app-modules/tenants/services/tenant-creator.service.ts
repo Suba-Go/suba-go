@@ -12,7 +12,7 @@ export class TenantCreatorService {
     const domain =
       process.env.NODE_ENV === 'development'
         ? `http://${tenantData.subdomain}.localhost:3000` // Development: subdomain.localhost:3000
-        : `https://www.${tenantData.subdomain}.subago.cl`; // Production: www.subdomain.subago.cl
+        : `https://${tenantData.subdomain}.subago.cl`; // Production: subdomain.subago.cl
     // Check if tenant with same domain already exists
     const existingTenant = await this.tenantRepository.findByDomain(domain);
 
