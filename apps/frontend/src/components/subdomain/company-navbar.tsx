@@ -13,7 +13,7 @@ interface CompanyNavbarProps {
   subdomain: string;
 }
 
-export default function CompanyNavbar({ company }: CompanyNavbarProps) {
+export default function CompanyNavbar({ company, subdomain }: CompanyNavbarProps) {
   const primaryColor = company.principal_color || '#3B82F6';
   const { data: session, status } = useSession();
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
@@ -50,8 +50,7 @@ export default function CompanyNavbar({ company }: CompanyNavbarProps) {
 
   const handleProfileClick = () => {
     setIsProfileMenuOpen(false);
-    // Navigate to profile page (you can implement this route later)
-    window.location.href = '/perfil';
+    window.location.href = `/s/${subdomain}/perfil`;
   };
 
   return (
