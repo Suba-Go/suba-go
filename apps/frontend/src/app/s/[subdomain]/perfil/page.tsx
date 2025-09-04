@@ -120,7 +120,13 @@ export default async function ProfilePage({ params }: ProfilePageProps) {
 
           {/* Columna Derecha - Información del Usuario */}
           <div className="bg-white rounded-lg shadow p-6">
-            <ProfileFormWithUserData company={company} />
+            <ProfileFormWithUserData 
+              company={{
+                id: company.id,
+                name: company.name,
+                principal_color: company.principal_color || undefined
+              }} 
+            />
           </div>
         </div>
       </div>

@@ -60,9 +60,18 @@ export const userSafeWithCompanyAndTenantSchema = userSafeSchema.extend({
   tenant: tenantSchema,
 });
 
+export const userUpdateProfileSchema = z.object({
+  name: name.optional(),
+  email: email.optional(),
+  phone: phone.optional().nullable(),
+  rut: rut.optional().nullable(),
+  public_name: name.optional().nullable(),
+}).strict();
+
 export type UserDto = z.infer<typeof userSchema>;
 export type UserCreateDto = z.infer<typeof userCreateSchema>;
 export type UserSafeDto = z.infer<typeof userSafeSchema>;
 export type UserSafeWithCompanyAndTenantDto = z.infer<
   typeof userSafeWithCompanyAndTenantSchema
 >;
+export type UserUpdateProfileDto = z.infer<typeof userUpdateProfileSchema>;

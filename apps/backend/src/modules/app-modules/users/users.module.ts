@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { UsersController } from './users.controller';
 import { UserCreatorService } from './services/user-creator.service';
 import { UserGettersService } from './services/user-getter.service';
+import { UserUpdaterService } from './services/user-updater.service';
 import { UserCompanyGetterService } from './services/user-company-getter.service';
 import { UserPrismaRepository } from './services/user-prisma-repository.service';
 import { UserLookupService } from './services/user-lookup.service';
@@ -15,6 +16,7 @@ import { CompanyPrismaRepository } from '../companies/services/company-prisma-re
   providers: [
     UserCreatorService,
     UserGettersService,
+    UserUpdaterService,
     UserCompanyGetterService,
     UserLookupService,
     UserPrismaRepository,
@@ -24,6 +26,7 @@ import { CompanyPrismaRepository } from '../companies/services/company-prisma-re
   exports: [
     UserCreatorService,
     UserGettersService,
+    UserUpdaterService,
     UserCompanyGetterService,
     UserPrismaRepository,
     TenantPrismaRepository,
