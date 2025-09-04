@@ -6,6 +6,18 @@ import { useState, useEffect } from 'react';
 import { updateUserProfileAction } from '@/domain/server-actions/user/update-profile';
 import { useToast } from '@suba-go/shared-components/components/ui/toaster';
 
+// Función para oscurecer un color para el boton volver que tiene el color de la empresa
+function darkenColor(color: string, percent: number): string {
+  const num = parseInt(color.replace("#", ""), 16);
+  const amt = Math.round(2.55 * percent);
+  const R = (num >> 16) - amt;
+  const G = (num >> 8 & 0x00FF) - amt;
+  const B = (num & 0x0000FF) - amt;
+  return "#" + (0x1000000 + (R < 255 ? R < 1 ? 0 : R : 255) * 0x10000 +
+    (G < 255 ? G < 1 ? 0 : G : 255) * 0x100 +
+    (B < 255 ? B < 1 ? 0 : B : 255)).toString(16).slice(1);
+}
+
 interface ProfileFormWithUserDataProps {
   company: {
     id: string;
@@ -266,7 +278,19 @@ export default function ProfileFormWithUserData({ company }: ProfileFormWithUser
       <div className="flex justify-end space-x-4 pt-4">
         <button 
           onClick={handleGoBack}
-          className="px-4 py-2 text-gray-600 border border-gray-300 rounded-md hover:bg-gray-50 transition-colors"
+          className="px-4 py-2 text-white rounded-md transition-colors"
+          style={{
+            backgroundColor: company.principal_color || '#3B82F6',
+            borderColor: company.principal_color || '#3B82F6',
+          }}
+          onMouseEnter={(e) => {
+            const color = company.principal_color || '#3B82F6';
+            e.currentTarget.style.backgroundColor = darkenColor(color, 10);
+          }}
+          onMouseLeave={(e) => {
+            const color = company.principal_color || '#3B82F6';
+            e.currentTarget.style.backgroundColor = color;
+          }}
         >
           Volver
         </button>
@@ -275,7 +299,7 @@ export default function ProfileFormWithUserData({ company }: ProfileFormWithUser
           <>
             <button 
               onClick={handleCancel}
-              className="px-4 py-2 text-gray-600 border border-gray-300 rounded-md hover:bg-gray-50 transition-colors"
+              className="px-4 py-2 bg-red-500 text-white border border-red-500 rounded-md hover:bg-red-600 transition-colors"
             >
               Cancelar
             </button>
