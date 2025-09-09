@@ -139,7 +139,6 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         
         
         if (hasChanges) {
-          console.log('Updating JWT token with new user data');
           const newToken = {
             tokens: token.tokens,
             updatedAt: Date.now(),

@@ -5,18 +5,9 @@ import { useRouter } from 'next/navigation';
 import { useState, useEffect } from 'react';
 import { updateUserProfileAction } from '@/domain/server-actions/user/update-profile';
 import { useToast } from '@suba-go/shared-components/components/ui/toaster';
+import { Button } from '@suba-go/shared-components/components/ui/button';
+import { darkenColor } from '@/utils/color-utils';
 
-// Función para oscurecer un color para el boton volver que tiene el color de la empresa
-function darkenColor(color: string, percent: number): string {
-  const num = parseInt(color.replace("#", ""), 16);
-  const amt = Math.round(2.55 * percent);
-  const R = (num >> 16) - amt;
-  const G = (num >> 8 & 0x00FF) - amt;
-  const B = (num & 0x0000FF) - amt;
-  return "#" + (0x1000000 + (R < 255 ? R < 1 ? 0 : R : 255) * 0x10000 +
-    (G < 255 ? G < 1 ? 0 : G : 255) * 0x100 +
-    (B < 255 ? B < 1 ? 0 : B : 255)).toString(16).slice(1);
-}
 
 interface ProfileFormWithUserDataProps {
   company: {
@@ -93,9 +84,6 @@ export default function ProfileFormWithUserData({ company }: ProfileFormWithUser
       });
 
       if (result.success) {
-        console.log('Profile updated successfully, updating session...');
-        console.log('New user data:', { name: userData.name, email: userData.email });
-        
         // Actualizar la sesión de NextAuth con los nuevos datos
         await update({
           user: {
@@ -107,7 +95,6 @@ export default function ProfileFormWithUserData({ company }: ProfileFormWithUser
           }
         });
 
-        console.log('Session updated successfully');
 
         toast({
           title: 'Perfil actualizado',
@@ -276,48 +263,50 @@ export default function ProfileFormWithUserData({ company }: ProfileFormWithUser
 
       {/* Botones de acción */}
       <div className="flex justify-end space-x-4 pt-4">
-        <button 
+        <Button 
           onClick={handleGoBack}
           className="px-4 py-2 text-white rounded-md transition-colors"
           style={{
-            backgroundColor: company.principal_color || '#3B82F6',
-            borderColor: company.principal_color || '#3B82F6',
+            backgroundColor: company.principal_color,
+            borderColor: company.principal_color,
           }}
           onMouseEnter={(e) => {
-            const color = company.principal_color || '#3B82F6';
-            e.currentTarget.style.backgroundColor = darkenColor(color, 10);
+            if (company.principal_color) {
+              e.currentTarget.style.backgroundColor = darkenColor(company.principal_color, 10);
+            }
           }}
           onMouseLeave={(e) => {
-            const color = company.principal_color || '#3B82F6';
-            e.currentTarget.style.backgroundColor = color;
+            if (company.principal_color) {
+              e.currentTarget.style.backgroundColor = company.principal_color;
+            }
           }}
         >
           Volver
-        </button>
+        </Button>
         
         {isEditing ? (
           <>
-            <button 
+            <Button 
               onClick={handleCancel}
               className="px-4 py-2 bg-red-500 text-white border border-red-500 rounded-md hover:bg-red-600 transition-colors"
             >
               Cancelar
-            </button>
-            <button 
+            </Button>
+            <Button 
               onClick={handleSave}
               disabled={isLoading}
               className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {isLoading ? 'Guardando...' : 'Guardar Cambios'}
-            </button>
+            </Button>
           </>
         ) : (
-          <button 
+          <Button 
             onClick={handleEdit}
             className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
           >
             Editar
-          </button>
+          </Button>
         )}
       </div>
     </div>
