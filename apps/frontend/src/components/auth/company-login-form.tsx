@@ -70,6 +70,62 @@ export default function CompanyLoginForm({
 
     setIsLoading(true);
 
+    // SECURITY: Validate that the email belongs to this tenant before attempting login
+    if (companyName) {
+      try {
+        const validationResponse = await fetch(
+          `/api/users/validate-email-for-tenant?email=${encodeURIComponent(
+            formData.email
+          )}&subdomain=${encodeURIComponent(companyName)}`
+        );
+
+        if (validationResponse.ok) {
+          const validationData = await validationResponse.json();
+          // Check if the validation was successful and the email is valid
+          if (validationData.success && validationData.data) {
+            if (!validationData.data.isValid) {
+              toast({
+                title: 'Acceso denegado',
+                description:
+                  validationData.data.message ||
+                  'Este email no pertenece a esta empresa',
+                variant: 'destructive',
+              });
+              setIsLoading(false);
+              return;
+            }
+          } else {
+            // Handle case where validation data structure is unexpected
+            toast({
+              title: 'Error de validación',
+              description: 'Error al validar el email',
+              variant: 'destructive',
+            });
+            setIsLoading(false);
+            return;
+          }
+        } else {
+          // If validation fails, show error and stop login
+          toast({
+            title: 'Error de validación',
+            description: 'No se pudo validar el acceso a esta empresa',
+            variant: 'destructive',
+          });
+          setIsLoading(false);
+          return;
+        }
+      } catch (error) {
+        console.error('Email validation error:', error);
+        toast({
+          title: 'Error de validación',
+          description: 'No se pudo validar el acceso a esta empresa',
+          variant: 'destructive',
+        });
+        setIsLoading(false);
+        return;
+      }
+    }
+
     // Clear any existing session cookies before login
     if (process.env.NODE_ENV === 'development') {
       // Clear cookies for both localhost and .localhost domain

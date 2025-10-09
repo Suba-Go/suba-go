@@ -1,7 +1,7 @@
 export enum LegalStatusEnum {
   TRANSFERIBLE = 'Transferible',
   LEASING = 'Leasing',
-  POSIBILIDAD_DE_ENBARGO = 'Posibilidad de enbargo',
+  POSIBILIDAD_DE_EMBARGO = 'Posibilidad de embargo',
   PRENDA = 'Prenda',
   OTRO = 'Otro',
 }

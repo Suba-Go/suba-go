@@ -13,6 +13,10 @@ export class UserGettersService {
     return await this.userRepository.findWithPasswordByEmail(email);
   }
 
+  async getUserWithPasswordAndRelationsByEmail(email: string): Promise<User> {
+    return await this.userRepository.findByEmailWithRelations(email);
+  }
+
   async getUserById(id: string): Promise<User> {
     return await this.userRepository.findById(id);
   }

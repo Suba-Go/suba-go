@@ -7,6 +7,7 @@ import { AuthService } from './services/auth.service';
 import { UserGettersService } from '@/modules/app-modules/users/services/user-getter.service';
 import { UserPrismaRepository } from '@/modules/app-modules/users/services/user-prisma-repository.service';
 import { LocalStrategy } from '@/common/guards/local-auth.strategy';
+import { JwtStrategy } from '@/common/guards/jwt.strategy';
 
 @Module({
   imports: [
@@ -29,6 +30,7 @@ import { LocalStrategy } from '@/common/guards/local-auth.strategy';
     UserGettersService,
     UserPrismaRepository,
     LocalStrategy,
+    JwtStrategy,
   ],
   exports: [AuthService, UserGettersService],
 })

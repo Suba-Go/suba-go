@@ -127,7 +127,9 @@ export class BidPrismaRepository {
     });
   }
 
-  async findHighestBidForAuctionItem(auctionItemId: string): Promise<Bid | null> {
+  async findHighestBidForAuctionItem(
+    auctionItemId: string
+  ): Promise<Bid | null> {
     return this.prisma.bid.findFirst({
       where: {
         auctionItemId,
@@ -198,6 +200,7 @@ export class BidPrismaRepository {
   // Transaction method for placing bids with validation
   async placeBidWithValidation(data: {
     userId: string;
+    auctionId: string;
     auctionItemId: string;
     tenantId: string;
     offered_price: number;
@@ -215,7 +218,10 @@ export class BidPrismaRepository {
       });
 
       // Validate bid amount
-      if (highestBid && data.offered_price <= Number(highestBid.offered_price)) {
+      if (
+        highestBid &&
+        data.offered_price <= Number(highestBid.offered_price)
+      ) {
         throw new Error('Bid amount must be higher than current highest bid');
       }
 
@@ -223,6 +229,7 @@ export class BidPrismaRepository {
       return prisma.bid.create({
         data: {
           userId: data.userId,
+          auctionId: data.auctionId,
           auctionItemId: data.auctionItemId,
           tenantId: data.tenantId,
           offered_price: data.offered_price,

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import superjson from 'superjson';
 
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
@@ -32,17 +33,20 @@ export async function GET(request: NextRequest) {
       return NextResponse.json(errorData, { status: response.status });
     }
 
-    const rawData = await response.json();
+    const data = await response.json();
 
-    // Handle SuperJSON response if present
-    let data;
-    if (rawData.superjson && rawData.superjson.json) {
-      data = rawData.superjson.json;
-    } else {
-      data = rawData;
+    // Handle superjson format from backend
+    let deserializedData = data;
+    if (data && data.superjson) {
+      try {
+        deserializedData = superjson.deserialize(data.superjson);
+      } catch (error) {
+        console.error('Failed to deserialize superjson response:', error);
+        deserializedData = data;
+      }
     }
 
-    return NextResponse.json(data);
+    return NextResponse.json(deserializedData);
   } catch (error) {
     console.error('Error proxying request to backend:', error);
     return NextResponse.json(

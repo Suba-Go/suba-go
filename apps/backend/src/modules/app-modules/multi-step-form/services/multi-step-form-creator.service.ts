@@ -3,7 +3,6 @@ import {
   UserCreateDto,
   CompanyCreateDto,
   TenantCreateDto,
-  UserRolesEnum,
 } from '@suba-go/shared-validation';
 import type { User, Company, Tenant } from '@prisma/client';
 import { UserPrismaRepository } from '../../users/services/user-prisma-repository.service';

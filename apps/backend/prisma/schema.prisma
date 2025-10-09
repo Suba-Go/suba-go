@@ -23,17 +23,26 @@ enum ItemStateEnum {
   DISPONIBLE
   EN_SUBASTA
   VENDIDO
-  RETIRADO
+  ELIMINADO
 
   @@map("item_state_enum")
 }
 
 enum LegalStatusEnum {
-  LEGAL
-  ILEGAL
-  PENDIENTE
+  TRANSFERIBLE
+  LEASING
+  POSIBILIDAD_DE_EMBARGO
+  PRENDA
+  OTRO
 
   @@map("legal_status_enum")
+}
+
+enum AuctionTypeEnum {
+  TEST
+  REAL
+
+  @@map("auction_type_enum")
 }
 
 // Base model with common fields matching TypeORM BaseEntity
@@ -133,6 +142,7 @@ model Item {
   kilometraje  Int?
   legal_status LegalStatusEnum?
   state        ItemStateEnum @default(DISPONIBLE)
+  basePrice    Decimal? @db.Decimal(10, 2)
 
   // Relations
   tenantId     String
@@ -155,11 +165,13 @@ model Auction {
   startTime   DateTime
   endTime     DateTime
   status      String   @default("PENDING")
+  type        AuctionTypeEnum @default(REAL)
 
   // Relations
   tenantId    String
   tenant      Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   items       AuctionItem[]
+  bids        Bid[]
 
   @@map("auction")
 }
@@ -200,6 +212,8 @@ model Bid {
   tenant        Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   userId        String
   user          User @relation(fields: [userId], references: [id])
+  auctionId     String
+  auction       Auction @relation(fields: [auctionId], references: [id])
   auctionItemId String
   auctionItem   AuctionItem @relation(fields: [auctionItemId], references: [id])
 
