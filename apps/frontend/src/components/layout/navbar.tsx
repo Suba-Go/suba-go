@@ -9,10 +9,10 @@ export default function Navbar() {
     <header className="flex h-16 w-full items-center justify-between px-4 md:px-6 bg-dark border-b border-gray-800">
       <Link href="/" className="flex items-center space-x-2">
         <Image
-          src="/logo-black.jpeg"
+          src="/logo-black.png"
           alt="Suba&Go Logo"
-          width={32}
-          height={32}
+          width={50}
+          height={50}
         />
         <span className="text-xl font-bold text-soft-white">Suba&Go</span>
       </Link>
@@ -50,16 +50,6 @@ export default function Navbar() {
             Iniciar Sesión
           </Button>
         </Link>
-        {process.env.NODE_ENV === 'development' && (
-          <Link href="/debug-session">
-            <Button
-              variant="ghost"
-              className="text-soft-white hover:text-primary hover:bg-dark/80 text-xs"
-            >
-              Debug
-            </Button>
-          </Link>
-        )}
       </nav>
     </header>
   );

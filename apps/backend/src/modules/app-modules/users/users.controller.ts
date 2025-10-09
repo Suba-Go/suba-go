@@ -1,16 +1,19 @@
-import { Controller, Post, Body, Param, Get } from '@nestjs/common';
+import { Controller, Post, Body, Param, Get, Patch } from '@nestjs/common';
 import { UserCreatorService } from './services/user-creator.service';
 import { UserGettersService } from './services/user-getter.service';
+import { UserUpdaterService } from './services/user-updater.service';
 import {
   UserCreateDto,
   UserSafeWithCompanyAndTenantDto,
+  UserUpdateProfileDto,
 } from '@suba-go/shared-validation';
 
 @Controller('users')
 export class UsersController {
   constructor(
     private readonly userCreatorService: UserCreatorService,
-    private readonly userGettersService: UserGettersService
+    private readonly userGettersService: UserGettersService,
+    private readonly userUpdaterService: UserUpdaterService
   ) {}
 
   @Post()
@@ -56,5 +59,13 @@ export class UsersController {
     return await this.userCreatorService.connectUserToCompanyAndTenant(
       userData
     );
+  }
+
+  @Patch(':id/profile')
+  async updateUserProfile(
+    @Param('id') id: string,
+    @Body() updateData: UserUpdateProfileDto
+  ) {
+    return await this.userUpdaterService.updateUserProfile(id, updateData);
   }
 }

@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../../providers-modules/prisma/prisma.service';
-import type { Item, Prisma } from '@prisma/client';
+import type { Item, Prisma, ItemStateEnum } from '@prisma/client';
 
 @Injectable()
 export class ItemPrismaRepository {
@@ -46,7 +46,7 @@ export class ItemPrismaRepository {
 
   async findByState(state: string, tenantId?: string): Promise<Item[]> {
     const where: Prisma.ItemWhereInput = {
-      state: state as any,
+      state: state as ItemStateEnum,
       isDeleted: false,
     };
 

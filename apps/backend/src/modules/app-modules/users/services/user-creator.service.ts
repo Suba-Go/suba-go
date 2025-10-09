@@ -5,6 +5,7 @@ import {
 } from '@nestjs/common';
 import * as bcrypt from 'bcrypt';
 import type { User } from '@prisma/client';
+import { UserRoleEnum } from '@prisma/client';
 import {
   UserCreateDto,
   UserSafeWithCompanyAndTenantDto,
@@ -87,7 +88,7 @@ export class UserCreatorService {
       password: hashedPassword,
       rut: userData.rut,
       public_name: userData.public_name,
-      role: (userData.role as any) || 'AUCTION_MANAGER',
+      role: (userData.role as UserRoleEnum) || UserRoleEnum.AUCTION_MANAGER,
       tenant: tenant ? { connect: { id: tenant.id } } : undefined,
       company: company ? { connect: { id: company.id } } : undefined,
     });

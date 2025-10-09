@@ -6,8 +6,14 @@ import { AuthModule } from './modules/providers-modules/auth/auth.module';
 import { UsersModule } from './modules/app-modules/users/users.module';
 import { CompaniesModule } from './modules/app-modules/companies/companies.module';
 import { TenantsModule } from './modules/app-modules/tenants/tenants.module';
+import { AuctionsModule } from './modules/app-modules/auctions/auctions.module';
+import { ItemsModule } from './modules/app-modules/items/items.module';
+import { ParticipantsModule } from './modules/app-modules/participants/participants.module';
+import { BidsModule } from './modules/app-modules/bids/bids.module';
+import { WebSocketModule } from './modules/app-modules/websocket/websocket.module';
 import { MultiStepFormModule } from './modules/app-modules/multi-step-form/multi-step-form.module';
 import { TrpcModule } from './trpc/trpc.module';
+import { WebsocketsModule } from './modules/providers-modules/websockets/websockets.module';
 
 @Module({
   imports: [
@@ -20,8 +26,14 @@ import { TrpcModule } from './trpc/trpc.module';
     UsersModule,
     CompaniesModule,
     TenantsModule,
+    AuctionsModule,
+    ItemsModule,
+    ParticipantsModule,
+    BidsModule,
+    WebSocketModule,
     MultiStepFormModule,
     TrpcModule,
+    WebsocketsModule,
   ],
   controllers: [],
   providers: [],

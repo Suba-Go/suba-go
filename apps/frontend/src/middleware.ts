@@ -50,15 +50,7 @@ function extractSubdomain(request: NextRequest): string | null {
 
 export default auth(async function middleware(request) {
   const { pathname } = request.nextUrl;
-  const host = request.headers.get('host') || '';
   const subdomain = extractSubdomain(request);
-
-  // Debug logging in development
-  if (process.env.NODE_ENV === 'development') {
-    console.log(
-      `[Middleware] Host: ${host}, Pathname: ${pathname}, Subdomain: ${subdomain}`
-    );
-  }
 
   if (subdomain) {
     // Check if user is authenticated for subdomain access
@@ -83,6 +75,58 @@ export default auth(async function middleware(request) {
       // Redirect to the company's login page
       const companyLoginUrl = new URL('/login', request.url);
       return NextResponse.redirect(companyLoginUrl);
+    }
+
+    // SECURITY: If user is authenticated, verify they belong to this tenant
+    if (session && !isPublicRoute) {
+      // Get tenant domain from user's tenant (stored as full URL)
+      const userTenantDomain = session.user?.tenant?.domain;
+
+      if (!userTenantDomain) {
+        console.warn(
+          `[SECURITY] User ${session.user?.email} has no tenant domain`
+        );
+        const protocol = request.url.includes('localhost') ? 'http' : 'https';
+        const rootDomain = request.url.includes('localhost')
+          ? 'localhost:3000'
+          : 'subago.cl';
+        const globalLoginUrl = new URL('/login', `${protocol}://${rootDomain}`);
+        return NextResponse.redirect(globalLoginUrl);
+      }
+
+      // Extract subdomain from the full domain URL
+      let extractedSubdomain = userTenantDomain;
+
+      // If domain is a full URL, extract just the subdomain part
+      if (userTenantDomain.includes('://')) {
+        try {
+          const url = new URL(userTenantDomain);
+          const hostname = url.hostname;
+          // Extract subdomain (everything before the first dot)
+          extractedSubdomain = hostname.split('.')[0];
+        } catch (error) {
+          console.error('Error parsing domain URL:', error);
+          // Fallback: try to extract subdomain manually
+          extractedSubdomain = userTenantDomain
+            .replace(/^https?:\/\//, '')
+            .split('.')[0];
+        }
+      }
+      // If the extracted subdomain doesn't match the current subdomain
+      if (extractedSubdomain !== subdomain) {
+        // Log security violation for monitoring
+        console.warn(
+          `[SECURITY] User ${session.user?.email} attempted to access ${subdomain} but belongs to ${extractedSubdomain}`
+        );
+
+        // Redirect to global login to force re-authentication
+        const protocol = request.url.includes('localhost') ? 'http' : 'https';
+        const rootDomain = request.url.includes('localhost')
+          ? 'localhost:3000'
+          : 'subago.cl';
+        const globalLoginUrl = new URL('/login', `${protocol}://${rootDomain}`);
+        return NextResponse.redirect(globalLoginUrl);
+      }
     }
 
     // Block access to admin page from subdomains

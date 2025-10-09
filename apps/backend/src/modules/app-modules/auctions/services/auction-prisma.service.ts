@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../../providers-modules/prisma/prisma.service';
-import type { Auction, Bid } from '@prisma/client';
+import type { Auction, Bid, AuctionTypeEnum } from '@prisma/client';
 
 @Injectable()
 export class AuctionPrismaService {
@@ -13,6 +13,7 @@ export class AuctionPrismaService {
     startTime: Date;
     endTime: Date;
     tenantId: string;
+    type?: AuctionTypeEnum;
   }): Promise<Auction> {
     return this.prisma.auction.create({
       data,
@@ -109,6 +110,7 @@ export class AuctionPrismaService {
     auctionId: string;
     auctionItemId: string;
     amount: number;
+    tenantId: string;
   }): Promise<Bid> {
     return this.prisma.executeTransaction(async (prisma) => {
       // Check if auction is still active
@@ -132,12 +134,12 @@ export class AuctionPrismaService {
           isDeleted: false,
         },
         orderBy: {
-          amount: 'desc',
+          offered_price: 'desc',
         },
       });
 
       // Validate bid amount
-      if (highestBid && data.amount <= Number(highestBid.amount)) {
+      if (highestBid && data.amount <= Number(highestBid.offered_price)) {
         throw new Error('Bid amount must be higher than current highest bid');
       }
 
@@ -147,7 +149,9 @@ export class AuctionPrismaService {
           userId: data.userId,
           auctionId: data.auctionId,
           auctionItemId: data.auctionItemId,
-          amount: data.amount,
+          offered_price: data.amount,
+          tenantId: data.tenantId,
+          bid_time: new Date(),
         },
         include: {
           user: {
@@ -208,6 +212,192 @@ export class AuctionPrismaService {
     });
   }
 
+  // Get auctions by tenant
+  async getAuctionsByTenant(tenantId: string): Promise<Auction[]> {
+    return this.prisma.auction.findMany({
+      where: {
+        tenantId,
+        isDeleted: false,
+      },
+      include: {
+        items: {
+          include: {
+            item: true,
+            bids: {
+              take: 1,
+              orderBy: {
+                offered_price: 'desc',
+              },
+            },
+          },
+        },
+      },
+      orderBy: {
+        createdAt: 'desc',
+      },
+    });
+  }
+
+  // Update auction
+  async updateAuction(id: string, data: Partial<Auction>): Promise<Auction> {
+    return this.prisma.auction.update({
+      where: { id },
+      data,
+      include: {
+        tenant: true,
+        items: {
+          include: {
+            item: true,
+            bids: {
+              include: {
+                user: {
+                  select: {
+                    id: true,
+                    email: true,
+                  },
+                },
+              },
+              orderBy: {
+                createdAt: 'desc',
+              },
+            },
+          },
+        },
+      },
+    });
+  }
+
+  // Delete auction (soft delete)
+  async deleteAuction(id: string): Promise<void> {
+    await this.prisma.auction.update({
+      where: { id },
+      data: {
+        isDeleted: true,
+        deletedAt: new Date(),
+      },
+    });
+  }
+
+  // Update auction status
+  async updateAuctionStatus(id: string, status: string): Promise<Auction> {
+    return this.prisma.auction.update({
+      where: { id },
+      data: { status },
+      include: {
+        tenant: true,
+        items: {
+          include: {
+            item: true,
+            bids: {
+              include: {
+                user: {
+                  select: {
+                    id: true,
+                    email: true,
+                  },
+                },
+              },
+              orderBy: {
+                createdAt: 'desc',
+              },
+            },
+          },
+        },
+      },
+    });
+  }
+
+  // Get auction statistics
+  async getAuctionStats(tenantId: string): Promise<{
+    totalAuctions: number;
+    activeAuctions: number;
+    totalParticipants: number;
+    totalRevenue: number;
+  }> {
+    const [totalAuctions, activeAuctions, participantsResult, revenueResult] =
+      await Promise.all([
+        // Total auctions
+        this.prisma.auction.count({
+          where: {
+            tenantId,
+            isDeleted: false,
+          },
+        }),
+
+        // Active auctions
+        this.prisma.auction.count({
+          where: {
+            tenantId,
+            status: 'ACTIVE',
+            isDeleted: false,
+          },
+        }),
+
+        // Total unique participants
+        this.prisma.bid.findMany({
+          where: {
+            auctionItem: {
+              auction: {
+                tenantId,
+                isDeleted: false,
+              },
+            },
+            isDeleted: false,
+          },
+          select: {
+            userId: true,
+          },
+          distinct: ['userId'],
+        }),
+
+        // Total revenue (sum of winning bids)
+        this.prisma.bid.aggregate({
+          where: {
+            auctionItem: {
+              auction: {
+                tenantId,
+                status: 'CLOSED',
+                isDeleted: false,
+              },
+            },
+            isDeleted: false,
+          },
+          _sum: {
+            offered_price: true,
+          },
+        }),
+      ]);
+
+    return {
+      totalAuctions,
+      activeAuctions,
+      totalParticipants: participantsResult.length,
+      totalRevenue: Number(revenueResult._sum.offered_price) || 0,
+    };
+  }
+
+  // Add items to auction
+  async addItemsToAuction(auctionId: string, itemIds: string[]): Promise<void> {
+    // Create AuctionItem records for each selected item
+    const auctionItems = itemIds.map((itemId) => ({
+      auctionId,
+      itemId,
+      startingBid: 0, // Default starting bid, could be made configurable
+      reservePrice: null, // Optional reserve price
+    }));
+
+    await this.prisma.auctionItem.createMany({
+      data: auctionItems,
+    });
+  }
+
+  // Remove all items from auction
+  async removeAllItemsFromAuction(auctionId: string): Promise<void> {
+    await this.prisma.auctionItem.deleteMany({
+      where: { auctionId },
+    });
+  }
+
   // Close auction and determine winners
   async closeAuction(auctionId: string): Promise<Auction> {
     return this.prisma.executeTransaction(async (prisma) => {
@@ -220,7 +410,7 @@ export class AuctionPrismaService {
             include: {
               bids: {
                 orderBy: {
-                  amount: 'desc',
+                  offered_price: 'desc',
                 },
                 take: 1,
                 include: {
@@ -236,7 +426,6 @@ export class AuctionPrismaService {
       // - Send notifications to winners
       // - Update item statuses
       // - Create audit logs
-      // - Process payments
 
       return auction;
     });

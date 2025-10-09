@@ -1,16 +1,14 @@
 'use client';
 
 import { CompanyDto } from '@suba-go/shared-validation';
-import CompanyNavbar from './company-navbar';
 
 interface CompanyBrandedPageProps {
   company: CompanyDto;
-  subdomain: string;
+  subdomain?: string;
 }
 
 export default function CompanyBrandedPage({
   company,
-  subdomain,
 }: CompanyBrandedPageProps) {
   const primaryColor = company.principal_color || '#3B82F6'; // Default blue if no color set
 
@@ -32,9 +30,6 @@ export default function CompanyBrandedPage({
           --company-primary-dark: ${darkenColor(primaryColor, 20)};
         }
       `}</style>
-
-      {/* Company Navbar */}
-      <CompanyNavbar company={company} subdomain={subdomain} />
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
         <div className="text-center">

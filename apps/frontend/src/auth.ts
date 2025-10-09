@@ -129,13 +129,29 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         return { ...token, ...user, updatedAt: Date.now() };
       }
 
-      if (trigger === 'update' && session.user.name !== token.user.name) {
-        const newToken = {
-          tokens: token.tokens,
-          updatedAt: Date.now(),
-          user: { ...token.user, name: session.user.name },
-        };
-        return newToken;
+      if (trigger === 'update') {
+        // Check if any user data has changed
+        const hasChanges = 
+          session.user.name !== token.user.name || 
+          session.user.email !== token.user.email ||
+          session.user.phone !== token.user.phone ||
+          session.user.rut !== token.user.rut;
+        
+        
+        if (hasChanges) {
+          const newToken = {
+            tokens: token.tokens,
+            updatedAt: Date.now(),
+            user: { 
+              ...token.user, 
+              name: session.user.name,
+              email: session.user.email,
+              phone: session.user.phone,
+              rut: session.user.rut
+            },
+          };
+          return newToken;
+        }
       }
 
       const currentTime = new Date().getTime();

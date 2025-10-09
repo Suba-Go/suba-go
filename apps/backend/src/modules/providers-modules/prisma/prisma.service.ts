@@ -22,6 +22,7 @@ export class PrismaService implements OnModuleInit, OnModuleDestroy {
     if (process.env.PRISMA_DATABASE_URL?.startsWith('prisma')) {
       this.prismaWithAccelerate = this.createAcceleratedClient();
     } else {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       this.prismaWithAccelerate = this.prisma as any;
     }
   }
@@ -93,9 +94,12 @@ export class PrismaService implements OnModuleInit, OnModuleDestroy {
   }
 
   // Transaction helper
-  async executeTransaction<T>(fn: (prisma: any) => Promise<T>): Promise<T> {
+  async executeTransaction<T>(
+    fn: (prisma: PrismaClient) => Promise<T>
+  ): Promise<T> {
     return this.prisma.$transaction(async (prisma) => {
-      return fn(prisma);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      return fn(prisma as any);
     });
   }
 }
