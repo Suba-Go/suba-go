@@ -4,8 +4,8 @@ import type { User, Prisma } from '@prisma/client';
 
 // Define User with relations type
 type UserWithRelations = User & {
-  tenant?: any;
-  company?: any;
+  tenant?: { id: string; name: string; domain: string };
+  company?: { id: string; name: string; principal_color?: string };
 };
 
 @Injectable()

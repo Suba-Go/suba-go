@@ -4,12 +4,11 @@ import { CompanyDto } from '@suba-go/shared-validation';
 
 interface CompanyBrandedPageProps {
   company: CompanyDto;
-  subdomain: string;
+  subdomain?: string;
 }
 
 export default function CompanyBrandedPage({
   company,
-  subdomain,
 }: CompanyBrandedPageProps) {
   const primaryColor = company.principal_color || '#3B82F6'; // Default blue if no color set
 

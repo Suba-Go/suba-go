@@ -14,5 +14,5 @@
     "declaration": true
   },
   "include": ["src/**/*.ts", "../../libs/shared-validation/src/**/*.ts"],
-  "exclude": ["jest.config.ts", "src/**/*.spec.ts", "src/**/*.test.ts"]
+  "exclude": ["src/**/*.spec.ts", "src/**/*.test.ts"]
 }

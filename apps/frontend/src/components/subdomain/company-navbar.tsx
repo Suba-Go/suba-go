@@ -2,18 +2,22 @@
 
 import { CompanyDto } from '@suba-go/shared-validation';
 import { protocol, rootDomain } from '@suba-go/shared-components/lib/utils';
-import { CustomLink } from '@suba-go/shared-components/components/ui/link';
+
 import { Button } from '@suba-go/shared-components/components/ui/button';
 import { useSession, signOut } from 'next-auth/react';
 import { useEffect, useState } from 'react';
-import { User, LogOut, ChevronDown } from 'lucide-react';
+import { User, LogOut, ChevronDown, Gavel, Package } from 'lucide-react';
+import Link from 'next/link';
 
 interface CompanyNavbarProps {
   company: CompanyDto;
   subdomain: string;
 }
 
-export default function CompanyNavbar({ company, subdomain }: CompanyNavbarProps) {
+export default function CompanyNavbar({
+  company,
+  subdomain,
+}: CompanyNavbarProps) {
   const primaryColor = company.principal_color || '#3B82F6';
   const { data: session, status } = useSession();
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
@@ -35,7 +39,7 @@ export default function CompanyNavbar({ company, subdomain }: CompanyNavbarProps
     setIsProfileMenuOpen(false);
     await signOut({ redirect: false });
     // Redirect to company login after sign out
-    window.location.href = '/login';
+    handleLoginRedirect();
   };
 
   const handleLoginRedirect = () => {
@@ -73,34 +77,37 @@ export default function CompanyNavbar({ company, subdomain }: CompanyNavbarProps
 
           {/* Navigation Menu */}
           <nav className="hidden md:flex items-center space-x-6">
-            <Button
-              variant="ghost"
-              className="text-gray-600 hover:text-gray-900"
-            >
-              Subastas
-            </Button>
-            <Button
-              variant="ghost"
-              className="text-gray-600 hover:text-gray-900"
-            >
-              Catálogo
-            </Button>
-            <Button
-              variant="ghost"
-              className="text-gray-600 hover:text-gray-900"
-            >
-              Contacto
-            </Button>
+            <Link href={`/s/${subdomain}/subastas`}>
+              <Button
+                variant="ghost"
+                className="text-gray-600 hover:text-gray-900 flex items-center gap-2"
+              >
+                <Gavel className="h-4 w-4" />
+                Subastas
+              </Button>
+            </Link>
+            {/* Productos - Solo para AUCTION_MANAGER */}
+            {session?.user?.role === 'AUCTION_MANAGER' && (
+              <Link href={`/s/${subdomain}/productos`}>
+                <Button
+                  variant="ghost"
+                  className="text-gray-600 hover:text-gray-900 flex items-center gap-2"
+                >
+                  <Package className="h-4 w-4" />
+                  Productos
+                </Button>
+              </Link>
+            )}
           </nav>
 
           {/* Right side actions */}
           <div className="flex items-center space-x-4">
-            <CustomLink
+            {/* <CustomLink
               href={`${protocol}://${rootDomain}`}
               className="text-gray-600 hover:text-gray-900 text-sm"
             >
               ← Volver a Suba&Go
-            </CustomLink>
+            </CustomLink> */}
 
             {/* Auth Section */}
             {status === 'loading' ? (
@@ -127,7 +134,7 @@ export default function CompanyNavbar({ company, subdomain }: CompanyNavbarProps
 
                 {/* Dropdown Menu */}
                 {isProfileMenuOpen && (
-                  <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg border border-gray-200 z-50">
+                  <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg border border-gray-200 z-navbar">
                     <div className="py-1">
                       <button
                         onClick={handleProfileClick}
@@ -159,24 +166,6 @@ export default function CompanyNavbar({ company, subdomain }: CompanyNavbarProps
                 Iniciar Sesión
               </Button>
             )}
-
-            <Button
-              variant="outline"
-              size="sm"
-              style={{
-                borderColor: primaryColor,
-                color: primaryColor,
-              }}
-              className="hover:bg-opacity-10"
-              onMouseEnter={(e) => {
-                e.currentTarget.style.backgroundColor = `${primaryColor}15`;
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.backgroundColor = 'transparent';
-              }}
-            >
-              Participar
-            </Button>
           </div>
         </div>
       </div>
@@ -184,24 +173,27 @@ export default function CompanyNavbar({ company, subdomain }: CompanyNavbarProps
       {/* Mobile menu (hidden by default, can be toggled) */}
       <div className="md:hidden border-t border-gray-200">
         <div className="px-4 py-2 space-y-1">
-          <Button
-            variant="ghost"
-            className="w-full text-left justify-start text-gray-600 hover:text-gray-900"
-          >
-            Subastas
-          </Button>
-          <Button
-            variant="ghost"
-            className="w-full text-left justify-start text-gray-600 hover:text-gray-900"
-          >
-            Catálogo
-          </Button>
-          <Button
-            variant="ghost"
-            className="w-full text-left justify-start text-gray-600 hover:text-gray-900"
-          >
-            Contacto
-          </Button>
+          <Link href={`/s/${subdomain}/subastas`}>
+            <Button
+              variant="ghost"
+              className="w-full text-left justify-start text-gray-600 hover:text-gray-900 flex items-center gap-2"
+            >
+              <Gavel className="h-4 w-4" />
+              Subastas
+            </Button>
+          </Link>
+          {/* Productos - Solo para AUCTION_MANAGER */}
+          {session?.user?.role === 'AUCTION_MANAGER' && (
+            <Link href={`/s/${subdomain}/productos`}>
+              <Button
+                variant="ghost"
+                className="w-full text-left justify-start text-gray-600 hover:text-gray-900 flex items-center gap-2"
+              >
+                <Package className="h-4 w-4" />
+                Productos
+              </Button>
+            </Link>
+          )}
         </div>
       </div>
     </header>

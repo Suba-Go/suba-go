@@ -60,9 +60,10 @@ export class AuthService {
   async validateLocalUser(signInDto: SignInDto): Promise<User> {
     const { email, password } = signInDto;
     this.logger.verbose(`Validating user with email: ${email}`);
-    const user = await this.userGettersService.getUserWithPasswordByEmail(
-      email
-    );
+    const user =
+      await this.userGettersService.getUserWithPasswordAndRelationsByEmail(
+        email
+      );
     if (user && (await bcrypt.compare(password, user.password))) {
       this.logger.verbose('User validated successfully');
       return user;

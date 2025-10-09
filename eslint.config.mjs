@@ -54,17 +54,7 @@ export default [
   //plugins: { customRules },
   //rules: { 'customRules/useguards': 'error' },
   //},
-  {
-    files: ['**/*.spec.ts', '**/*.spec.tsx', '**/*.spec.js', '**/*.spec.jsx'],
 
-    languageOptions: {
-      globals: {
-        ...globals.jest,
-      },
-    },
-
-    rules: {},
-  },
   {
     files: ['**/*.js', '**/*.jsx'],
     rules: {},
