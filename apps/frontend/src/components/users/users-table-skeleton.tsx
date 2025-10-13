@@ -11,8 +11,9 @@ export function UsersTableSkeleton() {
 
       <div className="border rounded-lg overflow-hidden">
         <div className="border-b">
-          <div className="grid grid-cols-6 gap-4 p-4">
+          <div className="grid grid-cols-7 gap-4 p-4">
             <div className="h-4 w-16 bg-gray-200 rounded animate-pulse" />
+            <div className="h-4 w-20 bg-gray-200 rounded animate-pulse" />
             <div className="h-4 w-20 bg-gray-200 rounded animate-pulse" />
             <div className="h-4 w-16 bg-gray-200 rounded animate-pulse" />
             <div className="h-4 w-12 bg-gray-200 rounded animate-pulse" />
@@ -23,8 +24,9 @@ export function UsersTableSkeleton() {
         
         {Array.from({ length: 5 }).map((_, i) => (
           <div key={i} className="border-b last:border-b-0">
-            <div className="grid grid-cols-6 gap-4 p-4">
+            <div className="grid grid-cols-7 gap-4 p-4">
               <div className="h-4 w-24 bg-gray-200 rounded animate-pulse" />
+              <div className="h-4 w-20 bg-gray-200 rounded animate-pulse" />
               <div className="h-4 w-32 bg-gray-200 rounded animate-pulse" />
               <div className="h-4 w-20 bg-gray-200 rounded animate-pulse" />
               <div className="h-4 w-16 bg-gray-200 rounded animate-pulse" />

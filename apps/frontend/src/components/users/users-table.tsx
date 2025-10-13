@@ -166,6 +166,12 @@ export function UsersTable({ className }: UsersTableProps) {
                 </SortButton>
               </th>
               <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <SortButton field="public_name">
+                  <UserIcon className="h-4 w-4 mr-1" />
+                  Nombre Público
+                </SortButton>
+              </th>
+              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                 <SortButton field="email">
                   <MailIcon className="h-4 w-4 mr-1" />
                   Email
@@ -199,7 +205,7 @@ export function UsersTable({ className }: UsersTableProps) {
           <tbody className="bg-white divide-y divide-gray-200">
             {sortedUsers.length === 0 ? (
               <tr>
-                <td colSpan={6} className="text-center py-8 text-gray-500">
+                <td colSpan={7} className="text-center py-8 text-gray-500">
                   <UserIcon className="h-8 w-8 mx-auto mb-2" />
                   <p className="font-medium">
                     {allUsers.length === 0 
@@ -219,7 +225,10 @@ export function UsersTable({ className }: UsersTableProps) {
               sortedUsers.map((user) => (
                 <tr key={user.id} className="hover:bg-gray-50">
                   <td className="px-4 py-4 whitespace-nowrap font-medium">
-                    {user.name || user.public_name || 'Sin nombre'}
+                    {user.name || 'Sin nombre'}
+                  </td>
+                  <td className="px-4 py-4 whitespace-nowrap">
+                    {user.public_name || 'No especificado'}
                   </td>
                   <td className="px-4 py-4 whitespace-nowrap">{user.email}</td>
                   <td className="px-4 py-4 whitespace-nowrap">{user.phone || 'No especificado'}</td>

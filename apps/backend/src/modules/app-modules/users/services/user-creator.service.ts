@@ -80,6 +80,13 @@ export class UserCreatorService {
     const saltRounds = 10;
     const hashedPassword = await bcrypt.hash(userData.password, saltRounds);
 
+    // Generate automatic public_name if user is being created within a company
+    let publicName = userData.public_name;
+    if (!publicName && company) {
+      const nextUserNumber = await this.userRepository.getNextUserNumberForCompany(company.id);
+      publicName = `Usuario ${nextUserNumber}`;
+    }
+
     // Create user
     return await this.userRepository.create({
       name: userData.name,
@@ -87,7 +94,7 @@ export class UserCreatorService {
       phone: userData.phone,
       password: hashedPassword,
       rut: userData.rut,
-      public_name: userData.public_name,
+      public_name: publicName,
       role: (userData.role as UserRoleEnum) || UserRoleEnum.AUCTION_MANAGER,
       tenant: tenant ? { connect: { id: tenant.id } } : undefined,
       company: company ? { connect: { id: company.id } } : undefined,
