@@ -1,4 +1,4 @@
-import { Controller, Post, Body, Param, Get, Patch } from '@nestjs/common';
+import { Controller, Post, Body, Param, Get, Patch, UseGuards, Request } from '@nestjs/common';
 import { UserCreatorService } from './services/user-creator.service';
 import { UserGettersService } from './services/user-getter.service';
 import { UserUpdaterService } from './services/user-updater.service';
@@ -7,7 +7,26 @@ import {
   UserSafeWithCompanyAndTenantDto,
   UserUpdateProfileDto,
 } from '@suba-go/shared-validation';
+import { JwtAuthGuard } from '../../../common/guards/jwt-auth.guard';
+import { RolesGuard } from '../../../common/guards/roles.guard';
+import { Roles } from '../../../common/decorators/roles.decorator';
 
+// Local enum definition to avoid import issues
+enum UserRolesEnum {
+  ADMIN = 'ADMIN',
+  USER = 'USER',
+  AUCTION_MANAGER = 'AUCTION_MANAGER',
+}
+
+interface AuthenticatedRequest extends Request {
+  user: {
+    userId: string;
+    tenantId: string;
+    role: string;
+  };
+}
+
+@UseGuards(JwtAuthGuard)
 @Controller('users')
 export class UsersController {
   constructor(
@@ -43,11 +62,15 @@ export class UsersController {
   }
 
   @Get(':id')
+  @UseGuards(RolesGuard)
+  @Roles(UserRolesEnum.ADMIN, UserRolesEnum.AUCTION_MANAGER)
   async getUserById(@Param('id') id: string) {
     return await this.userGettersService.getUserById(id);
   }
 
   @Get('email/:email')
+  @UseGuards(RolesGuard)
+  @Roles(UserRolesEnum.ADMIN, UserRolesEnum.AUCTION_MANAGER)
   async getUserByEmail(@Param('email') email: string) {
     return await this.userGettersService.findByEmail(email);
   }
@@ -62,10 +85,24 @@ export class UsersController {
   }
 
   @Patch(':id/profile')
+  @UseGuards(RolesGuard)
+  @Roles(UserRolesEnum.ADMIN, UserRolesEnum.AUCTION_MANAGER, UserRolesEnum.USER)
   async updateUserProfile(
     @Param('id') id: string,
-    @Body() updateData: UserUpdateProfileDto
+    @Body() updateData: UserUpdateProfileDto,
+    @Request() req: AuthenticatedRequest
   ) {
+    // Los usuarios solo pueden actualizar su propio perfil
+    if (req.user.role === UserRolesEnum.USER && req.user.userId !== id) {
+      throw new Error('No puedes actualizar el perfil de otro usuario');
+    }
     return await this.userUpdaterService.updateUserProfile(id, updateData);
+  }
+
+  @Get('company/:companyId')
+  @UseGuards(RolesGuard)
+  @Roles(UserRolesEnum.ADMIN, UserRolesEnum.AUCTION_MANAGER)
+  async getUsersByCompany(@Param('companyId') companyId: string) {
+    return await this.userGettersService.getUsersByCompany(companyId);
   }
 }

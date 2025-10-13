@@ -1,5 +1,6 @@
 import { Metadata } from 'next';
 import { notFound } from 'next/navigation';
+import { auth } from '@/auth';
 import { getCompanyBySubdomainServerAction } from '@/domain/server-actions/company/get-company-by-subdomain-server-action';
 import ProfileFormWithUserData from './profile-form-with-user-data';
 
@@ -40,10 +41,18 @@ export async function generateMetadata({
 export default async function ProfilePage({ params }: ProfilePageProps) {
   let company;
   let subdomain;
+  let userRole = 'Usuario';
 
   try {
     const resolvedParams = await params;
     subdomain = resolvedParams.subdomain;
+    
+    // Obtener la sesión del usuario
+    const session = await auth();
+    if (session?.user?.role) {
+      userRole = session.user.role;
+    }
+    
     const companyResponse = await getCompanyBySubdomainServerAction(
       subdomain
     );
@@ -58,6 +67,20 @@ export default async function ProfilePage({ params }: ProfilePageProps) {
     console.error('Error fetching company:', error);
     notFound();
   }
+
+  // Función para convertir el rol a texto legible
+  const getRoleLabel = (role: string) => {
+    switch (role) {
+      case 'ADMIN':
+        return 'Administrador';
+      case 'AUCTION_MANAGER':
+        return 'Gestor de Subastas';
+      case 'USER':
+        return 'Usuario';
+      default:
+        return role;
+    }
+  };
 
   return (
     <div className="min-h-screen bg-gray-50 py-12">
@@ -95,7 +118,7 @@ export default async function ProfilePage({ params }: ProfilePageProps) {
                   Rol del Usuario
                 </label>
                 <div className="px-3 py-2 bg-gray-50 border border-gray-200 rounded-md text-gray-900">
-                  Administrador
+                  {getRoleLabel(userRole)}
                 </div>
               </div>
               

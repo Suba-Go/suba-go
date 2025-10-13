@@ -6,7 +6,7 @@ import { protocol, rootDomain } from '@suba-go/shared-components/lib/utils';
 import { Button } from '@suba-go/shared-components/components/ui/button';
 import { useSession, signOut } from 'next-auth/react';
 import { useEffect, useState } from 'react';
-import { User, LogOut, ChevronDown, Gavel, Package } from 'lucide-react';
+import { User, LogOut, ChevronDown, Gavel, Package, Users } from 'lucide-react';
 import Link from 'next/link';
 
 interface CompanyNavbarProps {
@@ -70,9 +70,14 @@ export default function CompanyNavbar({
                 className="h-8 w-8 object-contain"
               />
             )}
-            <h1 className="text-2xl font-bold" style={{ color: primaryColor }}>
-              {company.name}
-            </h1>
+            <Link href={`/s/${subdomain}`}>
+              <h1 
+                className="text-2xl font-bold cursor-pointer hover:opacity-80 transition-opacity" 
+                style={{ color: primaryColor }}
+              >
+                {company.name}
+              </h1>
+            </Link>
           </div>
 
           {/* Navigation Menu */}
@@ -95,6 +100,18 @@ export default function CompanyNavbar({
                 >
                   <Package className="h-4 w-4" />
                   Productos
+                </Button>
+              </Link>
+            )}
+            {/* Usuarios - Solo para AUCTION_MANAGER */}
+            {session?.user?.role === 'AUCTION_MANAGER' && (
+              <Link href={`/s/${subdomain}/usuarios`}>
+                <Button
+                  variant="ghost"
+                  className="text-gray-600 hover:text-gray-900 flex items-center gap-2"
+                >
+                  <Users className="h-4 w-4" />
+                  Usuarios
                 </Button>
               </Link>
             )}
@@ -191,6 +208,18 @@ export default function CompanyNavbar({
               >
                 <Package className="h-4 w-4" />
                 Productos
+              </Button>
+            </Link>
+          )}
+          {/* Usuarios - Solo para AUCTION_MANAGER */}
+          {session?.user?.role === 'AUCTION_MANAGER' && (
+            <Link href={`/s/${subdomain}/usuarios`}>
+              <Button
+                variant="ghost"
+                className="w-full text-left justify-start text-gray-600 hover:text-gray-900 flex items-center gap-2"
+              >
+                <Users className="h-4 w-4" />
+                Usuarios
               </Button>
             </Link>
           )}
