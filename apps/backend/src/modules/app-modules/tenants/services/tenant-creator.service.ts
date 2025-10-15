@@ -9,10 +9,13 @@ export class TenantCreatorService {
 
   async createTenant(tenantData: TenantCreateDto): Promise<Tenant> {
     // Build domain based on environment
-    const domain =
-      process.env.NODE_ENV === 'development'
-        ? `http://${tenantData.subdomain}.localhost:3000` // Development: subdomain.localhost:3000
-        : `https://${tenantData.subdomain}.subago.cl`; // Production: subdomain.subago.cl
+    const rootDomain = process.env.ROOT_DOMAIN || 'subago.cl';
+    const isLocalDevelopment =
+      process.env.NODE_ENV === 'development' && !process.env.VERCEL;
+
+    const domain = isLocalDevelopment
+      ? `http://${tenantData.subdomain}.localhost:3000` // Local development: subdomain.localhost:3000
+      : `https://${tenantData.subdomain}.${rootDomain}`; // Vercel preview or production: subdomain.subago.cl
     // Check if tenant with same domain already exists
     const existingTenant = await this.tenantRepository.findByDomain(domain);
 

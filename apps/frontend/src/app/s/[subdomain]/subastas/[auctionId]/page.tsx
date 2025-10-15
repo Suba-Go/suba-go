@@ -21,7 +21,7 @@ export default async function AuctionDetailPage({
     session.user.role === 'AUCTION_MANAGER' || session.user.role === 'USER';
 
   if (!hasAccess) {
-    redirect(`/s/${subdomain}`);
+    redirect('/');
   }
 
   return (

@@ -261,13 +261,21 @@ export default function CompanyLoginForm({
         </Button>
       </form>
 
-      <div className="mt-6 text-center">
-        <a
-          href="http://localhost:3000/login"
-          className="text-sm text-gray-600 hover:text-primary hover:underline"
-        >
-          ← Volver al login principal
-        </a>
+      <div className="mt-6 text-center space-y-3">
+        <div className="border-t border-gray-200 pt-3">
+          <a
+            href={
+              process.env.NODE_ENV === 'development'
+                ? 'http://localhost:3000/login'
+                : `https://${
+                    process.env.NEXT_PUBLIC_ROOT_DOMAIN || 'subago.cl'
+                  }/login`
+            }
+            className="text-sm text-default hover:underline font-medium"
+          >
+            ← Volver al login principal
+          </a>
+        </div>
       </div>
     </div>
   );

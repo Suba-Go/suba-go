@@ -8,6 +8,8 @@ import { useSession, signOut } from 'next-auth/react';
 import { useEffect, useState } from 'react';
 import { User, LogOut, ChevronDown, Gavel, Package } from 'lucide-react';
 import Link from 'next/link';
+import Image from 'next/image';
+import { Spinner } from '@suba-go/shared-components/components/ui/spinner';
 
 interface CompanyNavbarProps {
   company: CompanyDto;
@@ -54,7 +56,7 @@ export default function CompanyNavbar({
 
   const handleProfileClick = () => {
     setIsProfileMenuOpen(false);
-    window.location.href = `/s/${subdomain}/perfil`;
+    window.location.href = `/perfil`;
   };
 
   return (
@@ -62,22 +64,27 @@ export default function CompanyNavbar({
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center py-4">
           {/* Company Logo/Name */}
-          <div className="flex items-center space-x-4">
-            {company.logo && (
-              <img
-                src={company.logo}
-                alt={`${company.name} logo`}
-                className="h-8 w-8 object-contain"
-              />
-            )}
-            <h1 className="text-2xl font-bold" style={{ color: primaryColor }}>
-              {company.name}
-            </h1>
-          </div>
+          <Link href={`/`}>
+            <div className="flex items-center space-x-4">
+              {company.logo && (
+                <Image
+                  src={company.logo}
+                  alt={`${company.name} logo`}
+                  className="h-8 w-8 object-contain hover:cursor-pointer"
+                />
+              )}
+              <h1
+                className="text-2xl font-bold"
+                style={{ color: primaryColor }}
+              >
+                {company.name}
+              </h1>
+            </div>
+          </Link>
 
           {/* Navigation Menu */}
           <nav className="hidden md:flex items-center space-x-6">
-            <Link href={`/s/${subdomain}/subastas`}>
+            <Link href="/subastas">
               <Button
                 variant="ghost"
                 className="text-gray-600 hover:text-gray-900 flex items-center gap-2"
@@ -88,7 +95,7 @@ export default function CompanyNavbar({
             </Link>
             {/* Productos - Solo para AUCTION_MANAGER */}
             {session?.user?.role === 'AUCTION_MANAGER' && (
-              <Link href={`/s/${subdomain}/productos`}>
+              <Link href="/productos">
                 <Button
                   variant="ghost"
                   className="text-gray-600 hover:text-gray-900 flex items-center gap-2"
@@ -111,7 +118,9 @@ export default function CompanyNavbar({
 
             {/* Auth Section */}
             {status === 'loading' ? (
-              <div className="text-sm text-gray-500">Cargando...</div>
+              <div className="flex items-center space-x-4">
+                <Spinner className="size-4" />
+              </div>
             ) : session ? (
               /* Profile Menu for Authenticated Users */
               <div className="relative profile-menu-container">
@@ -173,7 +182,7 @@ export default function CompanyNavbar({
       {/* Mobile menu (hidden by default, can be toggled) */}
       <div className="md:hidden border-t border-gray-200">
         <div className="px-4 py-2 space-y-1">
-          <Link href={`/s/${subdomain}/subastas`}>
+          <Link href="/subastas">
             <Button
               variant="ghost"
               className="w-full text-left justify-start text-gray-600 hover:text-gray-900 flex items-center gap-2"
@@ -184,7 +193,7 @@ export default function CompanyNavbar({
           </Link>
           {/* Productos - Solo para AUCTION_MANAGER */}
           {session?.user?.role === 'AUCTION_MANAGER' && (
-            <Link href={`/s/${subdomain}/productos`}>
+            <Link href="/productos">
               <Button
                 variant="ghost"
                 className="w-full text-left justify-start text-gray-600 hover:text-gray-900 flex items-center gap-2"

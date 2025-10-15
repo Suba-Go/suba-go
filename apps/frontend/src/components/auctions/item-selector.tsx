@@ -7,6 +7,7 @@ import { Badge } from '@suba-go/shared-components/components/ui/badge';
 import { Checkbox } from '@suba-go/shared-components/components/ui/checkbox';
 import { useAvailableItems } from '@/hooks/use-items';
 import { ProductCreateModal2 } from './product-create-modal2';
+import { Spinner } from '@suba-go/shared-components/components/ui/spinner';
 
 interface ItemSelectorProps {
   selectedItems: string[];
@@ -59,7 +60,10 @@ export function ItemSelector({
     return (
       <div className="border rounded-lg p-4 bg-gray-50">
         <div className="flex items-center justify-between mb-3">
-          <p className="text-sm text-gray-600">Cargando items...</p>
+          <p className="text-sm text-gray-600">
+            {' '}
+            <Spinner className="size-4" />
+          </p>
           <Button
             type="button"
             variant="outline"

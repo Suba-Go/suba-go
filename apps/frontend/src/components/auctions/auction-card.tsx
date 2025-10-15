@@ -199,7 +199,7 @@ export function AuctionCard({
         </div>
 
         {/* Action Button */}
-        <Link href={`/s/${subdomain}/subastas/${auction.id}`}>
+        <Link href={`/subastas/${auction.id}`}>
           <Button className="w-full" variant={isActive ? 'default' : 'outline'}>
             {isActive ? 'Ver Subasta Activa' : 'Ver Detalles'}
           </Button>

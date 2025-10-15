@@ -12,17 +12,20 @@ export class CompanyGetterService {
 
   async getCompanyBySubdomain(subdomain: string): Promise<Company> {
     // Build domain based on environment to find the tenant
-    const domain =
-      process.env.NODE_ENV === 'development'
-        ? `http://${subdomain}.localhost:3000`
-        : `https://www.${subdomain}.subago.cl`;
+    const rootDomain = process.env.ROOT_DOMAIN || 'subago.cl';
+    const isLocalDevelopment =
+      process.env.NODE_ENV === 'development' && !process.env.VERCEL;
+
+    const domain = isLocalDevelopment
+      ? `http://${subdomain}.localhost:3000`
+      : `https://${subdomain}.${rootDomain}`;
 
     // Find tenant by domain
     let tenant = await this.tenantRepository.findByDomain(domain);
 
-    // If not found with www prefix, try without it (for backward compatibility)
-    if (!tenant && process.env.NODE_ENV !== 'development') {
-      const alternativeDomain = `https://${subdomain}.subago.cl`;
+    // If not found, try with www prefix (for backward compatibility)
+    if (!tenant && !isLocalDevelopment) {
+      const alternativeDomain = `https://www.${subdomain}.${rootDomain}`;
       tenant = await this.tenantRepository.findByDomain(alternativeDomain);
     }
 

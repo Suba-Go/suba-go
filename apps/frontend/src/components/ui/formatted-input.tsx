@@ -1,6 +1,7 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import type React from 'react';
+import { useState, useEffect } from 'react';
 import { Input } from '@suba-go/shared-components/components/ui/input';
 import { useAutoFormat } from '@/hooks/use-auto-format';
 
@@ -38,7 +39,6 @@ export function FormattedInput({
     parseFormattedPrice,
   } = useAutoFormat();
 
-  // Sincronizar valor inicial
   useEffect(() => {
     if (value !== undefined && value !== null) {
       switch (formatType) {
@@ -80,7 +80,6 @@ export function FormattedInput({
 
     switch (formatType) {
       case 'plate': {
-        // Limitar a 6 caracteres y convertir a mayúsculas
         const plateValue = inputValue.slice(0, 6);
         formattedValue = formatPlate(plateValue);
         parsedValue = formattedValue;
@@ -94,7 +93,6 @@ export function FormattedInput({
       }
 
       case 'number': {
-        // Solo permitir números con separadores
         const numbersOnly = inputValue.replace(/\D/g, '');
         formattedValue = formatNumberWithSeparators(numbersOnly);
         parsedValue = parseFormattedNumber(formattedValue);
@@ -102,17 +100,15 @@ export function FormattedInput({
       }
 
       case 'simple-number': {
-        // Solo permitir números sin separadores
         const simpleNumbersOnly = inputValue.replace(/\D/g, '');
         formattedValue = formatSimpleNumber(simpleNumbersOnly);
         parsedValue = simpleNumbersOnly
-          ? parseInt(simpleNumbersOnly, 10)
+          ? Number.parseInt(simpleNumbersOnly, 10)
           : undefined;
         break;
       }
 
       case 'price': {
-        // Solo permitir números para precio
         const priceNumbersOnly = inputValue.replace(/[^0-9]/g, '');
         formattedValue = formatPrice(priceNumbersOnly);
         parsedValue = parseFormattedPrice(formattedValue);
@@ -124,9 +120,7 @@ export function FormattedInput({
         parsedValue = inputValue;
     }
 
-    // Actualizar inmediatamente el valor mostrado
     setDisplayValue(formattedValue);
-    // Llamar onChange inmediatamente
     onChange(parsedValue);
   };
 
