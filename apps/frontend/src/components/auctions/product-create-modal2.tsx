@@ -3,7 +3,11 @@
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { ItemStateEnum } from '@suba-go/shared-validation';
+import {
+  itemCreateDto,
+  itemCreateSchema,
+  ItemStateEnum,
+} from '@suba-go/shared-validation';
 import { Car, Upload, FileText } from 'lucide-react';
 import {
   Dialog,
