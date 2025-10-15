@@ -96,6 +96,15 @@ export class MultiStepFormCreatorService {
         saltRounds
       );
 
+      // Generate automatic public_name for the first user of the company
+      const userCount = await prisma.user.count({
+        where: {
+          companyId: savedCompany.id,
+          isDeleted: false,
+        },
+      });
+      const publicName = data.userData.public_name || `Usuario ${userCount + 1}`;
+
       const savedUser = await prisma.user.create({
         data: {
           name: data.userData.name,
@@ -103,7 +112,7 @@ export class MultiStepFormCreatorService {
           phone: data.userData.phone,
           password: hashedPassword,
           rut: data.userData.rut,
-          public_name: data.userData.public_name,
+          public_name: publicName,
           role: 'AUCTION_MANAGER', // Force AUCTION_MANAGER role
           tenantId: savedTenant.id,
           companyId: savedCompany.id,

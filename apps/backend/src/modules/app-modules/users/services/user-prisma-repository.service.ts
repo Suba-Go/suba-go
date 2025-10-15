@@ -158,4 +158,15 @@ export class UserPrismaRepository {
       },
     });
   }
+
+  // Get next user number for a specific company
+  async getNextUserNumberForCompany(companyId: string): Promise<number> {
+    const count = await this.prisma.user.count({
+      where: {
+        companyId,
+        isDeleted: false,
+      },
+    });
+    return count + 1;
+  }
 }
