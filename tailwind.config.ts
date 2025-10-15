@@ -22,11 +22,11 @@ module.exports = {
         // Suba&Go custom palette and UI colors, no CSS variables
         border: '#e5e7eb', // gray-200
         input: '#f1f5f9', // slate-100
-        ring: '#ffd600', // Amarillo
+        ring: '#ECC218', // Amarillo
         background: '#f8fafc', // Soft white
         foreground: '#16191b', // Negro
         primary: {
-          DEFAULT: '#ffcc00', // Amarillo
+          DEFAULT: '#ECC218', // Amarillo
           background: '#f8fafc',
           foreground: '#16191b', // Negro para texto sobre amarillo
         },
@@ -58,7 +58,7 @@ module.exports = {
         // Colores personalizados de Suba&Go
         dark: '#16191b', // Negro
         'soft-white': '#f8fafc', // Soft white
-        yellow: '#ffcc00', // Amarillo
+        yellow: '#ECC218', // Amarillo
       },
       borderRadius: {
         lg: '1rem',

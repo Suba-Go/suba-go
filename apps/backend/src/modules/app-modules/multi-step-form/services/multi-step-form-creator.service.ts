@@ -57,10 +57,13 @@ export class MultiStepFormCreatorService {
 
       // Step 3: Create tenant first (within transaction)
       // Build domain based on environment
-      const domain =
-        process.env.NODE_ENV === 'development'
-          ? `http://${data.tenantData.subdomain}.localhost:3000` // Development: subdomain.localhost:3000
-          : `https://www.${data.tenantData.subdomain}.subago.cl`; // Production: www.subdomain.subago.cl
+      const rootDomain = process.env.ROOT_DOMAIN || 'subago.cl';
+      const isLocalDevelopment =
+        process.env.NODE_ENV === 'development' && !process.env.VERCEL;
+
+      const domain = isLocalDevelopment
+        ? `http://${data.tenantData.subdomain}.localhost:3000` // Local development: subdomain.localhost:3000
+        : `https://${data.tenantData.subdomain}.${rootDomain}`; // Vercel preview or production: subdomain.subago.cl
 
       // Check if tenant with same domain already exists
       const existingTenant = await this.tenantRepository.findByDomain(domain);

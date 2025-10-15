@@ -3,13 +3,21 @@
 import { Button } from '@suba-go/shared-components/components/ui/button';
 import Link from 'next/link';
 import Image from 'next/image';
+import { usePathname } from 'next/navigation';
 
 export default function Navbar() {
+  const pathname = usePathname();
+
+  const shouldShowNavbar = !pathname.includes('/login');
+
+  if (!shouldShowNavbar) {
+    return null;
+  }
   return (
     <header className="flex h-16 w-full items-center justify-between px-4 md:px-6 bg-dark border-b border-gray-800">
       <Link href="/" className="flex items-center space-x-2">
         <Image
-          src="/logo-black.png"
+          src="/logo-white.png"
           alt="Suba&Go Logo"
           width={50}
           height={50}
@@ -34,18 +42,18 @@ export default function Navbar() {
             Sobre nosotros
           </Button>
         </Link>
-        <Link href="/estadisticas">
+        {/* <Link href="/estadisticas">
           <Button
             variant="ghost"
             className="text-soft-white hover:text-primary hover:bg-dark/80"
           >
             Estadísticas
           </Button>
-        </Link>
+        </Link> */}
         <Link href="/login">
           <Button
-            variant="outline"
-            className="text-dark border-soft-white hover:border-primary border-2"
+            variant="ghost"
+            className="text-white border-soft-white hover:border-primary border-2"
           >
             Iniciar Sesión
           </Button>
