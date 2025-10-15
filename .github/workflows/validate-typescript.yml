@@ -15,10 +15,11 @@ jobs:
     env:
       BACKEND_URL: https://dummy-backend-url.com
       AUTH_SECRET: dummy-secret
-      NEXTAUTH_URL: https://dummy-nextauth-url.com
-      NEXTAUTH_SECRET: dummy-secret
       AUTH_TRUST_HOST: 'true'
+      ROOT_DOMAIN: 'subago.cl'
+      NEXT_PUBLIC_ROOT_DOMAIN: 'subago.cl'
       NX_NO_CLOUD: 'true'
+      BLOB_READ_WRITE_TOKEN: 'vercel'
     steps:
       - name: Checkout repository
         uses: actions/checkout@v3

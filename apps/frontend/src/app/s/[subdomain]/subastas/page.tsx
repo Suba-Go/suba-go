@@ -18,7 +18,7 @@ export default async function SubastasPage({
 
   // Verify user has AUCTION_MANAGER role
   if (session.user.role !== 'AUCTION_MANAGER') {
-    redirect(`/s/${subdomain}`);
+    redirect('/');
   }
 
   return (

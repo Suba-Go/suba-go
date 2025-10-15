@@ -28,6 +28,15 @@ enum ItemStateEnum {
   @@map("item_state_enum")
 }
 
+enum AuctionStatusEnum {
+  PENDIENTE
+  ACTIVA
+  COMPLETADA
+  CANCELADA
+  ELIMINADA
+  @@map("auction_status_enum")
+}
+
 enum LegalStatusEnum {
   TRANSFERIBLE
   LEASING
@@ -84,9 +93,6 @@ model Tenant {
   isDeleted Boolean  @default(false)
   deletedAt DateTime?
 
-  name      String
-  domain    String   @unique
-
   // Relations
   users        User[]
   companies    Company[]
@@ -106,7 +112,7 @@ model Company {
   deletedAt DateTime?
 
   // Company-specific fields matching TypeORM entity
-  name              String
+  name              String @unique
   logo              String?
   principal_color   String?
   principal_color2  String?
@@ -164,7 +170,7 @@ model Auction {
   description String?
   startTime   DateTime
   endTime     DateTime
-  status      String   @default("PENDING")
+  status      AuctionStatusEnum   @default(PENDIENTE)
   type        AuctionTypeEnum @default(REAL)
 
   // Relations

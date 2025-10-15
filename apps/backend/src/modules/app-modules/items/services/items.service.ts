@@ -134,7 +134,7 @@ export class ItemsService {
 
     // Check if item is being used in any active auction
     const hasActiveAuctions = item.auctionItems?.some(
-      (auctionItem) => auctionItem.auction?.status === 'ACTIVE'
+      (auctionItem) => auctionItem.auction?.status === 'ACTIVA'
     );
 
     if (hasActiveAuctions) {

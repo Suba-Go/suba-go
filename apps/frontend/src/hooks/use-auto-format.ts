@@ -35,7 +35,7 @@ export function useAutoFormat() {
   // Parsear número formateado de vuelta a número
   const parseFormattedNumber = useCallback((value: string) => {
     const cleanValue = value.replace(/\./g, ''); // Remover puntos
-    return cleanValue ? parseInt(cleanValue, 10) : undefined;
+    return cleanValue ? Number.parseInt(cleanValue, 10) : undefined;
   }, []);
 
   // Formatear precio con separadores y símbolo de moneda
@@ -50,7 +50,7 @@ export function useAutoFormat() {
   // Parsear precio formateado
   const parseFormattedPrice = useCallback((value: string) => {
     const cleanValue = value.replace(/\$|[.]/g, ''); // Remover $ y puntos
-    return cleanValue ? parseFloat(cleanValue) : undefined;
+    return cleanValue ? Number.parseFloat(cleanValue) : undefined;
   }, []);
 
   return {

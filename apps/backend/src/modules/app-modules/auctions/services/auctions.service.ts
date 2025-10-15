@@ -95,10 +95,7 @@ export class AuctionsService {
     const existingAuction = await this.getAuctionById(id, tenantId);
 
     // Validate that auction can be updated (not started yet)
-    if (
-      existingAuction.status === 'ACTIVE' ||
-      existingAuction.status === 'CLOSED'
-    ) {
+    if (existingAuction.status != 'PENDIENTE') {
       throw new BadRequestException(
         'No se puede modificar una subasta activa o cerrada'
       );
@@ -154,7 +151,7 @@ export class AuctionsService {
     const auction = await this.getAuctionById(id, tenantId);
 
     // Validate that auction can be deleted (not started yet)
-    if (auction.status === 'ACTIVE') {
+    if (auction.status === 'ACTIVA') {
       throw new BadRequestException('No se puede eliminar una subasta activa');
     }
 
@@ -179,7 +176,7 @@ export class AuctionsService {
   async startAuction(id: string, tenantId: string): Promise<Auction> {
     const auction = await this.getAuctionById(id, tenantId);
 
-    if (auction.status !== 'PENDING') {
+    if (auction.status !== 'PENDIENTE') {
       throw new BadRequestException(
         'Solo se pueden iniciar subastas pendientes'
       );
@@ -191,13 +188,13 @@ export class AuctionsService {
       );
     }
 
-    return this.auctionRepository.updateAuctionStatus(id, 'ACTIVE');
+    return this.auctionRepository.updateAuctionStatus(id, 'ACTIVA');
   }
 
   async closeAuction(id: string, tenantId: string): Promise<Auction> {
     const auction = await this.getAuctionById(id, tenantId);
 
-    if (auction.status !== 'ACTIVE') {
+    if (auction.status !== 'ACTIVA') {
       throw new BadRequestException('Solo se pueden cerrar subastas activas');
     }
 

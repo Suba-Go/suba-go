@@ -1,6 +1,11 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../../providers-modules/prisma/prisma.service';
-import type { Auction, Bid, AuctionTypeEnum } from '@prisma/client';
+import type {
+  Auction,
+  Bid,
+  AuctionTypeEnum,
+  AuctionStatusEnum,
+} from '@prisma/client';
 
 @Injectable()
 export class AuctionPrismaService {
@@ -74,7 +79,7 @@ export class AuctionPrismaService {
         tenantId,
         startTime: { lte: now },
         endTime: { gte: now },
-        status: 'ACTIVE',
+        status: 'ACTIVA',
         isDeleted: false,
       },
       include: {
@@ -279,7 +284,10 @@ export class AuctionPrismaService {
   }
 
   // Update auction status
-  async updateAuctionStatus(id: string, status: string): Promise<Auction> {
+  async updateAuctionStatus(
+    id: string,
+    status: AuctionStatusEnum
+  ): Promise<Auction> {
     return this.prisma.auction.update({
       where: { id },
       data: { status },
@@ -328,7 +336,7 @@ export class AuctionPrismaService {
         this.prisma.auction.count({
           where: {
             tenantId,
-            status: 'ACTIVE',
+            status: 'ACTIVA',
             isDeleted: false,
           },
         }),
@@ -356,7 +364,7 @@ export class AuctionPrismaService {
             auctionItem: {
               auction: {
                 tenantId,
-                status: 'CLOSED',
+                status: 'COMPLETADA',
                 isDeleted: false,
               },
             },
@@ -404,7 +412,7 @@ export class AuctionPrismaService {
       // Update auction status
       const auction = await prisma.auction.update({
         where: { id: auctionId },
-        data: { status: 'CLOSED' },
+        data: { status: 'COMPLETADA' },
         include: {
           items: {
             include: {

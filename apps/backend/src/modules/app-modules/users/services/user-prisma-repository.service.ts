@@ -3,8 +3,9 @@ import { PrismaService } from '../../../providers-modules/prisma/prisma.service'
 import type { User, Prisma } from '@prisma/client';
 
 // Define User with relations type
+// Note: Tenant no longer has a name field - company name is used as subdomain
 type UserWithRelations = User & {
-  tenant?: { id: string; name: string; domain: string };
+  tenant?: { id: string };
   company?: { id: string; name: string; principal_color?: string };
 };
 

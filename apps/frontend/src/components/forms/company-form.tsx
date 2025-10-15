@@ -138,10 +138,8 @@ export default function CompanyForm({
       secondary_color3: null,
     };
 
-    const tenantData: TenantCreateDto = {
-      name: data.companyName,
-      subdomain: data.subdomain,
-    };
+    // Tenant no longer has a name field - company name is used as subdomain
+    const tenantData: TenantCreateDto = {};
 
     // Clear cache on successful submit
     clearCache();

@@ -23,7 +23,11 @@ const nextConfig = {
       },
     ],
   },
-  transpilePackages: ['@suba-go/shared-components'],
+  transpilePackages: [
+    '@suba-go/shared-components',
+    '@suba-go/shared-utils',
+    '@suba-go/shared-validation',
+  ],
   experimental: {
     externalDir: true,
   },
@@ -33,8 +37,9 @@ const nextConfig = {
   env: {
     BACKEND_URL: process.env.BACKEND_URL,
     AUTH_SECRET: process.env.AUTH_SECRET,
-    NEXTAUTH_URL: process.env.NEXTAUTH_URL,
-    NEXTAUTH_SECRET: process.env.NEXTAUTH_SECRET,
+    AUTH_TRUST_HOST: process.env.AUTH_TRUST_HOST,
+    ROOT_DOMAIN: process.env.ROOT_DOMAIN,
+    NEXT_PUBLIC_ROOT_DOMAIN: process.env.NEXT_PUBLIC_ROOT_DOMAIN,
   },
 };
 

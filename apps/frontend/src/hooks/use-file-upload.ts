@@ -55,9 +55,7 @@ export function useFileUpload(options: UseFileUploadOptions = {}) {
     return new Promise((resolve) => {
       setTimeout(() => {
         // Generate a mock URL - replace with actual upload endpoint
-        const mockUrl = `https://example.com/uploads/${Date.now()}_${
-          file.name
-        }`;
+        const mockUrl = 'logo-white.png';
         resolve(mockUrl);
       }, 1000 + Math.random() * 2000);
     });

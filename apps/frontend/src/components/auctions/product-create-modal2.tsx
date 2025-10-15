@@ -3,8 +3,11 @@
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { z } from 'zod';
-import { ItemStateEnum } from '@suba-go/shared-validation';
+import {
+  itemCreateDto,
+  itemCreateSchema,
+  ItemStateEnum,
+} from '@suba-go/shared-validation';
 import { Car, Upload, FileText } from 'lucide-react';
 import {
   Dialog,
@@ -27,28 +30,6 @@ import { FileUpload } from '@/components/ui/file-upload';
 import { FormattedInput } from '@/components/ui/formatted-input';
 import { useCompany } from '@/hooks/use-company';
 
-// Schema de validación simplificado para modal2
-const productCreateSchema = z.object({
-  plate: z
-    .string()
-    .min(6, 'La patente debe tener exactamente 6 caracteres')
-    .max(6, 'La patente debe tener exactamente 6 caracteres')
-    .optional(),
-  brand: z.string().min(1, 'La marca es requerida'),
-  model: z.string().min(1, 'El modelo es requerido'),
-  year: z
-    .number()
-    .int()
-    .min(1900)
-    .max(new Date().getFullYear() + 1),
-  basePrice: z.number().positive('El precio base debe ser positivo'),
-  legal_status: z.string().optional(),
-  photos: z.array(z.instanceof(File)).optional(),
-  docs: z.array(z.instanceof(File)).optional(),
-});
-
-type ProductCreateData = z.infer<typeof productCreateSchema>;
-
 interface ProductCreateModal2Props {
   isOpen: boolean;
   onClose: () => void;
@@ -70,8 +51,8 @@ export function ProductCreateModal2({
     formState: { errors },
     reset,
     setValue,
-  } = useForm<ProductCreateData>({
-    resolver: zodResolver(productCreateSchema),
+  } = useForm<itemCreateDto>({
+    resolver: zodResolver(itemCreateSchema),
     defaultValues: {
       legal_status: 'TRANSFERIBLE',
     },
@@ -84,7 +65,7 @@ export function ProductCreateModal2({
     onClose();
   };
 
-  const onSubmit = async (data: ProductCreateData) => {
+  const onSubmit = async (data: itemCreateDto) => {
     try {
       setIsLoading(true);
 

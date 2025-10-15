@@ -5,7 +5,7 @@ import { UserPrismaRepository } from './user-prisma-repository.service';
 type UserWithRelations = {
   id: string;
   email: string;
-  company?: { name: string; tenant?: { domain: string } };
+  company?: { name: string; tenant?: { name: string } };
 };
 
 @Injectable()
@@ -35,6 +35,7 @@ export class UserCompanyGetterService {
       );
     }
 
-    return user.company.tenant.domain;
+    // Return the tenant name (which is the subdomain)
+    return user.company.name;
   }
 }

@@ -12,7 +12,7 @@ import { NestExpressApplication } from '@nestjs/platform-express';
 import { Serialize } from './common/interceptors/serialize.interceptor';
 import { SuperJsonInterceptor } from './common/interceptors/superjson.interceptor';
 dotenv.config({
-  path: process.env.NODE_ENV !== 'test' ? '.env' : '.env',
+  path: '.env',
 });
 const PORT = parseInt(process.env.PORT) || 3333;
 
@@ -33,12 +33,26 @@ async function bootstrap() {
   // app.setGlobalPrefix('Api Suba&Go');
   app.useGlobalInterceptors(new SuperJsonInterceptor());
 
-  let origins: string[];
+  let origins: (string | RegExp)[];
 
-  if (process.env.NODE_ENV === 'development') {
-    origins = ['http://localhost:3000'];
+  // Determine environment: only local development uses localhost, everything else uses HTTPS
+  const isLocalDevelopment =
+    process.env.NODE_ENV === 'development' && !process.env.VERCEL;
+
+  if (isLocalDevelopment) {
+    // Local development: Allow localhost and any subdomain.localhost
+    origins = ['http://localhost:3000', /^http:\/\/[\w-]+\.localhost:3000$/];
   } else {
-    // pordefinir
+    // Vercel preview or production: Allow main domain, www, tenant subdomains, and Vercel URLs
+    const rootDomain = process.env.ROOT_DOMAIN || 'subago.cl';
+    origins = [
+      `https://${rootDomain}`,
+      `https://www.${rootDomain}`,
+      new RegExp(`^https://[\\w-]+\\.${rootDomain.replace('.', '\\.')}$`),
+      // Vercel preview URLs (for both preview and production deployments)
+      /^https:\/\/[\w-]+---[\w-]+\.vercel\.app$/,
+      /^https:\/\/[\w-]+\.vercel\.app$/,
+    ];
   }
 
   app.enableCors({

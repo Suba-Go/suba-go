@@ -1,12 +1,11 @@
-'use client';
-
-import NextAuthProvider from '@/components/auth-provider';
+import { type Metadata } from 'next';
+import ClientLayout from './client-layout';
 import './global.css';
 
-import ConditionalLayout from './conditional-layout';
-import ProgressBar from '@suba-go/shared-components/components/suba-go/atoms/progress-bar';
-import { Toaster } from '@suba-go/shared-components/components/ui/toaster';
-import { NuqsAdapter } from 'nuqs/adapters/next/app';
+export const metadata: Metadata = {
+  title: 'Suba&Go',
+  icons: [{ rel: 'icon', url: '/logo-black.png' }],
+};
 
 export default function RootLayout({
   children,
@@ -14,15 +13,9 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en">
+    <html lang="es">
       <body>
-        <ProgressBar />
-        <NextAuthProvider>
-          <NuqsAdapter>
-            <ConditionalLayout>{children}</ConditionalLayout>
-            <Toaster />
-          </NuqsAdapter>
-        </NextAuthProvider>
+        <ClientLayout>{children}</ClientLayout>
       </body>
     </html>
   );
