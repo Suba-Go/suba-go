@@ -1,8 +1,9 @@
 import { z } from 'zod';
 import { errorMap } from '../errors/error-map';
 import { name } from './main.schema';
-import { AuctionStateEnum, AuctionTypeEnum } from '../enums/auction';
+import { AuctionTypeEnum } from '../enums/auction';
 import { baseSchema } from './base.schema';
+import { AuctionStatusEnum } from '@prisma/client';
 
 z.setErrorMap(errorMap);
 
@@ -12,7 +13,7 @@ export const auctionSchema = baseSchema
     name: name,
     start: z.date(),
     end: z.date().nullable(),
-    state: z.nativeEnum(AuctionStateEnum).default(AuctionStateEnum.ACTIVE),
+    state: z.nativeEnum(AuctionStatusEnum).default(AuctionStatusEnum.ACTIVA),
     type: z.nativeEnum(AuctionTypeEnum).default(AuctionTypeEnum.REAL),
   })
   .strict();

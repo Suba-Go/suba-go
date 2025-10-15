@@ -164,7 +164,7 @@ export function AuctionDetail({
         </div>
 
         {/* Edit button - only show if auction hasn't started */}
-        {auction.status === 'PENDING' && userRole === 'AUCTION_MANAGER' && (
+        {auction.status === 'PENDIENTE' && userRole === 'AUCTION_MANAGER' && (
           <Button
             variant="outline"
             onClick={() => setIsEditModalOpen(true)}

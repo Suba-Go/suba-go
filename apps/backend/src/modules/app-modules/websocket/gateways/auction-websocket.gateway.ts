@@ -236,7 +236,7 @@ export class AuctionWebSocketGateway
 
     client.emit('auctionStatus', {
       auctionId,
-      status: 'ACTIVE', // Placeholder
+      status: 'ACTIVA', // Placeholder
       participantCount:
         this.websocketService.getAuctionParticipantCount(auctionId),
     });

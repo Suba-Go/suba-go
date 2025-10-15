@@ -21,8 +21,6 @@ export class TenantsController {
     return await this.tenantCreatorService.getTenantById(id);
   }
 
-  @Get('domain/:domain')
-  async getTenantByDomain(@Param('domain') domain: string) {
-    return await this.tenantCreatorService.getTenantByDomain(domain);
-  }
+  // Removed getTenantByName endpoint - tenant no longer has a name field
+  // Use company name to find tenant through company relationship
 }

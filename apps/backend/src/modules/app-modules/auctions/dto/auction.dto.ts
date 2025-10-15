@@ -11,6 +11,7 @@ import {
 } from 'class-validator';
 import { Transform, Type } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { AuctionStatusEnum } from '@prisma/client';
 
 // Local enum definition to avoid import issues
 enum AuctionTypeEnum {
@@ -161,7 +162,7 @@ export class AuctionResponseDto {
   endTime: Date;
 
   @ApiProperty({ description: 'Estado de la subasta' })
-  status: string;
+  status: AuctionStatusEnum;
 
   @ApiProperty({ description: 'Fecha de creación' })
   createdAt: Date;

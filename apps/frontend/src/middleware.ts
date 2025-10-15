@@ -74,25 +74,12 @@ export default auth(async function middleware(request: NextRequest) {
       return NextResponse.redirect(new URL('/login', request.url));
     }
 
-    // (opcional) validar pertenencia del usuario al tenant, con dominio desde DB
+    // Validate user belongs to the company (subdomain is company name)
     if (session && !isPublic) {
-      const userTenantDomain = session.user?.tenant?.domain ?? '';
-      const userSub =
-        (() => {
-          try {
-            const url = new URL(
-              userTenantDomain.includes('://')
-                ? userTenantDomain
-                : `https://${userTenantDomain}`
-            );
-            return getSubdomainFromHost(url.host, ROOT_DOMAIN);
-          } catch {
-            return userTenantDomain.split('.')[0] || null;
-          }
-        })() ?? '';
+      const userCompanyName = session.user?.company?.name ?? '';
 
-      if (userSub !== subdomain) {
-        // evitar loops: redirige al login global del dominio actual
+      if (userCompanyName !== subdomain) {
+        // Redirect to login if user doesn't belong to this company
         const login = new URL('/login', request.url);
         return NextResponse.redirect(login);
       }

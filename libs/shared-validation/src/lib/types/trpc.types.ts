@@ -22,16 +22,13 @@ export const companyCreateInputSchema = z.object({
   secondary_color3: z.string().nullable().optional(),
 });
 
-export const tenantCreateInputSchema = z.object({
-  name: z.string(),
-  subdomain: z.string(),
-});
+// Tenant no longer has a name field - company name is used as subdomain
+export const tenantCreateInputSchema = z.object({});
 
 export const connectUserInputSchema = z.object({
   tenant: z.object({
     id: z.string(),
-    name: z.string(),
-    domain: z.string(),
+    // Removed name - tenant no longer has a name field
   }),
   user: z.object({
     id: z.string(),

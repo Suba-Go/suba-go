@@ -26,28 +26,8 @@ export class TenantPrismaRepository {
     });
   }
 
-  async findByDomain(domain: string): Promise<Tenant | null> {
-    return this.prisma.tenant.findUnique({
-      where: { domain },
-      include: {
-        users: true,
-        companies: true,
-      },
-    });
-  }
-
-  async findByName(name: string): Promise<Tenant | null> {
-    return this.prisma.tenant.findFirst({
-      where: {
-        name,
-        isDeleted: false,
-      },
-      include: {
-        users: true,
-        companies: true,
-      },
-    });
-  }
+  // Removed findByName - tenant no longer has a name field
+  // Use company name to find tenant through company relationship
 
   async findAll(): Promise<Tenant[]> {
     return this.prisma.tenant.findMany({

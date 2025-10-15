@@ -37,7 +37,7 @@ describe('BidsService', () => {
       },
       auction: {
         id: 'auction1',
-        status: 'ACTIVE',
+        status: 'ACTIVA',
         title: 'Test Auction',
       },
     },
@@ -112,7 +112,10 @@ describe('BidsService', () => {
       const result = await service.createBid(createBidDto, 'user1', 'tenant1');
 
       expect(result).toEqual(mockBid);
-      expect(mockBidRepository.validateBidAmount).toHaveBeenCalledWith('item1', 100000);
+      expect(mockBidRepository.validateBidAmount).toHaveBeenCalledWith(
+        'item1',
+        100000
+      );
       expect(mockBidRepository.createBid).toHaveBeenCalled();
       expect(mockWebSocketService.emitBidUpdate).toHaveBeenCalledWith(mockBid);
     });
@@ -145,7 +148,9 @@ describe('BidsService', () => {
         minimumBid: 75000,
       });
 
-      mockBidRepository['prisma'].auctionItem.findUnique.mockResolvedValue(null);
+      mockBidRepository['prisma'].auctionItem.findUnique.mockResolvedValue(
+        null
+      );
 
       await expect(
         service.createBid(createBidDto, 'user1', 'tenant1')
@@ -208,7 +213,10 @@ describe('BidsService', () => {
       const result = await service.getMinimumBidAmount('item1');
 
       expect(result).toBe(75000);
-      expect(mockBidRepository.validateBidAmount).toHaveBeenCalledWith('item1', 0);
+      expect(mockBidRepository.validateBidAmount).toHaveBeenCalledWith(
+        'item1',
+        0
+      );
     });
   });
 });
