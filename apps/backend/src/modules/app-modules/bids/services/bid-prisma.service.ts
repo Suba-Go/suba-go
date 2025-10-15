@@ -222,7 +222,7 @@ export class BidPrismaService {
             isDeleted: false,
             auctionItem: {
               auction: {
-                status: 'ACTIVE',
+                status: 'ACTIVA',
                 isDeleted: false,
               },
             },
@@ -316,7 +316,7 @@ export class BidPrismaService {
       };
     }
 
-    if (auctionItem.auction.status !== 'ACTIVE') {
+    if (auctionItem.auction.status !== 'ACTIVA') {
       return {
         isValid: false,
         minimumBid: 0,

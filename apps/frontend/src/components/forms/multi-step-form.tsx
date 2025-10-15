@@ -182,7 +182,7 @@ export default function MultiStepForm() {
           />
         )}
         {currentStep === 3 && completedData && (
-          <FormResult tenantData={completedData.tenant as TenantDto} />
+          <FormResult companyData={completedData.company as CompanyDto} />
         )}
       </CardContent>
     </Card>

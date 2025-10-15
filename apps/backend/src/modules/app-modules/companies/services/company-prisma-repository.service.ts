@@ -39,7 +39,23 @@ export class CompanyPrismaRepository {
     });
   }
 
-  async findByNameAndTenant(name: string, tenantId: string): Promise<Company | null> {
+  async findByName(name: string): Promise<Company | null> {
+    return this.prisma.company.findFirst({
+      where: {
+        name,
+        isDeleted: false,
+      },
+      include: {
+        tenant: true,
+        users: true,
+      },
+    });
+  }
+
+  async findByNameAndTenant(
+    name: string,
+    tenantId: string
+  ): Promise<Company | null> {
     return this.prisma.company.findFirst({
       where: {
         name,
