@@ -7,7 +7,7 @@ import { updateUserProfileAction } from '@/domain/server-actions/user/update-pro
 import { useToast } from '@suba-go/shared-components/components/ui/toaster';
 import { Button } from '@suba-go/shared-components/components/ui/button';
 import { darkenColor } from '@/utils/color-utils';
-
+import { Spinner } from '@suba-go/shared-components/components/ui/spinner';
 
 interface ProfileFormWithUserDataProps {
   company: {
@@ -17,7 +17,9 @@ interface ProfileFormWithUserDataProps {
   };
 }
 
-export default function ProfileFormWithUserData({ company }: ProfileFormWithUserDataProps) {
+export default function ProfileFormWithUserData({
+  company,
+}: ProfileFormWithUserDataProps) {
   const { data: session, status, update } = useSession();
   const router = useRouter();
   const { toast } = useToast();
@@ -27,7 +29,7 @@ export default function ProfileFormWithUserData({ company }: ProfileFormWithUser
     name: '',
     email: '',
     phone: '',
-    rut: ''
+    rut: '',
   });
 
   useEffect(() => {
@@ -36,7 +38,7 @@ export default function ProfileFormWithUserData({ company }: ProfileFormWithUser
         name: session.user.name || '',
         email: session.user.email || '',
         phone: session.user.phone || '',
-        rut: session.user.rut || ''
+        rut: session.user.rut || '',
       });
     }
   }, [session]);
@@ -57,7 +59,7 @@ export default function ProfileFormWithUserData({ company }: ProfileFormWithUser
         name: session.user.name || '',
         email: session.user.email || '',
         phone: session.user.phone || '',
-        rut: session.user.rut || ''
+        rut: session.user.rut || '',
       });
     }
   };
@@ -73,7 +75,7 @@ export default function ProfileFormWithUserData({ company }: ProfileFormWithUser
     }
 
     setIsLoading(true);
-    
+
     try {
       // Llamar a la API para actualizar el perfil
       const result = await updateUserProfileAction(session.user.id, {
@@ -92,9 +94,8 @@ export default function ProfileFormWithUserData({ company }: ProfileFormWithUser
             email: userData.email,
             phone: userData.phone,
             rut: userData.rut,
-          }
+          },
         });
-
 
         toast({
           title: 'Perfil actualizado',
@@ -110,7 +111,10 @@ export default function ProfileFormWithUserData({ company }: ProfileFormWithUser
       console.error('Error updating profile:', error);
       toast({
         title: 'Error',
-        description: error instanceof Error ? error.message : 'Error al actualizar el perfil',
+        description:
+          error instanceof Error
+            ? error.message
+            : 'Error al actualizar el perfil',
         variant: 'destructive',
       });
     } finally {
@@ -118,12 +122,14 @@ export default function ProfileFormWithUserData({ company }: ProfileFormWithUser
     }
   };
 
-  const handleInputChange = (field: 'name' | 'email' | 'phone' | 'rut') => (e: React.ChangeEvent<HTMLInputElement>) => {
-    setUserData(prev => ({
-      ...prev,
-      [field]: e.target.value
-    }));
-  };
+  const handleInputChange =
+    (field: 'name' | 'email' | 'phone' | 'rut') =>
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      setUserData((prev) => ({
+        ...prev,
+        [field]: e.target.value,
+      }));
+    };
 
   if (status === 'loading') {
     return (
@@ -131,30 +137,9 @@ export default function ProfileFormWithUserData({ company }: ProfileFormWithUser
         <h2 className="text-xl font-semibold text-gray-900 mb-6 border-b border-gray-200 pb-4">
           Información Personal
         </h2>
-        <div className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Nombre
-            </label>
-            <div className="px-3 py-2 bg-gray-100 border border-gray-200 rounded-md text-gray-400">
-              Cargando...
-            </div>
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Email
-            </label>
-            <div className="px-3 py-2 bg-gray-100 border border-gray-200 rounded-md text-gray-400">
-              Cargando...
-            </div>
-          </div>
-        </div>
-        <div className="flex justify-end space-x-4 pt-4">
-          <div className="px-4 py-2 text-gray-400 border border-gray-200 rounded-md">
-            Cargando...
-          </div>
-          <div className="px-4 py-2 bg-gray-300 text-white rounded-md">
-            Cargando...
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-gray-50">
+          <div className="text-center">
+            <Spinner className="size-8" />
           </div>
         </div>
       </div>
@@ -181,7 +166,7 @@ export default function ProfileFormWithUserData({ company }: ProfileFormWithUser
       <h2 className="text-xl font-semibold text-gray-900 mb-6 border-b border-gray-200 pb-4">
         Información Personal
       </h2>
-      
+
       <div className="space-y-4">
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -201,7 +186,7 @@ export default function ProfileFormWithUserData({ company }: ProfileFormWithUser
             </div>
           )}
         </div>
-        
+
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">
             Email
@@ -258,12 +243,11 @@ export default function ProfileFormWithUserData({ company }: ProfileFormWithUser
             </div>
           )}
         </div>
-
       </div>
 
       {/* Botones de acción */}
       <div className="flex justify-end space-x-4 pt-4">
-        <Button 
+        <Button
           onClick={handleGoBack}
           className="px-4 py-2 text-white rounded-md transition-colors"
           style={{
@@ -272,7 +256,10 @@ export default function ProfileFormWithUserData({ company }: ProfileFormWithUser
           }}
           onMouseEnter={(e) => {
             if (company.principal_color) {
-              e.currentTarget.style.backgroundColor = darkenColor(company.principal_color, 10);
+              e.currentTarget.style.backgroundColor = darkenColor(
+                company.principal_color,
+                10
+              );
             }
           }}
           onMouseLeave={(e) => {
@@ -283,16 +270,16 @@ export default function ProfileFormWithUserData({ company }: ProfileFormWithUser
         >
           Volver
         </Button>
-        
+
         {isEditing ? (
           <>
-            <Button 
+            <Button
               onClick={handleCancel}
               className="px-4 py-2 bg-red-500 text-white border border-red-500 rounded-md hover:bg-red-600 transition-colors"
             >
               Cancelar
             </Button>
-            <Button 
+            <Button
               onClick={handleSave}
               disabled={isLoading}
               className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
@@ -301,7 +288,7 @@ export default function ProfileFormWithUserData({ company }: ProfileFormWithUser
             </Button>
           </>
         ) : (
-          <Button 
+          <Button
             onClick={handleEdit}
             className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
           >

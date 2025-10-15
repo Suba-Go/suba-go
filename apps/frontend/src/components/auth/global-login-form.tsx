@@ -62,9 +62,22 @@ export default function GlobalLoginForm() {
 
       if (data.success && data.data && data.data.companyDomain) {
         // Redirect to company-specific login
-        const companyLoginUrl = `http://${
-          data.data.companyDomain
-        }.localhost:3000/login?email=${encodeURIComponent(email)}`;
+        const protocol =
+          process.env.NODE_ENV === 'production' ? 'https' : 'http';
+        const rootDomain =
+          process.env.NEXT_PUBLIC_ROOT_DOMAIN || 'localhost:3000';
+        const port = process.env.NODE_ENV === 'production' ? '' : ':3000';
+
+        let companyLoginUrl: string;
+        if (process.env.NODE_ENV === 'development') {
+          companyLoginUrl = `${protocol}://${
+            data.data.companyDomain
+          }.localhost${port}/login?email=${encodeURIComponent(email)}`;
+        } else {
+          companyLoginUrl = `${protocol}://${
+            data.data.companyDomain
+          }.${rootDomain}/login?email=${encodeURIComponent(email)}`;
+        }
 
         toast({
           title: 'Redirigiendo...',
@@ -132,14 +145,40 @@ export default function GlobalLoginForm() {
           {isLoading ? 'Buscando empresa...' : 'Continuar'}
         </Button>
       </form>
-
-      <div className="mt-6 text-center">
+      <div className="mt-6 text-center p-3">
         <p className="text-sm text-gray-600">
           ¿No tienes una cuenta?{' '}
-          <Link href="/" className="text-primary hover:underline">
+          <Link
+            href="/#formulario"
+            className="text-primary hover:underline font-medium"
+          >
             Crear empresa
           </Link>
         </p>
+      </div>
+
+      <div className="border-t border-gray-200 pt-3">
+        <div>
+          <Link
+            href="/"
+            className="inline-flex items-center text-sm text-gray-500 hover:text-gray-700 transition-colors duration-200"
+          >
+            <svg
+              className="w-4 h-4 mr-2"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M10 19l-7-7m0 0l7-7m-7 7h18"
+              />
+            </svg>
+            Volver al inicio
+          </Link>
+        </div>
       </div>
     </div>
   );

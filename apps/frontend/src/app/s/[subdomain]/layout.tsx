@@ -20,20 +20,28 @@ export async function generateMetadata({
     );
 
     if (companyResponse.success && companyResponse.data) {
+      const company = companyResponse.data;
+
+      // Use company logo if available, otherwise fallback to logo-white.png
+      const faviconUrl = company.logo || '/logo-white.png';
+
       return {
-        title: companyResponse.data.name,
-        description: `Página de ${companyResponse.data.name}`,
+        title: company.name,
+        description: `Página de ${company.name}`,
+        icons: [{ rel: 'icon', url: faviconUrl }],
       };
     }
 
     return {
       title: 'Empresa',
       description: 'Página de empresa',
+      icons: [{ rel: 'icon', url: '/logo-white.png' }],
     };
   } catch {
     return {
       title: 'Empresa',
       description: 'Página de empresa',
+      icons: [{ rel: 'icon', url: '/logo-white.png' }],
     };
   }
 }
@@ -48,9 +56,7 @@ export default async function SubdomainLayout({
   try {
     const resolvedParams = await params;
     subdomain = resolvedParams.subdomain;
-    const companyResponse = await getCompanyBySubdomainServerAction(
-      subdomain
-    );
+    const companyResponse = await getCompanyBySubdomainServerAction(subdomain);
 
     if (!companyResponse.success || !companyResponse.data) {
       console.error('Company not found:', companyResponse.error);
@@ -66,15 +72,15 @@ export default async function SubdomainLayout({
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Company Navbar - Condicionalmente incluida (no en login) */}
-      <ConditionalNavbar 
+      <ConditionalNavbar
         company={{
           id: company.id,
           name: company.name,
-          principal_color: company.principal_color || undefined
-        }} 
-        subdomain={subdomain} 
+          principal_color: company.principal_color || undefined,
+        }}
+        subdomain={subdomain}
       />
-      
+
       {/* Contenido de la página */}
       {children}
     </div>

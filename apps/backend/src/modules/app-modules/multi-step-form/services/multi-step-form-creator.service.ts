@@ -56,47 +56,23 @@ export class MultiStepFormCreatorService {
       }
 
       // Step 3: Create tenant first (within transaction)
-      // Build domain based on environment
-      const domain =
-        process.env.NODE_ENV === 'development'
-          ? `http://${data.tenantData.subdomain}.localhost:3000` // Development: subdomain.localhost:3000
-          : `https://www.${data.tenantData.subdomain}.subago.cl`; // Production: www.subdomain.subago.cl
-
-      // Check if tenant with same domain already exists
-      const existingTenant = await this.tenantRepository.findByDomain(domain);
-      if (existingTenant) {
-        throw new BadRequestException('Ya existe un tenant con este dominio');
-      }
-
-      // Check if tenant with same name already exists
-      const existingTenantByName = await this.tenantRepository.findByName(
-        data.tenantData.name
-      );
-      if (existingTenantByName) {
-        throw new BadRequestException('Ya existe un tenant con este nombre');
-      }
-
-      // Step 4: Create tenant (within transaction)
+      // Tenant no longer has a name field - company name is used as subdomain
       const savedTenant = await prisma.tenant.create({
-        data: {
-          name: data.tenantData.name,
-          domain: domain,
-        },
+        data: {},
       });
 
-      // Step 5: Create company with tenant reference (within transaction)
-      // Check if company with same name already exists for this tenant
+      // Step 4: Create company with tenant reference (within transaction)
+      // Check if company with same name already exists globally (company name is unique)
       const existingCompany = await prisma.company.findFirst({
         where: {
           name: data.companyData.name,
-          tenantId: savedTenant.id,
           isDeleted: false,
         },
       });
 
       if (existingCompany) {
         throw new BadRequestException(
-          'Ya existe una empresa con este nombre en el tenant'
+          'Ya existe una empresa con este nombre (el nombre de la empresa es el subdominio)'
         );
       }
 
@@ -113,7 +89,7 @@ export class MultiStepFormCreatorService {
         },
       });
 
-      // Step 6: Create user with tenant and company references (within transaction)
+      // Step 5: Create user with tenant and company references (within transaction)
       const saltRounds = 10;
       const hashedPassword = await bcrypt.hash(
         data.userData.password,

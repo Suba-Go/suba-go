@@ -25,9 +25,7 @@ import {
   TabsList,
   TabsTrigger,
 } from '@suba-go/shared-components/components/ui/tabs';
-// import { AuctionItemCard } from './auction-item-card';
-// import { ParticipantsList } from './participants-list';
-// import { AuctionTimer } from './auction-timer';
+import { Spinner } from '@suba-go/shared-components/components/ui/spinner';
 import { useFetchData } from '@/hooks/use-fetch-data';
 import type {
   AuctionData,
@@ -37,6 +35,7 @@ import type {
 import { formatDistanceToNow, format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { AuctionEditModal } from './auction-edit-modal';
+import Image from 'next/image';
 
 interface AuctionDetailProps {
   auctionId: string;
@@ -84,7 +83,13 @@ export function AuctionDetail({
   }
 
   if (isLoading || !auction) {
-    return <div>Cargando...</div>;
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-gray-50">
+        <div className="text-center">
+          <Spinner className="size-8" />
+        </div>
+      </div>
+    );
   }
 
   const startTime = new Date(auction.startTime);
@@ -140,7 +145,7 @@ export function AuctionDetail({
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center gap-4">
-        <Link href={`/s/${subdomain}/subastas`}>
+        <Link href="/subastas">
           <Button variant="ghost" size="sm">
             <ArrowLeft className="h-4 w-4 mr-2" />
             Volver a Subastas
@@ -159,7 +164,7 @@ export function AuctionDetail({
         </div>
 
         {/* Edit button - only show if auction hasn't started */}
-        {auction.status === 'PENDING' && userRole === 'AUCTION_MANAGER' && (
+        {auction.status === 'PENDIENTE' && userRole === 'AUCTION_MANAGER' && (
           <Button
             variant="outline"
             onClick={() => setIsEditModalOpen(true)}
@@ -281,7 +286,7 @@ export function AuctionDetail({
                   onClick={() => {
                     if (auctionItem.item?.id) {
                       window.open(
-                        `/s/${subdomain}/productos/${auctionItem.item.id}`,
+                        `/productos/${auctionItem.item.id}`,
                         '_blank'
                       );
                     }
@@ -290,7 +295,7 @@ export function AuctionDetail({
                   {/* Item Image */}
                   {auctionItem.item?.photos && (
                     <div className="relative h-32 overflow-hidden rounded-t-lg bg-gray-100">
-                      <img
+                      <Image
                         src={auctionItem.item.photos.split(',')[0]?.trim()}
                         alt={`${auctionItem.item.brand} ${auctionItem.item.model}`}
                         className="w-full h-full object-cover"

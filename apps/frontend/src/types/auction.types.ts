@@ -1,5 +1,5 @@
 // Auction-related types for frontend components
-
+import { AuctionStatusEnum } from '@suba-go/shared-validation';
 export interface AuctionBid {
   id: string;
   offered_price: number;
@@ -37,7 +37,7 @@ export interface AuctionData {
   description?: string;
   startTime: string;
   endTime: string;
-  status: string;
+  status: AuctionStatusEnum;
   type: string;
   items?: AuctionItem[];
   createdAt: string;
@@ -50,7 +50,7 @@ export interface AuctionListItem {
   description?: string;
   startTime: string;
   endTime: string;
-  status: string;
+  status: AuctionStatusEnum;
   type: string;
   items?: {
     id: string;
@@ -86,7 +86,7 @@ export interface WebSocketBidData {
 export interface WebSocketAuctionData {
   id: string;
   title: string;
-  status: string;
+  status: AuctionStatusEnum;
   startTime: string;
   endTime: string;
   description: string;

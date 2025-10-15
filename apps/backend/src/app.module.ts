@@ -19,7 +19,7 @@ import { WebsocketsModule } from './modules/providers-modules/websockets/websock
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
-      envFilePath: process.env.NODE_ENV !== 'test' ? '.env' : '.env',
+      envFilePath: '.env',
     }),
     PrismaModule,
     AuthModule,

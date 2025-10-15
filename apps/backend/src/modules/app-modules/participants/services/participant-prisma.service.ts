@@ -76,7 +76,7 @@ export class ParticipantPrismaService {
           some: {
             auctionItem: {
               auction: {
-                status: 'ACTIVE',
+                status: 'ACTIVA',
                 isDeleted: false,
               },
             },
@@ -90,7 +90,7 @@ export class ParticipantPrismaService {
           where: {
             auctionItem: {
               auction: {
-                status: 'ACTIVE',
+                status: 'ACTIVA',
                 isDeleted: false,
               },
             },
@@ -141,7 +141,7 @@ export class ParticipantPrismaService {
               some: {
                 auctionItem: {
                   auction: {
-                    status: 'ACTIVE',
+                    status: 'ACTIVA',
                     isDeleted: false,
                   },
                 },
@@ -271,7 +271,7 @@ export class ParticipantPrismaService {
         tenantId,
         auctionItem: {
           auction: {
-            status: 'ACTIVE',
+            status: 'ACTIVA',
           },
         },
         isDeleted: false,

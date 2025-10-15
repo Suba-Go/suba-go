@@ -147,7 +147,7 @@ export class BidsService {
     }
 
     // Check if auction is still active
-    if (existingBid.auctionItem.auction.status !== 'ACTIVE') {
+    if (existingBid.auctionItem.auction.status !== 'ACTIVA') {
       throw new BadRequestException(
         'No se puede actualizar una puja en una subasta inactiva'
       );
@@ -186,7 +186,7 @@ export class BidsService {
     }
 
     // Check if auction is still active
-    if (bid.auctionItem.auction.status !== 'ACTIVE') {
+    if (bid.auctionItem.auction.status !== 'ACTIVA') {
       throw new BadRequestException(
         'No se puede eliminar una puja en una subasta inactiva'
       );

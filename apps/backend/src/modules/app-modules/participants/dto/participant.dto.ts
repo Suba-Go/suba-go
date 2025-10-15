@@ -6,6 +6,7 @@ import {
   IsBoolean,
 } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { AuctionStatusEnum } from '@prisma/client';
 
 export class InviteParticipantDto {
   @ApiProperty({ description: 'Email del participante a invitar' })
@@ -86,7 +87,7 @@ export class ParticipantBidHistoryDto {
     auction: {
       id: string;
       title: string;
-      status: string;
+      status: AuctionStatusEnum;
       startTime: Date;
       endTime: Date;
     };

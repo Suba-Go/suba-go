@@ -1,6 +1,13 @@
-import { IsString, IsNumber, IsPositive, IsOptional, Min } from 'class-validator';
+import {
+  IsString,
+  IsNumber,
+  IsPositive,
+  IsOptional,
+  Min,
+} from 'class-validator';
 import { Transform } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { AuctionStatusEnum } from '@prisma/client';
 
 export class CreateBidDto {
   @ApiProperty({ description: 'ID del item de subasta' })
@@ -76,7 +83,7 @@ export class BidResponseDto {
     auction: {
       id: string;
       title: string;
-      status: string;
+      status: AuctionStatusEnum;
       startTime: Date;
       endTime: Date;
     };
@@ -93,12 +100,17 @@ export class BidValidationDto {
   @ApiProperty({ description: 'Puja mínima requerida' })
   minimumBid: number;
 
-  @ApiPropertyOptional({ description: 'Mensaje de error si la puja no es válida' })
+  @ApiPropertyOptional({
+    description: 'Mensaje de error si la puja no es válida',
+  })
   message?: string;
 }
 
 export class BidHistoryQueryDto {
-  @ApiPropertyOptional({ description: 'Número de pujas a retornar', default: 10 })
+  @ApiPropertyOptional({
+    description: 'Número de pujas a retornar',
+    default: 10,
+  })
   @IsOptional()
   @IsNumber()
   @Min(1)

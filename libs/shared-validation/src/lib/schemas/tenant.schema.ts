@@ -1,16 +1,11 @@
 import { z } from 'zod';
 import { errorMap } from '../errors/error-map';
-import { name } from './main.schema';
 import { baseSchema } from './base.schema';
 
 z.setErrorMap(errorMap);
 
-export const tenantSchema = baseSchema
-  .extend({
-    name: name,
-    domain: z.string().url(),
-  })
-  .strict();
+// Tenant no longer has a name field - company name is used as subdomain
+export const tenantSchema = baseSchema.strict();
 
 export const tenantCreateSchema = tenantSchema
   .omit({
@@ -19,12 +14,8 @@ export const tenantCreateSchema = tenantSchema
     updatedAt: true,
     deletedAt: true,
     is_deleted: true,
-    domain: true,
   })
-  .strict()
-  .extend({
-    subdomain: z.string().min(3).max(20),
-  });
+  .strict();
 
 export type TenantDto = z.infer<typeof tenantSchema>;
 export type TenantCreateDto = z.infer<typeof tenantCreateSchema>;
