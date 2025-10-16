@@ -93,8 +93,8 @@ export default function CompanyNavbar({
                 Subastas
               </Button>
             </Link>
-            {/* Productos - Solo para AUCTION_MANAGER */}
-            {session?.user?.role === 'AUCTION_MANAGER' && (
+            {/* Productos - Solo para AUCTION_MANAGER y ADMIN */}
+            {(session?.user?.role === 'AUCTION_MANAGER' || session?.user?.role === 'ADMIN') && (
               <Link href="/productos">
                 <Button
                   variant="ghost"
@@ -105,9 +105,9 @@ export default function CompanyNavbar({
                 </Button>
               </Link>
             )}
-            {/* Usuarios - Solo para AUCTION_MANAGER */}
-            {session?.user?.role === 'AUCTION_MANAGER' && (
-              <Link href={`/s/${subdomain}/usuarios`}>
+            {/* Usuarios - Solo para AUCTION_MANAGER y ADMIN */}
+            {(session?.user?.role === 'AUCTION_MANAGER' || session?.user?.role === 'ADMIN') && (
+              <Link href="/usuarios">
                 <Button
                   variant="ghost"
                   className="text-gray-600 hover:text-gray-900 flex items-center gap-2"
@@ -203,8 +203,8 @@ export default function CompanyNavbar({
               Subastas
             </Button>
           </Link>
-          {/* Productos - Solo para AUCTION_MANAGER */}
-          {session?.user?.role === 'AUCTION_MANAGER' && (
+          {/* Productos - Solo para AUCTION_MANAGER y ADMIN */}
+          {(session?.user?.role === 'AUCTION_MANAGER' || session?.user?.role === 'ADMIN') && (
             <Link href="/productos">
               <Button
                 variant="ghost"
@@ -215,9 +215,9 @@ export default function CompanyNavbar({
               </Button>
             </Link>
           )}
-          {/* Usuarios - Solo para AUCTION_MANAGER */}
-          {session?.user?.role === 'AUCTION_MANAGER' && (
-            <Link href={`/s/${subdomain}/usuarios`}>
+          {/* Usuarios - Solo para AUCTION_MANAGER y ADMIN */}
+          {(session?.user?.role === 'AUCTION_MANAGER' || session?.user?.role === 'ADMIN') && (
+            <Link href="/usuarios">
               <Button
                 variant="ghost"
                 className="w-full text-left justify-start text-gray-600 hover:text-gray-900 flex items-center gap-2"

@@ -16,8 +16,8 @@ export default async function ProductsPage({ params }: ProductsPageProps) {
     redirect('/login');
   }
 
-  // Verificar que el usuario tenga rol de AUCTION_MANAGER
-  if (session.user.role !== 'AUCTION_MANAGER') {
+  // Verificar que el usuario tenga rol de AUCTION_MANAGER o ADMIN
+  if (session.user.role !== 'AUCTION_MANAGER' && session.user.role !== 'ADMIN') {
     redirect('/');
   }
 

@@ -47,6 +47,13 @@ export default auth(async function middleware(request: NextRequest) {
       );
     }
 
+    // Users page
+    if (pathname === '/usuarios') {
+      return NextResponse.rewrite(
+        new URL(`/s/${subdomain}/usuarios`, request.url)
+      );
+    }
+
     // Auctions pages
     if (pathname === '/subastas') {
       return NextResponse.rewrite(

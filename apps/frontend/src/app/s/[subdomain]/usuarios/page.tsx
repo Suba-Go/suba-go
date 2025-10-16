@@ -15,9 +15,9 @@ export default async function UsuariosPage({
     redirect('/login');
   }
 
-  // Verify user has AUCTION_MANAGER role
-  if (session.user.role !== 'AUCTION_MANAGER') {
-    redirect(`/s/${subdomain}`);
+  // Verify user has AUCTION_MANAGER role or ADMIN role
+  if (session.user.role !== 'AUCTION_MANAGER' && session.user.role !== 'ADMIN') {
+    redirect('/');
   }
 
   return (

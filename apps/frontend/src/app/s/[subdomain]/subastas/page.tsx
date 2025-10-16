@@ -16,11 +16,6 @@ export default async function SubastasPage({
     redirect('/login');
   }
 
-  // Verify user has AUCTION_MANAGER role
-  if (session.user.role !== 'AUCTION_MANAGER') {
-    redirect('/');
-  }
-
   return (
     <div className="container mx-auto px-4 py-8">
       <div className="flex justify-between items-center mb-8">

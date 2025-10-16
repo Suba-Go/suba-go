@@ -81,10 +81,19 @@ export class UserLookupService {
         };
       }
 
-      // The tenant name is the subdomain
-      const userTenantSubdomain = user.company.name;
+      // normaliza el nombre de la empresa para que coincida con el formato del subdominio
+      const normalizeCompanyName = (name: string): string => {
+        return name
+          .toLowerCase()
+          .replace(/[^a-z0-9]/g, '')
+          .substring(0, 20);
+      };
 
-      // Compare the tenant subdomain with the requested subdomain
+      // el nombre del tenant es el subdominio se normaliza para que coincida 
+      // con el formato del subdominio para la comparación
+      const userTenantSubdomain = normalizeCompanyName(user.company.name);
+
+      // se compara el nombre del tenant normalizado con el subdominio solicitado
       if (userTenantSubdomain !== subdomain) {
         return {
           isValid: false,
