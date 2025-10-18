@@ -294,13 +294,16 @@ export function AuctionDetail({
                 >
                   {/* Item Image */}
                   {auctionItem.item?.photos && (
-                    <div className="relative h-32 overflow-hidden rounded-t-lg bg-gray-100">
+                    <div className="relative h-48 overflow-hidden rounded-t-lg bg-gray-100">
                       <Image
                         src={auctionItem.item.photos.split(',')[0]?.trim()}
                         alt={`${auctionItem.item.brand} ${auctionItem.item.model}`}
-                        className="w-full h-full object-cover"
+                        fill
+                        className="object-cover"
+                        sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
                         onError={(e) => {
-                          e.currentTarget.src =
+                          const target = e.currentTarget as HTMLImageElement;
+                          target.src =
                             'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgdmlld0JveD0iMCAwIDIwMCAyMDAiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxyZWN0IHdpZHRoPSIyMDAiIGhlaWdodD0iMjAwIiBmaWxsPSIjRjNGNEY2Ii8+CjxwYXRoIGQ9Ik04MCA2MEgxMjBWODBIODBWNjBaIiBmaWxsPSIjOUI5QkEwIi8+CjxwYXRoIGQ9Ik02MCA4MEgxNDBWMTQwSDYwVjgwWiIgZmlsbD0iIzlCOUJBMCIvPgo8L3N2Zz4K';
                         }}
                       />

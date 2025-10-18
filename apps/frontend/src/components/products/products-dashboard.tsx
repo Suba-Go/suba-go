@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { Plus, Search, Edit, Trash2, Eye, Package } from 'lucide-react';
 import { ItemStateEnum } from '@suba-go/shared-validation';
 import { Button } from '@suba-go/shared-components/components/ui/button';
@@ -14,7 +15,6 @@ import {
 import { Badge } from '@suba-go/shared-components/components/ui/badge';
 import { useToast } from '@suba-go/shared-components/components/ui/toaster';
 import { ProductCreateModal } from './product-create-modal';
-import { ProductDetailModal } from './product-detail-modal';
 import { ProductEditModal } from './product-edit-modal';
 
 interface Product {
@@ -37,13 +37,13 @@ interface ProductsDashboardProps {
 }
 
 export function ProductsDashboard({ subdomain }: ProductsDashboardProps) {
+  const router = useRouter();
   const [products, setProducts] = useState<Product[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterState, setFilterState] = useState('all');
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
-  const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const { toast } = useToast();
 
@@ -261,10 +261,7 @@ export function ProductsDashboard({ subdomain }: ProductsDashboardProps) {
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => {
-                    setSelectedProduct(product);
-                    setIsDetailModalOpen(true);
-                  }}
+                  onClick={() => router.push(`/productos/${product.id}`)}
                   className="flex-1"
                 >
                   <Eye className="h-4 w-4 mr-1" />
@@ -322,12 +319,6 @@ export function ProductsDashboard({ subdomain }: ProductsDashboardProps) {
         onClose={() => setIsCreateModalOpen(false)}
         onSuccess={handleCreateSuccess}
         subdomain={subdomain}
-      />
-
-      <ProductDetailModal
-        isOpen={isDetailModalOpen}
-        onClose={() => setIsDetailModalOpen(false)}
-        product={selectedProduct}
       />
 
       <ProductEditModal
