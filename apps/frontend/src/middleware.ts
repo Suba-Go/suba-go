@@ -47,10 +47,27 @@ export default auth(async function middleware(request: NextRequest) {
       );
     }
 
+    // Product detail page
+    if (
+      pathname.startsWith('/productos/') &&
+      pathname.split('/').length === 3
+    ) {
+      const productId = pathname.split('/')[2];
+      return NextResponse.rewrite(
+        new URL(`/s/${subdomain}/productos/${productId}`, request.url)
+      );
+    }
+
     // Auctions pages
     if (pathname === '/subastas') {
       return NextResponse.rewrite(
         new URL(`/s/${subdomain}/subastas`, request.url)
+      );
+    }
+
+    if (pathname === '/usuarios') {
+      return NextResponse.rewrite(
+        new URL(`/s/${subdomain}/usuarios`, request.url)
       );
     }
 

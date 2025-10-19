@@ -5,7 +5,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { LegalStatusEnum, ItemStateEnum } from '@suba-go/shared-validation';
-import { Car } from 'lucide-react';
+import { Car, X, Image as ImageIcon, FileText } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -25,6 +25,7 @@ import {
   SelectValue,
 } from '@suba-go/shared-components/components/ui/select';
 import { useToast } from '@suba-go/shared-components/components/ui/toaster';
+import { FileUpload } from '@/components/ui/file-upload';
 
 const productEditSchema = z.object({
   plate: z.string().optional(),
@@ -73,7 +74,21 @@ export function ProductEditModal({
   const [isLoading, setIsLoading] = useState(false);
   const [photoUrls, setPhotoUrls] = useState<string[]>([]);
   const [docUrls, setDocUrls] = useState<string[]>([]);
+  const [newPhotoUrls, setNewPhotoUrls] = useState<string[]>([]);
+  const [newDocUrls, setNewDocUrls] = useState<string[]>([]);
   const { toast } = useToast();
+
+  // Extract filename from Vercel Blob URL
+  const getFilenameFromUrl = (url: string): string => {
+    try {
+      const urlParts = url.split('/');
+      const filename = urlParts[urlParts.length - 1];
+      const cleanFilename = filename.replace(/-[a-zA-Z0-9]{6,}\./g, '.');
+      return decodeURIComponent(cleanFilename);
+    } catch {
+      return 'Archivo';
+    }
+  };
 
   const {
     register,
@@ -89,39 +104,98 @@ export function ProductEditModal({
   // Load product data when modal opens
   useEffect(() => {
     if (product && isOpen) {
-      reset({
+      console.log('Loading product data into form:', product);
+      console.log('Product legal_status:', product.legal_status);
+
+      const formData = {
         plate: product.plate || '',
         brand: product.brand || '',
         model: product.model || '',
         year: product.year || undefined,
         version: product.version || '',
         kilometraje: product.kilometraje || undefined,
-        legal_status: (product.legal_status as LegalStatusEnum) || undefined,
+        legal_status: product.legal_status as LegalStatusEnum | undefined,
         state: product.state as ItemStateEnum,
         basePrice: product.basePrice || undefined,
         description: product.description || '',
-      });
+      };
+
+      console.log('Form data to reset:', formData);
+      reset(formData);
+
+      // Explicitly set legal_status if it exists
+      if (product.legal_status) {
+        setValue('legal_status', product.legal_status as LegalStatusEnum, {
+          shouldValidate: true,
+          shouldDirty: false,
+        });
+        console.log('Set legal_status to:', product.legal_status);
+      }
 
       // Load existing photos and docs
       if (product.photos) {
         setPhotoUrls(product.photos.split(',').map((url) => url.trim()));
+      } else {
+        setPhotoUrls([]);
       }
       if (product.docs) {
         setDocUrls(product.docs.split(',').map((url) => url.trim()));
+      } else {
+        setDocUrls([]);
       }
+
+      // Reset new uploads
+      setNewPhotoUrls([]);
+      setNewDocUrls([]);
     }
-  }, [product, isOpen, reset]);
+  }, [product, isOpen, reset, setValue]);
+
+  const removePhoto = (index: number) => {
+    setPhotoUrls((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  const removeDoc = (index: number) => {
+    setDocUrls((prev) => prev.filter((_, i) => i !== index));
+  };
 
   const onSubmit = async (data: ProductEditFormData) => {
-    if (!product) return;
+    console.log('=== PRODUCT UPDATE STARTED ===');
+    console.log('onSubmit called with data:', data);
+    console.log('Product:', product);
+    console.log('Form errors:', errors);
+    console.log('Form is valid:', Object.keys(errors).length === 0);
+
+    if (!product) {
+      console.error('No product selected');
+      return;
+    }
 
     setIsLoading(true);
     try {
+      // Combine existing and new URLs
+      const allPhotoUrls = [...photoUrls, ...newPhotoUrls];
+      const allDocUrls = [...docUrls, ...newDocUrls];
+
+      console.log('Photo URLs:', {
+        existing: photoUrls,
+        new: newPhotoUrls,
+        all: allPhotoUrls,
+      });
+      console.log('Doc URLs:', {
+        existing: docUrls,
+        new: newDocUrls,
+        all: allDocUrls,
+      });
+
       const requestBody = {
         ...data,
-        photos: photoUrls.length > 0 ? photoUrls.join(', ') : null,
-        docs: docUrls.length > 0 ? docUrls.join(', ') : null,
+        photos: allPhotoUrls.length > 0 ? allPhotoUrls.join(', ') : null,
+        docs: allDocUrls.length > 0 ? allDocUrls.join(', ') : null,
       };
+
+      console.log('Request body:', requestBody);
+      console.log('Updating product with ID:', product.id);
+      console.log('API endpoint:', `/api/items/${product.id}`);
 
       const response = await fetch(`/api/items/${product.id}`, {
         method: 'PUT',
@@ -131,10 +205,18 @@ export function ProductEditModal({
         body: JSON.stringify(requestBody),
       });
 
+      console.log('Response status:', response.status);
+      console.log('Response ok:', response.ok);
+
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
+        console.error('Error response:', errorData);
         throw new Error(errorData.error || 'Error al actualizar el producto');
       }
+
+      const result = await response.json();
+      console.log('Update successful:', result);
+      console.log('=== PRODUCT UPDATE COMPLETED ===');
 
       toast({
         title: 'Éxito',
@@ -145,7 +227,11 @@ export function ProductEditModal({
       handleCloseClick();
       onSuccess();
     } catch (error) {
+      console.error('=== PRODUCT UPDATE FAILED ===');
       console.error('Error updating product:', error);
+      console.error('Error type:', typeof error);
+      console.error('Error details:', error);
+
       toast({
         title: 'Error',
         description:
@@ -164,6 +250,8 @@ export function ProductEditModal({
       reset();
       setPhotoUrls([]);
       setDocUrls([]);
+      setNewPhotoUrls([]);
+      setNewDocUrls([]);
       onClose();
     }
   };
@@ -347,6 +435,105 @@ export function ProductEditModal({
                 {errors.description.message}
               </p>
             )}
+          </div>
+
+          {/* Existing Photos */}
+          {photoUrls.length > 0 && (
+            <div className="space-y-3">
+              <Label className="flex items-center gap-2">
+                <ImageIcon className="h-4 w-4" />
+                Fotos Actuales ({photoUrls.length})
+              </Label>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                {photoUrls.map((url, index) => (
+                  <div key={index} className="relative group">
+                    <div className="aspect-video bg-gray-100 rounded-lg overflow-hidden">
+                      <img
+                        src={url}
+                        alt={`Foto ${index + 1}`}
+                        className="w-full h-full object-cover"
+                      />
+                    </div>
+                    <Button
+                      type="button"
+                      variant="destructive"
+                      size="sm"
+                      className="absolute top-1 right-1 h-6 w-6 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
+                      onClick={() => removePhoto(index)}
+                    >
+                      <X className="h-3 w-3" />
+                    </Button>
+                    <p
+                      className="text-xs text-gray-500 mt-1 truncate"
+                      title={getFilenameFromUrl(url)}
+                    >
+                      {getFilenameFromUrl(url)}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Upload New Photos */}
+          <div>
+            <FileUpload
+              label="Agregar Nuevas Fotos"
+              description="Sube fotos adicionales del producto (máximo 10 archivos)"
+              acceptedTypes={['image/*']}
+              maxFiles={10}
+              maxSizeInMB={5}
+              onFilesChange={setNewPhotoUrls}
+            />
+          </div>
+
+          {/* Existing Documents */}
+          {docUrls.length > 0 && (
+            <div className="space-y-3">
+              <Label className="flex items-center gap-2">
+                <FileText className="h-4 w-4" />
+                Documentos Actuales ({docUrls.length})
+              </Label>
+              <div className="space-y-2">
+                {docUrls.map((url, index) => (
+                  <div
+                    key={index}
+                    className="flex items-center justify-between p-3 border rounded-lg group"
+                  >
+                    <div className="flex items-center gap-2 flex-1 min-w-0">
+                      <FileText className="h-4 w-4 text-gray-500 flex-shrink-0" />
+                      <span
+                        className="text-sm truncate"
+                        title={getFilenameFromUrl(url)}
+                      >
+                        {getFilenameFromUrl(url)}
+                      </span>
+                    </div>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="h-8 w-8 p-0 text-red-500 hover:text-red-700 hover:bg-red-50"
+                      onClick={() => removeDoc(index)}
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Upload New Documents */}
+          <div>
+            <FileUpload
+              label="Agregar Nuevos Documentos"
+              description="Sube documentos adicionales (PDF, DOC, etc.)"
+              acceptedTypes={['application/pdf', '.doc', '.docx', '.txt']}
+              maxFiles={5}
+              maxSizeInMB={10}
+              onFilesChange={setNewDocUrls}
+            />
           </div>
 
           {/* Actions */}

@@ -16,7 +16,7 @@ export default function Home() {
         <div className="container mx-auto px-4">
           <div className="max-w-4xl mx-auto text-center">
             <h1 className="text-6xl font-bold mb-6">Suba&Go</h1>
-            <p className="text-2xl mb-8 leading-relaxed">
+            <p className="text-2xl mb-8 leading-relaxed text-dark font-bold">
               La forma más simple y rentable de vender
             </p>
             <p className="text-xl mb-8 opacity-90">

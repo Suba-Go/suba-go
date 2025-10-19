@@ -193,9 +193,9 @@ export function AuctionCard({
         {/* Schedule */}
         <div className="text-xs text-gray-500 space-y-1">
           <div>
-            Inicio: {format(startTime, 'dd/MM/yyyy HH:mm', { locale: es })}
+            Inicio: {format(startTime, 'dd/mm/yyyy HH:mm', { locale: es })}
           </div>
-          <div>Fin: {format(endTime, 'dd/MM/yyyy HH:mm', { locale: es })}</div>
+          <div>Fin: {format(endTime, 'dd/mm/yyyy HH:mm', { locale: es })}</div>
         </div>
 
         {/* Action Button */}
