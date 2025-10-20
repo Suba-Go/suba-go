@@ -39,11 +39,11 @@ importers:
         specifier: ^11.1.6
         version: 11.1.6(@nestjs/common@11.1.3(class-transformer@0.5.1)(class-validator@0.14.2)(reflect-metadata@0.1.14)(rxjs@7.8.2))(@nestjs/core@11.1.3)(@nestjs/platform-socket.io@11.1.6)(reflect-metadata@0.1.14)(rxjs@7.8.2)
       '@prisma/client':
-        specifier: ^6.15.0
-        version: 6.15.0(prisma@6.15.0(typescript@5.8.3))(typescript@5.8.3)
+        specifier: ^6.17.1
+        version: 6.17.1(prisma@6.15.0(typescript@5.8.3))(typescript@5.8.3)
       '@prisma/extension-accelerate':
         specifier: ^2.0.2
-        version: 2.0.2(@prisma/client@6.15.0(prisma@6.15.0(typescript@5.8.3))(typescript@5.8.3))
+        version: 2.0.2(@prisma/client@6.17.1(prisma@6.15.0(typescript@5.8.3))(typescript@5.8.3))
       '@radix-ui/react-checkbox':
         specifier: ^1.3.3
         version: 1.3.3(@types/react-dom@19.0.0)(@types/react@19.0.0)(react-dom@19.0.0(react@19.0.0))(react@19.0.0)
@@ -2222,8 +2222,8 @@ packages:
     resolution: {integrity: sha512-+1VkjdD0QBLPodGrJUeqarH8VAIvQODIbwh9XpP5Syisf7YoQgsJKPNFoqqLQlu+VQ/tVSshMR6loPMn8U+dPg==}
     engines: {node: '>=14'}
 
-  '@prisma/client@6.15.0':
-    resolution: {integrity: sha512-wR2LXUbOH4cL/WToatI/Y2c7uzni76oNFND7+23ypLllBmIS8e3ZHhO+nud9iXSXKFt1SoM3fTZvHawg63emZw==}
+  '@prisma/client@6.17.1':
+    resolution: {integrity: sha512-zL58jbLzYamjnNnmNA51IOZdbk5ci03KviXCuB0Tydc9btH2kDWsi1pQm2VecviRTM7jGia0OPPkgpGnT3nKvw==}
     engines: {node: '>=18.18'}
     peerDependencies:
       prisma: '*'
@@ -11135,7 +11135,7 @@ snapshots:
   '@pkgjs/parseargs@0.11.0':
     optional: true
 
-  '@prisma/client@6.15.0(prisma@6.15.0(typescript@5.8.3))(typescript@5.8.3)':
+  '@prisma/client@6.17.1(prisma@6.15.0(typescript@5.8.3))(typescript@5.8.3)':
     optionalDependencies:
       prisma: 6.15.0(typescript@5.8.3)
       typescript: 5.8.3
@@ -11160,9 +11160,9 @@ snapshots:
       '@prisma/fetch-engine': 6.15.0
       '@prisma/get-platform': 6.15.0
 
-  '@prisma/extension-accelerate@2.0.2(@prisma/client@6.15.0(prisma@6.15.0(typescript@5.8.3))(typescript@5.8.3))':
+  '@prisma/extension-accelerate@2.0.2(@prisma/client@6.17.1(prisma@6.15.0(typescript@5.8.3))(typescript@5.8.3))':
     dependencies:
-      '@prisma/client': 6.15.0(prisma@6.15.0(typescript@5.8.3))(typescript@5.8.3)
+      '@prisma/client': 6.17.1(prisma@6.15.0(typescript@5.8.3))(typescript@5.8.3)
 
   '@prisma/fetch-engine@6.15.0':
     dependencies:

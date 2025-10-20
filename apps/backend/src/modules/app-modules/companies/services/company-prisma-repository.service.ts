@@ -40,9 +40,10 @@ export class CompanyPrismaRepository {
   }
 
   async findByName(name: string): Promise<Company | null> {
+    // Case-insensitive search using nameLowercase field
     return this.prisma.company.findFirst({
       where: {
-        name,
+        nameLowercase: name.toLowerCase(),
         isDeleted: false,
       },
       include: {
@@ -56,9 +57,10 @@ export class CompanyPrismaRepository {
     name: string,
     tenantId: string
   ): Promise<Company | null> {
+    // Case-insensitive search using nameLowercase field
     return this.prisma.company.findFirst({
       where: {
-        name,
+        nameLowercase: name.toLowerCase(),
         tenantId,
         isDeleted: false,
       },

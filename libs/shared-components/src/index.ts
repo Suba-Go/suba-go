@@ -4,3 +4,13 @@
 
 // Export tenant utilities
 export { getSubdomainFromHost } from './lib/tenant/subdomain-from-host';
+
+// Export environment utilities
+export {
+  getNodeEnv,
+  isLocal,
+  isDevelopment,
+  isProduction,
+  isTest,
+  type AppEnvironment,
+} from './lib/env';

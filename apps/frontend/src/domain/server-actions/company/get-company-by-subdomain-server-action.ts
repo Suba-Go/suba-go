@@ -7,13 +7,10 @@ export const getCompanyBySubdomainServerAction = async (
   subdomain: string
 ): Promise<ApiResponse<CompanyDto>> => {
   try {
-    const result = await fetcher(
-      `/companies/subdomain/${subdomain}`,
-      {
-        method: 'GET',
-        requireAuth: false, // Public endpoint for subdomain pages
-      }
-    );
+    const result = await fetcher(`/companies/subdomain/${subdomain}`, {
+      method: 'GET',
+      requireAuth: false, // Public endpoint for subdomain pages
+    });
 
     if (result.success) {
       return {

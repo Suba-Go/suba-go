@@ -112,7 +112,8 @@ model Company {
   deletedAt DateTime?
 
   // Company-specific fields matching TypeORM entity
-  name              String @unique
+  name              String  @unique
+  nameLowercase     String  @unique // Lowercase version for case-insensitive subdomain lookup
   logo              String?
   principal_color   String?
   principal_color2  String?
