@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from './auth';
 import { getSubdomainFromHost } from '@suba-go/shared-components';
+import { isUserProfileComplete } from './utils/subdomain-profile-validation';
 
 const ROOT_DOMAIN = process.env.ROOT_DOMAIN ?? 'subago.cl';
 
@@ -83,13 +84,27 @@ export default auth(async function middleware(request: NextRequest) {
 
     // Validate user belongs to the company (subdomain is company name)
     if (session && !isPublic) {
-      const userCompanyName = session.user?.company?.name ?? '';
+    const userCompanyName = session.user?.company?.name ?? '';
 
-      if (userCompanyName !== subdomain) {
-        // Redirect to login if user doesn't belong to this company
-        const login = new URL('/login', request.url);
-        return NextResponse.redirect(login);
-      }
+    if (userCompanyName !== subdomain) {
+      // Redirect to login if user doesn't belong to this company
+      const login = new URL('/login', request.url);
+      return NextResponse.redirect(login);
+    }
+
+    // Check if user profile is complete - redirect to /perfil if not
+    if (!isUserProfileComplete(session)) {
+      console.log('Profile incomplete, redirecting to /perfil', {
+        user: session.user?.email,
+        name: session.user?.name,
+        phone: session.user?.phone,
+        rut: session.user?.rut,
+        pathname: pathname,
+      });
+      
+      // Si está en la página de inicio, permitir acceso pero mostrar advertencia
+      return NextResponse.redirect(new URL('/perfil', request.url));
+    }
     }
 
     // bloquea zonas globales desde subdominios

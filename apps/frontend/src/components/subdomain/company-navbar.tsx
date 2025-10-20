@@ -10,6 +10,7 @@ import { User, LogOut, ChevronDown, Gavel, Package, Users } from 'lucide-react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { Spinner } from '@suba-go/shared-components/components/ui/spinner';
+import { isUserProfileComplete } from '@/utils/subdomain-profile-validation';
 
 interface CompanyNavbarProps {
   company: CompanyDto;
@@ -83,6 +84,8 @@ export default function CompanyNavbar({
           </Link>
 
           {/* Navigation Menu */}
+          {/* verifcar si el perfil está completo */}
+          {isUserProfileComplete(session) && (
           <nav className="hidden md:flex items-center space-x-6">
             <Link href="/subastas">
               <Button
@@ -118,6 +121,7 @@ export default function CompanyNavbar({
               </Link>
             )}
           </nav>
+          )}
 
           {/* Right side actions */}
           <div className="flex items-center space-x-4">
