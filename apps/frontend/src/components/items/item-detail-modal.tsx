@@ -1,8 +1,14 @@
 'use client';
 
 import { useState } from 'react';
-import { Car, Calendar, Gauge, FileText, Image } from 'lucide-react';
-import { ItemStateEnum } from '@suba-go/shared-validation';
+import {
+  Car,
+  Calendar,
+  Gauge,
+  FileText,
+  Image as ImageIcon,
+} from 'lucide-react';
+import { ItemDto, ItemStateEnum } from '@suba-go/shared-validation';
 import {
   Dialog,
   DialogContent,
@@ -20,39 +26,25 @@ import {
   CarouselPrevious,
 } from '@suba-go/shared-components/components/ui/carousel';
 import { DocumentPreview } from '@/components/ui/document-preview';
+import Image from 'next/image';
 
-interface Product {
-  id: string;
-  plate?: string;
-  brand?: string;
-  model?: string;
-  year?: number;
-  version?: string;
-  kilometraje?: number;
-  legal_status?: string;
-  state: string;
-  photos?: string;
-  docs?: string;
-  createdAt: string;
-}
-
-interface ProductDetailModalProps {
+interface ItemDetailModalProps {
   isOpen: boolean;
   onClose: () => void;
-  product: Product | null;
+  item: ItemDto | null;
 }
 
-export function ProductDetailModal({
+export function ItemDetailModal({
   isOpen,
   onClose,
-  product,
-}: ProductDetailModalProps) {
+  item,
+}: ItemDetailModalProps) {
   const [selectedDoc, setSelectedDoc] = useState<{
     url: string;
     filename: string;
   } | null>(null);
 
-  if (!product) return null;
+  if (!item) return null;
 
   const getStateColor = (state: string) => {
     switch (state) {
@@ -69,7 +61,7 @@ export function ProductDetailModal({
     }
   };
 
-  const formatDate = (dateString: string) => {
+  const formatDate = (dateString: Date) => {
     return new Date(dateString).toLocaleDateString('es-CL', {
       year: 'numeric',
       month: 'long',
@@ -77,11 +69,11 @@ export function ProductDetailModal({
     });
   };
 
-  const photoUrls = product.photos
-    ? product.photos.split(',').map((url) => url.trim())
+  const photoUrls = item.photos
+    ? item.photos.split(',').map((url) => url.trim())
     : [];
-  const docUrls = product.docs
-    ? product.docs.split(',').map((url) => url.trim())
+  const docUrls = item.docs
+    ? item.docs.split(',').map((url) => url.trim())
     : [];
 
   // Extract filename from Vercel Blob URL
@@ -115,15 +107,13 @@ export function ProductDetailModal({
           <div className="flex justify-between items-start">
             <div>
               <h2 className="text-2xl font-bold">
-                {product.plate || 'Sin Patente'}
+                {item.plate || 'Sin Patente'}
               </h2>
               <p className="text-gray-600">
-                {product.brand} {product.model} {product.year}
+                {item.brand} {item.model} {item.year}
               </p>
             </div>
-            <Badge className={getStateColor(product.state)}>
-              {product.state}
-            </Badge>
+            <Badge className={getStateColor(item.state)}>{item.state}</Badge>
           </div>
 
           {/* Información básica */}
@@ -137,31 +127,31 @@ export function ProductDetailModal({
               <div className="space-y-3">
                 <div className="flex justify-between">
                   <span className="font-medium">Patente:</span>
-                  <span>{product.plate || 'N/A'}</span>
+                  <span>{item.plate || 'N/A'}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="font-medium">Marca:</span>
-                  <span>{product.brand || 'N/A'}</span>
+                  <span>{item.brand || 'N/A'}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="font-medium">Modelo:</span>
-                  <span>{product.model || 'N/A'}</span>
+                  <span>{item.model || 'N/A'}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="font-medium">Año:</span>
-                  <span>{product.year || 'N/A'}</span>
+                  <span>{item.year || 'N/A'}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="font-medium">Versión:</span>
-                  <span>{product.version || 'N/A'}</span>
+                  <span>{item.version || 'N/A'}</span>
                 </div>
-                {product.kilometraje && (
+                {item.kilometraje && (
                   <div className="flex justify-between">
                     <span className="font-medium flex items-center gap-1">
                       <Gauge className="h-4 w-4" />
                       Kilometraje:
                     </span>
-                    <span>{product.kilometraje.toLocaleString()} km</span>
+                    <span>{item.kilometraje.toLocaleString()} km</span>
                   </div>
                 )}
               </div>
@@ -176,34 +166,36 @@ export function ProductDetailModal({
               <div className="space-y-3">
                 <div className="flex justify-between">
                   <span className="font-medium">Estado Legal:</span>
-                  <span>{product.legal_status || 'N/A'}</span>
+                  <span>{item.legal_status || 'N/A'}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="font-medium flex items-center gap-1">
                     <Calendar className="h-4 w-4" />
                     Fecha de Creación:
                   </span>
-                  <span>{formatDate(product.createdAt)}</span>
+                  <span>{formatDate(item.createdAt as Date)}</span>
                 </div>
               </div>
             </div>
           </div>
 
           {/* Fotos - Carousel */}
-          {photoUrls.length > 0 && (
-            <div className="space-y-4">
-              <h3 className="text-lg font-semibold flex items-center gap-2">
-                <Image className="h-5 w-5" />
-                Fotos ({photoUrls.length})
-              </h3>
+          <div className="space-y-4">
+            <h3 className="text-lg font-semibold flex items-center gap-2">
+              <ImageIcon className="h-5 w-5" />
+              Fotos {photoUrls.length > 0 && `(${photoUrls.length})`}
+            </h3>
+            {photoUrls.length > 0 ? (
               <Carousel className="w-full">
                 <CarouselContent>
                   {photoUrls.map((url, index) => (
                     <CarouselItem key={index}>
                       <div className="aspect-video bg-gray-100 rounded-lg overflow-hidden">
-                        <img
+                        <Image
                           src={url}
                           alt={`Foto ${index + 1}`}
+                          width={100}
+                          height={100}
                           className="w-full h-full object-cover"
                           onError={(e) => {
                             const target = e.target as HTMLImageElement;
@@ -229,16 +221,21 @@ export function ProductDetailModal({
                 <CarouselPrevious />
                 <CarouselNext />
               </Carousel>
-            </div>
-          )}
+            ) : (
+              <div className="p-8 text-center bg-gray-50 rounded-lg border-2 border-dashed border-gray-300">
+                <ImageIcon className="h-12 w-12 text-gray-400 mx-auto mb-2" />
+                <p className="text-gray-600">No hay fotos disponibles</p>
+              </div>
+            )}
+          </div>
 
           {/* Documentos - With Preview */}
-          {docUrls.length > 0 && (
-            <div className="space-y-4">
-              <h3 className="text-lg font-semibold flex items-center gap-2">
-                <FileText className="h-5 w-5" />
-                Documentos ({docUrls.length})
-              </h3>
+          <div className="space-y-4">
+            <h3 className="text-lg font-semibold flex items-center gap-2">
+              <FileText className="h-5 w-5" />
+              Documentos {docUrls.length > 0 && `(${docUrls.length})`}
+            </h3>
+            {docUrls.length > 0 ? (
               <Carousel className="w-full">
                 <CarouselContent>
                   {docUrls.map((url, index) => (
@@ -293,8 +290,13 @@ export function ProductDetailModal({
                 <CarouselPrevious />
                 <CarouselNext />
               </Carousel>
-            </div>
-          )}
+            ) : (
+              <div className="p-8 text-center bg-gray-50 rounded-lg border-2 border-dashed border-gray-300">
+                <FileText className="h-12 w-12 text-gray-400 mx-auto mb-2" />
+                <p className="text-gray-600">No hay documentos disponibles</p>
+              </div>
+            )}
+          </div>
 
           {/* Actions */}
           <div className="flex justify-end gap-3 pt-4 border-t">

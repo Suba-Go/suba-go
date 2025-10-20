@@ -41,20 +41,17 @@ export default auth(async function middleware(request: NextRequest) {
     }
 
     // Products page
-    if (pathname === '/productos') {
+    if (pathname === '/items') {
       return NextResponse.rewrite(
-        new URL(`/s/${subdomain}/productos`, request.url)
+        new URL(`/s/${subdomain}/items`, request.url)
       );
     }
 
     // Product detail page
-    if (
-      pathname.startsWith('/productos/') &&
-      pathname.split('/').length === 3
-    ) {
-      const productId = pathname.split('/')[2];
+    if (pathname.startsWith('/items/') && pathname.split('/').length === 3) {
+      const itemId = pathname.split('/')[2];
       return NextResponse.rewrite(
-        new URL(`/s/${subdomain}/productos/${productId}`, request.url)
+        new URL(`/s/${subdomain}/items/${itemId}`, request.url)
       );
     }
 

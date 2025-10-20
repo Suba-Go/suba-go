@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { Clock, Users, Car, MoreVertical, Edit, Trash2 } from 'lucide-react';
+import { useState } from 'react';
 import {
   Card,
   CardContent,
@@ -17,8 +18,21 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@suba-go/shared-components/components/ui/dropdown-menu';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from '@suba-go/shared-components/components/ui/dialog';
 import { formatDistanceToNow, format } from 'date-fns';
 import { es } from 'date-fns/locale';
+import {
+  getAuctionBadgeColor,
+  getAuctionStatusLabel,
+} from '@/lib/auction-badge-colors';
+import { useAuctionStatus } from '@/hooks/use-auction-status';
 
 interface AuctionCardProps {
   auction: {
@@ -53,46 +67,40 @@ export function AuctionCard({
 }: AuctionCardProps) {
   const startTime = new Date(auction.startTime);
   const endTime = new Date(auction.endTime);
-  const now = new Date();
+  const [showCompletedDialog, setShowCompletedDialog] = useState(false);
 
-  const isUpcoming = startTime > now;
-  const isActive = startTime <= now && endTime > now;
-  const isCompleted = endTime <= now;
+  // Use automatic status hook
+  const auctionStatus = useAuctionStatus(
+    auction.status,
+    auction.startTime,
+    auction.endTime
+  );
 
   const getStatusBadge = () => {
-    if (isUpcoming) {
-      return <Badge variant="secondary">Próxima</Badge>;
-    }
-    if (isActive) {
-      return (
-        <Badge variant="default" className="bg-green-600">
-          Activa
-        </Badge>
-      );
-    }
-    if (isCompleted) {
-      return <Badge variant="outline">Completada</Badge>;
-    }
-    return <Badge variant="destructive">Cancelada</Badge>;
+    return (
+      <Badge className={getAuctionBadgeColor(auctionStatus.displayStatus)}>
+        {getAuctionStatusLabel(auctionStatus.displayStatus)}
+      </Badge>
+    );
   };
 
   const getTimeDisplay = () => {
-    if (isUpcoming) {
-      return `Inicia ${formatDistanceToNow(startTime, {
+    if (auctionStatus.isPending && auctionStatus.timeRemaining) {
+      return `Inicia en ${auctionStatus.timeRemaining}`;
+    }
+    if (auctionStatus.isActive && auctionStatus.timeRemaining) {
+      return `Termina en ${auctionStatus.timeRemaining}`;
+    }
+    if (auctionStatus.isCompleted) {
+      return `Terminó ${formatDistanceToNow(endTime, {
         addSuffix: true,
         locale: es,
       })}`;
     }
-    if (isActive) {
-      return `Termina ${formatDistanceToNow(endTime, {
-        addSuffix: true,
-        locale: es,
-      })}`;
+    if (auctionStatus.isCanceled) {
+      return 'Cancelada';
     }
-    return `Terminó ${formatDistanceToNow(endTime, {
-      addSuffix: true,
-      locale: es,
-    })}`;
+    return '';
   };
 
   const totalItems = auction.items?.length || 0;
@@ -108,6 +116,12 @@ export function AuctionCard({
     }, 0) || 0;
 
   const handleAction = async (action: string) => {
+    // Check if auction is completed
+    if (auctionStatus.isCompleted) {
+      setShowCompletedDialog(true);
+      return;
+    }
+
     if (action === 'edit' && onEdit) {
       onEdit(auction);
       return;
@@ -140,19 +154,28 @@ export function AuctionCard({
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
-                {isUpcoming && (
+                {auctionStatus.isCompleted ? (
                   <DropdownMenuItem onClick={() => handleAction('edit')}>
                     <Edit className="h-4 w-4 mr-2" />
                     Editar
                   </DropdownMenuItem>
+                ) : (
+                  <>
+                    {auctionStatus.isPending && (
+                      <DropdownMenuItem onClick={() => handleAction('edit')}>
+                        <Edit className="h-4 w-4 mr-2" />
+                        Editar
+                      </DropdownMenuItem>
+                    )}
+                    <DropdownMenuItem
+                      onClick={() => handleAction('delete')}
+                      className="text-red-600"
+                    >
+                      <Trash2 className="h-4 w-4 mr-2" />
+                      Eliminar
+                    </DropdownMenuItem>
+                  </>
                 )}
-                <DropdownMenuItem
-                  onClick={() => handleAction('delete')}
-                  className="text-red-600"
-                >
-                  <Trash2 className="h-4 w-4 mr-2" />
-                  Eliminar
-                </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
           </div>
@@ -200,11 +223,32 @@ export function AuctionCard({
 
         {/* Action Button */}
         <Link href={`/subastas/${auction.id}`}>
-          <Button className="w-full" variant={isActive ? 'default' : 'outline'}>
-            {isActive ? 'Ver Subasta Activa' : 'Ver Detalles'}
+          <Button
+            className="w-full"
+            variant={auctionStatus.isActive ? 'default' : 'outline'}
+          >
+            {auctionStatus.isActive ? 'Ver Subasta Activa' : 'Ver Detalles'}
           </Button>
         </Link>
       </CardContent>
+
+      {/* Dialog for completed auctions */}
+      <Dialog open={showCompletedDialog} onOpenChange={setShowCompletedDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Subasta Completada</DialogTitle>
+            <DialogDescription>
+              Una subasta completada no puede ser editada, cancelada o
+              eliminada.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button onClick={() => setShowCompletedDialog(false)}>
+              Entendido
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </Card>
   );
 }

@@ -29,7 +29,6 @@ export default async function AuctionDetailPage({
       <Suspense fallback={<AuctionDetailSkeleton />}>
         <AuctionDetail
           auctionId={auctionId}
-          subdomain={subdomain}
           userRole={session.user.role || 'USER'}
           userId={session.user.id}
         />

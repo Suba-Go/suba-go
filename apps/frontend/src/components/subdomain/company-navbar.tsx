@@ -95,7 +95,7 @@ export default function CompanyNavbar({
             </Link>
             {/* Productos - Solo para AUCTION_MANAGER */}
             {session?.user?.role === 'AUCTION_MANAGER' && (
-              <Link href="/productos">
+              <Link href="/items">
                 <Button
                   variant="ghost"
                   className="text-gray-600 hover:text-gray-900 flex items-center gap-2"
@@ -107,7 +107,7 @@ export default function CompanyNavbar({
             )}
             {/* Usuarios - Solo para AUCTION_MANAGER */}
             {session?.user?.role === 'AUCTION_MANAGER' && (
-              <Link href={`/s/${subdomain}/usuarios`}>
+              <Link href={`/usuarios`}>
                 <Button
                   variant="ghost"
                   className="text-gray-600 hover:text-gray-900 flex items-center gap-2"
@@ -205,7 +205,7 @@ export default function CompanyNavbar({
           </Link>
           {/* Productos - Solo para AUCTION_MANAGER */}
           {session?.user?.role === 'AUCTION_MANAGER' && (
-            <Link href="/productos">
+            <Link href="/items">
               <Button
                 variant="ghost"
                 className="w-full text-left justify-start text-gray-600 hover:text-gray-900 flex items-center gap-2"

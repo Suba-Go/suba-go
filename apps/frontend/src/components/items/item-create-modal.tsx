@@ -3,8 +3,11 @@
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { z } from 'zod';
-import { LegalStatusEnum } from '@suba-go/shared-validation';
+import {
+  itemCreateSchema,
+  ItemCreateDto,
+  LegalStatusEnum,
+} from '@suba-go/shared-validation';
 import { Car } from 'lucide-react';
 import {
   Dialog,
@@ -20,43 +23,18 @@ import { useToast } from '@suba-go/shared-components/components/ui/toaster';
 import { FileUpload } from '@/components/ui/file-upload';
 import { FormattedInput } from '@/components/ui/formatted-input';
 
-// Schema de validación para crear productos
-const productCreateSchema = z.object({
-  plate: z
-    .string()
-    .min(6, 'La patente debe tener exactamente 6 caracteres')
-    .max(6, 'La patente debe tener exactamente 6 caracteres')
-    .optional(),
-  brand: z.string().optional(),
-  model: z.string().optional(),
-  year: z
-    .number()
-    .int()
-    .min(1900)
-    .max(new Date().getFullYear() + 1)
-    .optional(),
-  version: z.string().optional(),
-  kilometraje: z.number().int().min(0).optional(),
-  legal_status: z.string().optional(), // Cambiado a string para manejar las keys del enum
-  basePrice: z.number().positive().optional(),
-  photos: z.array(z.instanceof(File)).optional(),
-  docs: z.array(z.instanceof(File)).optional(),
-});
-
-type ProductCreateData = z.infer<typeof productCreateSchema>;
-
-interface ProductCreateModalProps {
+interface ItemCreateModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSuccess: () => void;
   subdomain?: string;
 }
 
-export function ProductCreateModal({
+export function ItemCreateModal({
   isOpen,
   onClose,
   onSuccess,
-}: ProductCreateModalProps) {
+}: ItemCreateModalProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [photoUrls, setPhotoUrls] = useState<string[]>([]);
   const [docUrls, setDocUrls] = useState<string[]>([]);
@@ -67,11 +45,11 @@ export function ProductCreateModal({
     formState: { errors },
     reset,
     setValue,
-  } = useForm<ProductCreateData>({
-    resolver: zodResolver(productCreateSchema),
+  } = useForm<ItemCreateDto>({
+    resolver: zodResolver(itemCreateSchema),
   });
 
-  const onSubmit = async (data: ProductCreateData) => {
+  const onSubmit = async (data: ItemCreateDto) => {
     setIsLoading(true);
     try {
       // Prepare data with file URLs and convert enum key to Prisma enum value
@@ -244,7 +222,9 @@ export function ProductCreateModal({
               <Label htmlFor="legal_status">Estado Legal</Label>
               <select
                 id="legal_status"
-                onChange={(e) => setValue('legal_status', e.target.value)}
+                onChange={(e) =>
+                  setValue('legal_status', e.target.value as any)
+                }
                 className={`w-full px-3 py-2 border rounded-md text-sm ${
                   errors.legal_status ? 'border-red-500' : 'border-gray-300'
                 }`}
@@ -253,7 +233,7 @@ export function ProductCreateModal({
                 <option value="">Seleccionar estado legal</option>
                 {Object.entries(LegalStatusEnum).map(([key, value]) => (
                   <option key={key} value={key}>
-                    {value}
+                    {value as LegalStatusEnum}
                   </option>
                 ))}
               </select>

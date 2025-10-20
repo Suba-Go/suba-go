@@ -228,4 +228,45 @@ export class AuctionsController {
     const tenantId = req.user.tenantId;
     return this.auctionsService.closeAuction(id, tenantId);
   }
+
+  @Post(':id/cancel')
+  @UseGuards(RolesGuard)
+  @Roles(UserRolesEnum.AUCTION_MANAGER)
+  @ApiOperation({ summary: 'Cancelar subasta' })
+  @ApiParam({ name: 'id', description: 'ID de la subasta' })
+  @ApiResponse({
+    status: 200,
+    description: 'Subasta cancelada exitosamente',
+    type: AuctionResponseDto,
+  })
+  @ApiResponse({ status: 400, description: 'Subasta no puede ser cancelada' })
+  async cancelAuction(
+    @Param('id') id: string,
+    @Request() req: AuthenticatedRequest
+  ) {
+    const tenantId = req.user.tenantId;
+    return this.auctionsService.cancelAuction(id, tenantId);
+  }
+
+  @Post(':id/uncancel')
+  @UseGuards(RolesGuard)
+  @Roles(UserRolesEnum.AUCTION_MANAGER)
+  @ApiOperation({ summary: 'Descancelar subasta' })
+  @ApiParam({ name: 'id', description: 'ID de la subasta' })
+  @ApiResponse({
+    status: 200,
+    description: 'Subasta descancelada exitosamente',
+    type: AuctionResponseDto,
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Subasta no puede ser descancelada',
+  })
+  async uncancelAuction(
+    @Param('id') id: string,
+    @Request() req: AuthenticatedRequest
+  ) {
+    const tenantId = req.user.tenantId;
+    return this.auctionsService.uncancelAuction(id, tenantId);
+  }
 }

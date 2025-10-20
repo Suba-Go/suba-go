@@ -94,10 +94,13 @@ export class AuctionsService {
   ): Promise<Auction> {
     const existingAuction = await this.getAuctionById(id, tenantId);
 
-    // Validate that auction can be updated (not started yet)
-    if (existingAuction.status != 'PENDIENTE') {
+    // Validate that auction can be updated (PENDIENTE or CANCELADA)
+    if (
+      existingAuction.status !== 'PENDIENTE' &&
+      existingAuction.status !== 'CANCELADA'
+    ) {
       throw new BadRequestException(
-        'No se puede modificar una subasta activa o cerrada'
+        'No se puede modificar una subasta activa o completada'
       );
     }
 
@@ -128,6 +131,11 @@ export class AuctionsService {
       endTime: updateAuctionDto.endTime,
       type: auctionType,
     });
+
+    // If auction was CANCELADA and is being edited, change status to PENDIENTE
+    if (existingAuction.status === 'CANCELADA') {
+      await this.auctionRepository.updateAuctionStatus(id, 'PENDIENTE');
+    }
 
     // Update selected items if provided
     if (updateAuctionDto.selectedItems) {
@@ -199,5 +207,46 @@ export class AuctionsService {
     }
 
     return this.auctionRepository.closeAuction(id);
+  }
+
+  async cancelAuction(id: string, tenantId: string): Promise<Auction> {
+    const auction = await this.getAuctionById(id, tenantId);
+
+    // Can only cancel PENDIENTE auctions (not started yet)
+    if (auction.status !== 'PENDIENTE') {
+      throw new BadRequestException(
+        'Solo se pueden cancelar subastas que no han iniciado'
+      );
+    }
+
+    return this.auctionRepository.updateAuctionStatus(id, 'CANCELADA');
+  }
+
+  async uncancelAuction(id: string, tenantId: string): Promise<Auction> {
+    const auction = await this.getAuctionById(id, tenantId);
+
+    // Can only uncancel CANCELADA auctions
+    if (auction.status !== 'CANCELADA') {
+      throw new BadRequestException(
+        'Solo se pueden descancelar subastas canceladas'
+      );
+    }
+
+    // Check if auction should be PENDIENTE or ACTIVA based on current time
+    const now = new Date();
+    const startTime = new Date(auction.startTime);
+    const endTime = new Date(auction.endTime);
+
+    let newStatus: 'PENDIENTE' | 'ACTIVA' | 'COMPLETADA' = 'PENDIENTE';
+
+    if (now >= startTime && now < endTime) {
+      newStatus = 'ACTIVA';
+    } else if (now >= endTime) {
+      throw new BadRequestException(
+        'No se puede descancelar una subasta cuya fecha de fin ya pasó'
+      );
+    }
+
+    return this.auctionRepository.updateAuctionStatus(id, newStatus);
   }
 }
