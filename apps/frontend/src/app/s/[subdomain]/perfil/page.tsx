@@ -1,5 +1,5 @@
 import { Metadata } from 'next';
-import { notFound } from 'next/navigation';
+import { notFound, redirect } from 'next/navigation';
 import { auth } from '@/auth';
 import { getCompanyBySubdomainServerAction } from '@/domain/server-actions/company/get-company-by-subdomain-server-action';
 import ProfileFormWithUserData from './profile-form-with-user-data';
@@ -43,12 +43,18 @@ export default async function ProfilePage({ params }: ProfilePageProps) {
   let subdomain;
   let userRole = 'Usuario';
 
+  // Obtener la sesión del usuario primero
+  const session = await auth();
+  
+  // Redirigir a login si no hay sesión
+  if (!session) {
+    redirect('/login');
+  }
+
   try {
     const resolvedParams = await params;
     subdomain = resolvedParams.subdomain;
     
-    // Obtener la sesión del usuario
-    const session = await auth();
     if (session?.user?.role) {
       userRole = session.user.role;
     }
