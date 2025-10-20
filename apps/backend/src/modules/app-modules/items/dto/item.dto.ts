@@ -125,6 +125,25 @@ export class UpdateItemDto {
   @Transform(({ value }) => Number(value))
   year?: number;
 
+  @ApiPropertyOptional({ description: 'Versión del vehículo' })
+  @IsOptional()
+  @IsString()
+  version?: string;
+
+  @ApiPropertyOptional({ description: 'Kilometraje del vehículo' })
+  @IsOptional()
+  @IsInt({ message: 'El kilometraje debe ser un número entero' })
+  @Transform(({ value }) => Number(value))
+  kilometraje?: number;
+
+  @ApiPropertyOptional({
+    description: 'Estado legal del vehículo',
+    enum: LegalStatusEnum,
+  })
+  @IsOptional()
+  @IsEnum(LegalStatusEnum, { message: 'Estado legal inválido' })
+  legal_status?: LegalStatusEnum;
+
   @ApiPropertyOptional({ description: 'Color del vehículo' })
   @IsOptional()
   @IsString()
@@ -136,6 +155,18 @@ export class UpdateItemDto {
   @IsPositive({ message: 'El precio base debe ser positivo' })
   @Transform(({ value }) => Number(value))
   basePrice?: number;
+
+  @ApiPropertyOptional({ description: 'URLs de fotos separadas por comas' })
+  @IsOptional()
+  @IsString()
+  photos?: string;
+
+  @ApiPropertyOptional({
+    description: 'URLs de documentos separadas por comas',
+  })
+  @IsOptional()
+  @IsString()
+  docs?: string;
 
   @ApiPropertyOptional({ description: 'Estado del item', enum: ItemStateEnum })
   @IsOptional()

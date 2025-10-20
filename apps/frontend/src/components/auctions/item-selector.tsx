@@ -6,7 +6,7 @@ import { Button } from '@suba-go/shared-components/components/ui/button';
 import { Badge } from '@suba-go/shared-components/components/ui/badge';
 import { Checkbox } from '@suba-go/shared-components/components/ui/checkbox';
 import { useAvailableItems } from '@/hooks/use-items';
-import { ProductCreateModal2 } from './product-create-modal2';
+import { ItemCreateModal2 } from './item-create-modal2';
 import { Spinner } from '@suba-go/shared-components/components/ui/spinner';
 
 interface ItemSelectorProps {
@@ -187,7 +187,7 @@ export function ItemSelector({
         )}
       </div>
 
-      <ProductCreateModal2
+      <ItemCreateModal2
         isOpen={isCreateModalOpen}
         onClose={() => setIsCreateModalOpen(false)}
         onSuccess={handleCreateSuccess}

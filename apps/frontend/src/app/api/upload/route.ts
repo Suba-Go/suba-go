@@ -41,21 +41,12 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    console.log('Uploading file:', {
-      filename,
-      size: file.size,
-      type: file.type,
-      tenantId,
-    });
-
     // Upload to Vercel Blob with tenant-specific path
     // This organizes files by tenant for better management
     const blob = await put(`${tenantId}/${filename}`, file, {
       access: 'public',
       addRandomSuffix: true, // Prevents filename collisions
     });
-
-    console.log('Upload successful:', blob.url);
 
     return NextResponse.json(blob);
   } catch (error) {

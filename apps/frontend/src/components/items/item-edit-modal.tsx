@@ -3,8 +3,6 @@
 import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { z } from 'zod';
-import { LegalStatusEnum, ItemStateEnum } from '@suba-go/shared-validation';
 import { Car, X, Image as ImageIcon, FileText } from 'lucide-react';
 import {
   Dialog,
@@ -15,7 +13,6 @@ import {
 } from '@suba-go/shared-components/components/ui/dialog';
 import { Button } from '@suba-go/shared-components/components/ui/button';
 import { Input } from '@suba-go/shared-components/components/ui/input';
-import { Textarea } from '@suba-go/shared-components/components/ui/textarea';
 import { Label } from '@suba-go/shared-components/components/ui/label';
 import {
   Select,
@@ -26,51 +23,27 @@ import {
 } from '@suba-go/shared-components/components/ui/select';
 import { useToast } from '@suba-go/shared-components/components/ui/toaster';
 import { FileUpload } from '@/components/ui/file-upload';
+import { FormattedInput } from '@/components/ui/formatted-input';
+import {
+  ItemDto,
+  ItemEditDto,
+  itemEditSchema,
+} from '@suba-go/shared-validation';
+import Image from 'next/image';
 
-const productEditSchema = z.object({
-  plate: z.string().optional(),
-  brand: z.string().optional(),
-  model: z.string().optional(),
-  year: z.number().int().positive().optional(),
-  version: z.string().optional(),
-  kilometraje: z.number().int().positive().optional(),
-  legal_status: z.nativeEnum(LegalStatusEnum).optional(),
-  state: z.nativeEnum(ItemStateEnum),
-  basePrice: z.number().positive().optional(),
-  description: z.string().optional(),
-});
-
-type ProductEditFormData = z.infer<typeof productEditSchema>;
-
-interface Product {
-  id: string;
-  plate?: string;
-  brand?: string;
-  model?: string;
-  year?: number;
-  version?: string;
-  kilometraje?: number;
-  legal_status?: string;
-  state: string;
-  basePrice?: number;
-  description?: string;
-  photos?: string;
-  docs?: string;
-}
-
-interface ProductEditModalProps {
+interface ItemEditModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSuccess: () => void;
-  product: Product | null;
+  item: ItemDto | null;
 }
 
-export function ProductEditModal({
+export function ItemEditModal({
   isOpen,
   onClose,
   onSuccess,
-  product,
-}: ProductEditModalProps) {
+  item,
+}: ItemEditModalProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [photoUrls, setPhotoUrls] = useState<string[]>([]);
   const [docUrls, setDocUrls] = useState<string[]>([]);
@@ -97,49 +70,45 @@ export function ProductEditModal({
     reset,
     setValue,
     watch,
-  } = useForm<ProductEditFormData>({
-    resolver: zodResolver(productEditSchema),
+  } = useForm<ItemEditDto>({
+    resolver: zodResolver(itemEditSchema),
   });
 
-  // Load product data when modal opens
+  // Load item data when modal opens
   useEffect(() => {
-    if (product && isOpen) {
-      console.log('Loading product data into form:', product);
-      console.log('Product legal_status:', product.legal_status);
-
-      const formData = {
-        plate: product.plate || '',
-        brand: product.brand || '',
-        model: product.model || '',
-        year: product.year || undefined,
-        version: product.version || '',
-        kilometraje: product.kilometraje || undefined,
-        legal_status: product.legal_status as LegalStatusEnum | undefined,
-        state: product.state as ItemStateEnum,
-        basePrice: product.basePrice || undefined,
-        description: product.description || '',
+    if (item && isOpen) {
+      const formData: ItemEditDto = {
+        plate: item.plate || '',
+        brand: item.brand || '',
+        model: item.model || '',
+        year: item.year || undefined,
+        version: item.version || '',
+        kilometraje: item.kilometraje || undefined,
+        legal_status: item.legal_status as any,
+        basePrice: item.basePrice || undefined,
       };
 
-      console.log('Form data to reset:', formData);
       reset(formData);
 
       // Explicitly set legal_status if it exists
-      if (product.legal_status) {
-        setValue('legal_status', product.legal_status as LegalStatusEnum, {
+      if (item.legal_status) {
+        setValue('legal_status', item.legal_status as any, {
           shouldValidate: true,
           shouldDirty: false,
         });
-        console.log('Set legal_status to:', product.legal_status);
       }
 
       // Load existing photos and docs
-      if (product.photos) {
-        setPhotoUrls(product.photos.split(',').map((url) => url.trim()));
+      if (item.photos) {
+        const photos = item.photos.split(',').map((url) => url.trim());
+        setPhotoUrls(photos);
       } else {
         setPhotoUrls([]);
       }
-      if (product.docs) {
-        setDocUrls(product.docs.split(',').map((url) => url.trim()));
+
+      if (item.docs) {
+        const docs = item.docs.split(',').map((url) => url.trim());
+        setDocUrls(docs);
       } else {
         setDocUrls([]);
       }
@@ -148,7 +117,7 @@ export function ProductEditModal({
       setNewPhotoUrls([]);
       setNewDocUrls([]);
     }
-  }, [product, isOpen, reset, setValue]);
+  }, [item, isOpen, reset, setValue]);
 
   const removePhoto = (index: number) => {
     setPhotoUrls((prev) => prev.filter((_, i) => i !== index));
@@ -158,34 +127,16 @@ export function ProductEditModal({
     setDocUrls((prev) => prev.filter((_, i) => i !== index));
   };
 
-  const onSubmit = async (data: ProductEditFormData) => {
-    console.log('=== PRODUCT UPDATE STARTED ===');
-    console.log('onSubmit called with data:', data);
-    console.log('Product:', product);
-    console.log('Form errors:', errors);
-    console.log('Form is valid:', Object.keys(errors).length === 0);
-
-    if (!product) {
-      console.error('No product selected');
+  const onSubmit = async (data: ItemEditDto) => {
+    if (!item) {
       return;
     }
-
     setIsLoading(true);
+
     try {
       // Combine existing and new URLs
       const allPhotoUrls = [...photoUrls, ...newPhotoUrls];
       const allDocUrls = [...docUrls, ...newDocUrls];
-
-      console.log('Photo URLs:', {
-        existing: photoUrls,
-        new: newPhotoUrls,
-        all: allPhotoUrls,
-      });
-      console.log('Doc URLs:', {
-        existing: docUrls,
-        new: newDocUrls,
-        all: allDocUrls,
-      });
 
       const requestBody = {
         ...data,
@@ -193,11 +144,7 @@ export function ProductEditModal({
         docs: allDocUrls.length > 0 ? allDocUrls.join(', ') : null,
       };
 
-      console.log('Request body:', requestBody);
-      console.log('Updating product with ID:', product.id);
-      console.log('API endpoint:', `/api/items/${product.id}`);
-
-      const response = await fetch(`/api/items/${product.id}`, {
+      const response = await fetch(`/api/items/${item.id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -205,39 +152,40 @@ export function ProductEditModal({
         body: JSON.stringify(requestBody),
       });
 
-      console.log('Response status:', response.status);
-      console.log('Response ok:', response.ok);
-
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        console.error('Error response:', errorData);
-        throw new Error(errorData.error || 'Error al actualizar el producto');
+        console.error('\n❌ Response NOT OK - Attempting to parse error...');
+        let errorData;
+        try {
+          errorData = await response.json();
+          console.error(
+            '❌ Error Response Data:',
+            JSON.stringify(errorData, null, 2)
+          );
+        } catch (parseError) {
+          console.error('❌ Could not parse error response as JSON');
+          console.error('❌ Parse error:', parseError);
+          errorData = { error: 'Unknown error' };
+        }
+        throw new Error(
+          errorData.error || `HTTP ${response.status}: ${response.statusText}`
+        );
       }
-
-      const result = await response.json();
-      console.log('Update successful:', result);
-      console.log('=== PRODUCT UPDATE COMPLETED ===');
 
       toast({
         title: 'Éxito',
-        description: 'Producto actualizado correctamente',
+        description: 'Item actualizado correctamente',
         variant: 'default',
       });
 
       handleCloseClick();
       onSuccess();
     } catch (error) {
-      console.error('=== PRODUCT UPDATE FAILED ===');
-      console.error('Error updating product:', error);
-      console.error('Error type:', typeof error);
-      console.error('Error details:', error);
-
       toast({
         title: 'Error',
         description:
           error instanceof Error
             ? error.message
-            : 'Error al actualizar el producto',
+            : 'Error al actualizar el item',
         variant: 'destructive',
       });
     } finally {
@@ -260,7 +208,7 @@ export function ProductEditModal({
     handleClose(false);
   };
 
-  if (!product) return null;
+  if (!item) return null;
 
   return (
     <Dialog open={isOpen} onOpenChange={handleClose}>
@@ -268,11 +216,9 @@ export function ProductEditModal({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Car className="h-5 w-5" />
-            Editar Producto
+            Editar Item
           </DialogTitle>
-          <DialogDescription>
-            Modifica los detalles del producto
-          </DialogDescription>
+          <DialogDescription>Modifica los detalles del item</DialogDescription>
         </DialogHeader>
 
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
@@ -356,11 +302,12 @@ export function ProductEditModal({
 
             <div>
               <Label htmlFor="kilometraje">Kilometraje</Label>
-              <Input
+              <FormattedInput
                 id="kilometraje"
-                type="number"
-                placeholder="50000"
-                {...register('kilometraje', { valueAsNumber: true })}
+                formatType="number"
+                placeholder="50.000"
+                value={watch('kilometraje')}
+                onChange={(value) => setValue('kilometraje', value as number)}
                 className={errors.kilometraje ? 'border-red-500' : ''}
               />
               {errors.kilometraje && (
@@ -372,11 +319,12 @@ export function ProductEditModal({
 
             <div>
               <Label htmlFor="basePrice">Precio Base</Label>
-              <Input
+              <FormattedInput
                 id="basePrice"
-                type="number"
-                placeholder="15000000"
-                {...register('basePrice', { valueAsNumber: true })}
+                formatType="number"
+                placeholder="15.000.000"
+                value={watch('basePrice')}
+                onChange={(value) => setValue('basePrice', value as number)}
                 className={errors.basePrice ? 'border-red-500' : ''}
               />
               {errors.basePrice && (
@@ -389,9 +337,9 @@ export function ProductEditModal({
             <div>
               <Label htmlFor="legal_status">Estado Legal</Label>
               <Select
-                value={watch('legal_status') || product?.legal_status || ''}
+                value={watch('legal_status') || item?.legal_status || ''}
                 onValueChange={(value) =>
-                  setValue('legal_status', value as LegalStatusEnum)
+                  setValue('legal_status', value as any)
                 }
               >
                 <SelectTrigger
@@ -400,17 +348,13 @@ export function ProductEditModal({
                   <SelectValue placeholder="Seleccionar estado legal" />
                 </SelectTrigger>
                 <SelectContent className="z-dropdown">
-                  <SelectItem value={LegalStatusEnum.TRANSFERIBLE}>
-                    Transferible
-                  </SelectItem>
-                  <SelectItem value={LegalStatusEnum.LEASING}>
-                    Leasing
-                  </SelectItem>
-                  <SelectItem value={LegalStatusEnum.POSIBILIDAD_DE_EMBARGO}>
+                  <SelectItem value="TRANSFERIBLE">Transferible</SelectItem>
+                  <SelectItem value="LEASING">Leasing</SelectItem>
+                  <SelectItem value="POSIBILIDAD_DE_EMBARGO">
                     Posibilidad de Embargo
                   </SelectItem>
-                  <SelectItem value={LegalStatusEnum.PRENDA}>Prenda</SelectItem>
-                  <SelectItem value={LegalStatusEnum.OTRO}>Otro</SelectItem>
+                  <SelectItem value="PRENDA">Prenda</SelectItem>
+                  <SelectItem value="OTRO">Otro</SelectItem>
                 </SelectContent>
               </Select>
               {errors.legal_status && (
@@ -419,22 +363,6 @@ export function ProductEditModal({
                 </p>
               )}
             </div>
-          </div>
-
-          {/* Description */}
-          <div>
-            <Label htmlFor="description">Descripción</Label>
-            <Textarea
-              id="description"
-              placeholder="Descripción detallada del vehículo..."
-              {...register('description')}
-              className={errors.description ? 'border-red-500' : ''}
-            />
-            {errors.description && (
-              <p className="text-sm text-red-600 mt-1">
-                {errors.description.message}
-              </p>
-            )}
           </div>
 
           {/* Existing Photos */}
@@ -448,8 +376,10 @@ export function ProductEditModal({
                 {photoUrls.map((url, index) => (
                   <div key={index} className="relative group">
                     <div className="aspect-video bg-gray-100 rounded-lg overflow-hidden">
-                      <img
+                      <Image
                         src={url}
+                        width={100}
+                        height={100}
                         alt={`Foto ${index + 1}`}
                         className="w-full h-full object-cover"
                       />
@@ -542,7 +472,7 @@ export function ProductEditModal({
               Cancelar
             </Button>
             <Button type="submit" disabled={isLoading}>
-              {isLoading ? 'Actualizando...' : 'Actualizar Producto'}
+              {isLoading ? 'Actualizando...' : 'Actualizar Item'}
             </Button>
           </div>
         </form>
