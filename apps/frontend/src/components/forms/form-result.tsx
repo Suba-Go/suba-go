@@ -1,33 +1,25 @@
 import { CompanyDto } from '@suba-go/shared-validation';
 import Link from 'next/link';
 import { Button } from '@suba-go/shared-components/components/ui/button';
+import { getNodeEnv } from '@suba-go/shared-components';
 
 // Helper to build company URL based on environment
 function getCompanyUrl(companyName: string): string {
   if (typeof window === 'undefined') return '#';
 
-  const isLocalDevelopment = window.location.hostname === 'localhost';
+  const nodeEnv = getNodeEnv();
 
-  if (isLocalDevelopment) {
-    return `http://${companyName}.localhost:3000`;
+  if (nodeEnv === 'local') {
+    // Local: http://{company}.localhost:3000
+    return `http://${companyName}.localhost:3000/login`;
+  } else if (nodeEnv === 'development') {
+    // Development: https://{company}.development.subago.cl
+    return `https://${companyName}.development.subago.cl/login`;
+  } else {
+    // Production: https://{company}.subago.cl
+    const rootDomain = process.env.NEXT_PUBLIC_ROOT_DOMAIN || 'subago.cl';
+    return `https://${companyName}.${rootDomain}/login`;
   }
-
-  // Check if we're on Vercel
-  if (window.location.hostname.endsWith('.vercel.app')) {
-    // Check if it's a preview deploy (contains git branch info)
-    if (window.location.hostname.includes('-git-')) {
-      // Preview deploy: use --- separator
-      const baseDomain = window.location.hostname;
-      return `https://${companyName}---${baseDomain}`;
-    }
-    // Main Vercel deploy
-    const appName = window.location.hostname.split('.')[0];
-    return `https://${companyName}.${appName}.vercel.app`;
-  }
-
-  // Production
-  const rootDomain = process.env.NEXT_PUBLIC_ROOT_DOMAIN || 'subago.cl';
-  return `https://${companyName}.${rootDomain}`;
 }
 
 export default function FormResult({

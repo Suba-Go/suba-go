@@ -60,6 +60,6 @@ export function useFetchData<T>(options: UseFetchDataOptions) {
     data: result.data,
     isLoading: result.isLoading,
     error: result.error,
-    refetch: result.mutate,
+    refetch: () => result.mutate(), // Force revalidation by calling mutate without arguments
   };
 }

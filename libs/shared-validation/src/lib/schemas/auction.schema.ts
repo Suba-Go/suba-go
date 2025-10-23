@@ -21,13 +21,14 @@ export const auctionSchema = baseSchema
 export type AuctionDto = z.infer<typeof auctionSchema>;
 
 // Schema for creating auctions with bid increment settings
+// Note: Date/time validation happens in the component to allow same-day auctions with future times
 export const auctionCreateSchema = z.object({
   title: z
     .string()
     .min(1, 'El título es requerido')
     .max(100, 'El título no puede exceder 100 caracteres'),
   description: z.string().optional(),
-  startDate: z.date().min(new Date(), 'La fecha de inicio debe ser futura'),
+  startDate: z.date(),
   startTime: z
     .string()
     .regex(
@@ -58,7 +59,6 @@ export const auctionWithItemsSchema = auctionSchema.extend({
     z.object({
       id: z.string(),
       startingBid: z.number(),
-      reservePrice: z.number().nullable(),
       item: z.object({
         id: z.string(),
         plate: z.string().nullable(),

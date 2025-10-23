@@ -12,3 +12,9 @@ export enum ItemStateEnum {
   EN_SUBASTA = 'En subasta',
   ELIMINADO = 'Eliminado',
 }
+
+export enum ShowItemStateEnum {
+  DISPONIBLE = 'Disponible',
+  VENDIDO = 'Vendido',
+  EN_SUBASTA = 'En subasta',
+}

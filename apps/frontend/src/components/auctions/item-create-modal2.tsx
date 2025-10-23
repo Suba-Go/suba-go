@@ -4,9 +4,10 @@ import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import {
-  itemCreateDto,
+  ItemCreateDto,
   itemCreateSchema,
   ItemStateEnum,
+  LegalStatusEnum,
 } from '@suba-go/shared-validation';
 import { Car, Upload, FileText } from 'lucide-react';
 import {
@@ -30,17 +31,17 @@ import { FileUpload } from '@/components/ui/file-upload';
 import { FormattedInput } from '@/components/ui/formatted-input';
 import { useCompany } from '@/hooks/use-company';
 
-interface ProductCreateModal2Props {
+interface ItemCreateModal2Props {
   isOpen: boolean;
   onClose: () => void;
   onSuccess: () => void;
 }
 
-export function ProductCreateModal2({
+export function ItemCreateModal2({
   isOpen,
   onClose,
   onSuccess,
-}: ProductCreateModal2Props) {
+}: ItemCreateModal2Props) {
   const [isLoading, setIsLoading] = useState(false);
   const [photoUrls, setPhotoUrls] = useState<string[]>([]);
   const [docUrls, setDocUrls] = useState<string[]>([]);
@@ -51,10 +52,10 @@ export function ProductCreateModal2({
     formState: { errors },
     reset,
     setValue,
-  } = useForm<itemCreateDto>({
+  } = useForm<ItemCreateDto>({
     resolver: zodResolver(itemCreateSchema),
     defaultValues: {
-      legal_status: 'TRANSFERIBLE',
+      legal_status: 'TRANSFERIBLE' as any,
     },
   });
 
@@ -65,7 +66,7 @@ export function ProductCreateModal2({
     onClose();
   };
 
-  const onSubmit = async (data: itemCreateDto) => {
+  const onSubmit = async (data: ItemCreateDto) => {
     try {
       setIsLoading(true);
 
@@ -216,7 +217,9 @@ export function ProductCreateModal2({
             <div>
               <Label htmlFor="legal_status">Estado Legal</Label>
               <Select
-                onValueChange={(value) => setValue('legal_status', value)}
+                onValueChange={(value) =>
+                  setValue('legal_status', value as any)
+                }
                 defaultValue="TRANSFERIBLE"
               >
                 <SelectTrigger
@@ -225,13 +228,17 @@ export function ProductCreateModal2({
                   <SelectValue placeholder="Seleccionar estado legal" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="TRANSFERIBLE">Transferible</SelectItem>
-                  <SelectItem value="LEASING">Leasing</SelectItem>
-                  <SelectItem value="POSIBILIDAD_DE_EMBARGO">
+                  <SelectItem value={LegalStatusEnum.TRANSFERIBLE}>
+                    Transferible
+                  </SelectItem>
+                  <SelectItem value={LegalStatusEnum.LEASING}>
+                    Leasing
+                  </SelectItem>
+                  <SelectItem value={LegalStatusEnum.POSIBILIDAD_DE_EMBARGO}>
                     Posibilidad de Embargo
                   </SelectItem>
-                  <SelectItem value="PRENDA">Prenda</SelectItem>
-                  <SelectItem value="OTRO">Otro</SelectItem>
+                  <SelectItem value={LegalStatusEnum.PRENDA}>Prenda</SelectItem>
+                  <SelectItem value={LegalStatusEnum.OTRO}>Otro</SelectItem>
                 </SelectContent>
               </Select>
               {errors.legal_status && (

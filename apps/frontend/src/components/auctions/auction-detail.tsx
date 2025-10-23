@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+
 import {
   ArrowLeft,
   Calendar,
@@ -10,8 +11,18 @@ import {
   Trophy,
   Edit,
 } from 'lucide-react';
-import Link from 'next/link';
 import { Button } from '@suba-go/shared-components/components/ui/button';
+import { useToast } from '@suba-go/shared-components/components/ui/toaster';
+import { Switch } from '@suba-go/shared-components/components/ui/switch';
+import { Label } from '@suba-go/shared-components/components/ui/label';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from '@suba-go/shared-components/components/ui/dialog';
 import {
   Card,
   CardContent,
@@ -32,25 +43,30 @@ import type {
   AuctionItem,
   AuctionBid,
 } from '@/types/auction.types';
-import { formatDistanceToNow, format } from 'date-fns';
-import { es } from 'date-fns/locale';
+import {
+  getAuctionBadgeColor,
+  getAuctionStatusLabel,
+} from '@/lib/auction-badge-colors';
 import { AuctionEditModal } from './auction-edit-modal';
 import Image from 'next/image';
+import { useRouter } from 'next-nprogress-bar';
+import { useAuctionStatus } from '@/hooks/use-auction-status';
+import { AuctionStatusEnum } from '@suba-go/shared-validation';
+import { ParticipantsList } from './participants-list';
 
 interface AuctionDetailProps {
   auctionId: string;
-  subdomain: string;
   userRole: string;
   userId?: string;
 }
 
-export function AuctionDetail({
-  auctionId,
-  subdomain,
-  userRole,
-}: AuctionDetailProps) {
+export function AuctionDetail({ auctionId, userRole }: AuctionDetailProps) {
+  const router = useRouter();
+  const { toast } = useToast();
   const [activeTab, setActiveTab] = useState('items');
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [isCanceled, setIsCanceled] = useState(false);
+  const [showCompletedDialog, setShowCompletedDialog] = useState(false);
 
   // Fetch auction data
   const {
@@ -62,6 +78,52 @@ export function AuctionDetail({
     url: `/api/auctions/${auctionId}`,
     key: ['auction', auctionId],
   });
+
+  // Use the automatic status hook (must be called before early returns)
+  const auctionStatus = useAuctionStatus(
+    auction?.status || AuctionStatusEnum.PENDIENTE,
+    auction?.startTime || new Date(),
+    auction?.endTime || new Date()
+  );
+
+  const handleCancelToggle = async (checked: boolean) => {
+    try {
+      const endpoint = checked
+        ? `/api/auctions/${auctionId}/cancel`
+        : `/api/auctions/${auctionId}/uncancel`;
+
+      const response = await fetch(endpoint, {
+        method: 'POST',
+      });
+
+      if (!response.ok) {
+        throw new Error(
+          checked
+            ? 'Error al cancelar la subasta'
+            : 'Error al descancelar la subasta'
+        );
+      }
+
+      toast({
+        title: checked ? 'Subasta cancelada' : 'Subasta descancelada',
+        description: checked
+          ? 'La subasta ha sido cancelada exitosamente'
+          : 'La subasta ha sido descancelada exitosamente',
+      });
+
+      setIsCanceled(checked);
+      refetch();
+    } catch (error) {
+      toast({
+        title: 'Error',
+        description:
+          error instanceof Error
+            ? error.message
+            : 'No se pudo realizar la operación',
+        variant: 'destructive',
+      });
+    }
+  };
 
   if (error) {
     return (
@@ -92,39 +154,14 @@ export function AuctionDetail({
     );
   }
 
-  const startTime = new Date(auction.startTime);
-  const endTime = new Date(auction.endTime);
-  const now = new Date();
-
-  const isUpcoming = startTime > now;
-  const isActive = startTime <= now && endTime > now;
-  const isCompleted = endTime <= now;
-
   const getStatusBadge = () => {
-    if (isUpcoming) {
-      return (
-        <Badge variant="secondary" className="text-sm">
-          Próxima
-        </Badge>
-      );
-    }
-    if (isActive) {
-      return (
-        <Badge variant="default" className="bg-green-600 text-sm">
-          Activa
-        </Badge>
-      );
-    }
-    if (isCompleted) {
-      return (
-        <Badge variant="outline" className="text-sm">
-          Completada
-        </Badge>
-      );
-    }
     return (
-      <Badge variant="destructive" className="text-sm">
-        Cancelada
+      <Badge
+        className={`${getAuctionBadgeColor(
+          auctionStatus.displayStatus
+        )} text-sm`}
+      >
+        {getAuctionStatusLabel(auctionStatus.displayStatus)}
       </Badge>
     );
   };
@@ -145,12 +182,15 @@ export function AuctionDetail({
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center gap-4">
-        <Link href="/subastas">
-          <Button variant="ghost" size="sm">
-            <ArrowLeft className="h-4 w-4 mr-2" />
-            Volver a Subastas
-          </Button>
-        </Link>
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => router.back()}
+          className="gap-2"
+        >
+          <ArrowLeft className="h-4 w-4" />
+          Volver
+        </Button>
         <div className="flex-1">
           <div className="flex items-center gap-3 mb-2">
             <h1 className="text-2xl font-bold text-gray-900">
@@ -163,58 +203,167 @@ export function AuctionDetail({
           )}
         </div>
 
-        {/* Edit button - only show if auction hasn't started */}
-        {auction.status === 'PENDIENTE' && userRole === 'AUCTION_MANAGER' && (
-          <Button
-            variant="outline"
-            onClick={() => setIsEditModalOpen(true)}
-            className="flex items-center gap-2"
-          >
-            <Edit className="h-4 w-4" />
-            Editar Subasta
-          </Button>
+        {/* Action buttons for auction managers */}
+        {userRole === 'AUCTION_MANAGER' && (
+          <div className="flex items-center gap-4">
+            {/* Show message for completed auctions */}
+            {auction.status === 'COMPLETADA' ? (
+              <Button
+                variant="outline"
+                onClick={() => setShowCompletedDialog(true)}
+                className="flex items-center gap-2"
+              >
+                <Edit className="h-4 w-4" />
+                Editar Subasta
+              </Button>
+            ) : (
+              <>
+                {/* Edit button - only show if auction is PENDIENTE or CANCELADA */}
+                {(auction.status === 'PENDIENTE' ||
+                  auction.status === 'CANCELADA') && (
+                  <Button
+                    variant="outline"
+                    onClick={() => setIsEditModalOpen(true)}
+                    className="flex items-center gap-2"
+                  >
+                    <Edit className="h-4 w-4" />
+                    Editar Subasta
+                  </Button>
+                )}
+
+                {/* Cancel switch - only show if auction is PENDIENTE, CANCELADA, or TEST */}
+                {(auction.status === 'PENDIENTE' ||
+                  auction.status === 'CANCELADA' ||
+                  auction.type === 'TEST') && (
+                  <div className="flex items-center gap-2">
+                    <Switch
+                      id="cancel-auction"
+                      checked={auction.status === 'CANCELADA' || isCanceled}
+                      onCheckedChange={handleCancelToggle}
+                    />
+                    <Label htmlFor="cancel-auction" className="cursor-pointer">
+                      Cancelar Subasta
+                    </Label>
+                  </div>
+                )}
+              </>
+            )}
+          </div>
         )}
       </div>
 
-      {/* Timer for Active Auctions */}
-      {isActive && (
+      {/* Dialog for completed auctions */}
+      <Dialog open={showCompletedDialog} onOpenChange={setShowCompletedDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Subasta Completada</DialogTitle>
+            <DialogDescription>
+              Una subasta completada no puede ser editada, cancelada o
+              eliminada.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button onClick={() => setShowCompletedDialog(false)}>
+              Entendido
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Countdown Timer for Active Auctions */}
+      {auctionStatus.isActive && auctionStatus.timeRemainingDetailed && (
         <Card className="border-green-200 bg-green-50">
           <CardContent className="pt-6">
             <div className="flex items-center gap-3">
               <Clock className="h-5 w-5 text-green-600" />
-              <div>
-                <h3 className="font-medium text-green-900">Subasta Activa</h3>
-                <p className="text-green-700">
-                  Termina{' '}
-                  {formatDistanceToNow(endTime, {
-                    addSuffix: true,
-                    locale: es,
-                  })}
-                </p>
+              <div className="flex-1">
+                <h3 className="font-medium text-green-900 mb-2">
+                  Subasta Activa - Termina en:
+                </h3>
+                <div className="flex gap-4 text-2xl font-bold text-green-700">
+                  <div className="flex flex-col items-center">
+                    <span>
+                      {String(
+                        auctionStatus.timeRemainingDetailed.hours
+                      ).padStart(2, '0')}
+                    </span>
+                    <span className="text-xs font-normal text-green-600">
+                      horas
+                    </span>
+                  </div>
+                  <span className="text-green-600">:</span>
+                  <div className="flex flex-col items-center">
+                    <span>
+                      {String(
+                        auctionStatus.timeRemainingDetailed.minutes
+                      ).padStart(2, '0')}
+                    </span>
+                    <span className="text-xs font-normal text-green-600">
+                      minutos
+                    </span>
+                  </div>
+                  <span className="text-green-600">:</span>
+                  <div className="flex flex-col items-center">
+                    <span>
+                      {String(
+                        auctionStatus.timeRemainingDetailed.seconds
+                      ).padStart(2, '0')}
+                    </span>
+                    <span className="text-xs font-normal text-green-600">
+                      segundos
+                    </span>
+                  </div>
+                </div>
               </div>
             </div>
           </CardContent>
         </Card>
       )}
 
-      {/* Upcoming Auction Notice */}
-      {isUpcoming && (
+      {/* Countdown Timer for Upcoming Auctions */}
+      {auctionStatus.isPending && auctionStatus.timeRemainingDetailed && (
         <Card className="border-blue-200 bg-blue-50">
           <CardContent className="pt-6">
             <div className="flex items-center gap-3">
               <Calendar className="h-5 w-5 text-blue-600" />
-              <div>
-                <h3 className="font-medium text-blue-900">
-                  Subasta Programada
+              <div className="flex-1">
+                <h3 className="font-medium text-blue-900 mb-2">
+                  Subasta Programada - Inicia en:
                 </h3>
-                <p className="text-blue-700">
-                  Inicia{' '}
-                  {formatDistanceToNow(startTime, {
-                    addSuffix: true,
-                    locale: es,
-                  })}
-                  ({format(startTime, 'dd/MM/yyyy HH:mm', { locale: es })})
-                </p>
+                <div className="flex gap-4 text-2xl font-bold text-blue-700">
+                  <div className="flex flex-col items-center">
+                    <span>
+                      {String(
+                        auctionStatus.timeRemainingDetailed.hours
+                      ).padStart(2, '0')}
+                    </span>
+                    <span className="text-xs font-normal text-blue-600">
+                      horas
+                    </span>
+                  </div>
+                  <span className="text-blue-600">:</span>
+                  <div className="flex flex-col items-center">
+                    <span>
+                      {String(
+                        auctionStatus.timeRemainingDetailed.minutes
+                      ).padStart(2, '0')}
+                    </span>
+                    <span className="text-xs font-normal text-blue-600">
+                      minutos
+                    </span>
+                  </div>
+                  <span className="text-blue-600">:</span>
+                  <div className="flex flex-col items-center">
+                    <span>
+                      {String(
+                        auctionStatus.timeRemainingDetailed.seconds
+                      ).padStart(2, '0')}
+                    </span>
+                    <span className="text-xs font-normal text-blue-600">
+                      segundos
+                    </span>
+                  </div>
+                </div>
               </div>
             </div>
           </CardContent>
@@ -285,22 +434,22 @@ export function AuctionDetail({
                   className="hover:shadow-lg transition-shadow cursor-pointer"
                   onClick={() => {
                     if (auctionItem.item?.id) {
-                      window.open(
-                        `/productos/${auctionItem.item.id}`,
-                        '_blank'
-                      );
+                      router.push(`/items/${auctionItem.item.id}`);
                     }
                   }}
                 >
                   {/* Item Image */}
                   {auctionItem.item?.photos && (
-                    <div className="relative h-32 overflow-hidden rounded-t-lg bg-gray-100">
+                    <div className="relative h-48 overflow-hidden rounded-t-lg bg-gray-100">
                       <Image
                         src={auctionItem.item.photos.split(',')[0]?.trim()}
                         alt={`${auctionItem.item.brand} ${auctionItem.item.model}`}
-                        className="w-full h-full object-cover"
+                        fill
+                        className="object-cover"
+                        sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
                         onError={(e) => {
-                          e.currentTarget.src =
+                          const target = e.currentTarget as HTMLImageElement;
+                          target.src =
                             'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgdmlld0JveD0iMCAwIDIwMCAyMDAiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxyZWN0IHdpZHRoPSIyMDAiIGhlaWdodD0iMjAwIiBmaWxsPSIjRjNGNEY2Ii8+CjxwYXRoIGQ9Ik04MCA2MEgxMjBWODBIODBWNjBaIiBmaWxsPSIjOUI5QkEwIi8+CjxwYXRoIGQ9Ik02MCA4MEgxNDBWMTQwSDYwVjgwWiIgZmlsbD0iIzlCOUJBMCIvPgo8L3N2Zz4K';
                         }}
                       />
@@ -366,15 +515,13 @@ export function AuctionDetail({
         </TabsContent>
 
         <TabsContent value="participants">
-          <Card className="p-6">
-            <div className="text-center">
-              <Users className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-              <h3 className="font-medium">Lista de Participantes</h3>
-              <p className="text-sm text-gray-600">
-                Componente ParticipantsList será implementado
-              </p>
-            </div>
-          </Card>
+          {/* TODO: Fetch participants from API*/}
+          <ParticipantsList
+            auctionId={auctionId}
+            participants={[] as any}
+            isManager={userRole === 'AUCTION_MANAGER'}
+            onRefresh={refetch}
+          />
         </TabsContent>
       </Tabs>
 

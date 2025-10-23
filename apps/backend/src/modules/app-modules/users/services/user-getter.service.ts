@@ -24,4 +24,8 @@ export class UserGettersService {
   async findByEmail(email: string): Promise<User> {
     return await this.userRepository.findByEmail(email);
   }
+
+  async getUsersByCompany(companyId: string): Promise<User[]> {
+    return await this.userRepository.findByCompany(companyId);
+  }
 }

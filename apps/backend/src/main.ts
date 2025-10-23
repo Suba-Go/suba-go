@@ -11,6 +11,7 @@ import { NestExpressApplication } from '@nestjs/platform-express';
 
 import { Serialize } from './common/interceptors/serialize.interceptor';
 import { SuperJsonInterceptor } from './common/interceptors/superjson.interceptor';
+import { getNodeEnv } from './utils/env';
 dotenv.config({
   path: '.env',
 });
@@ -35,15 +36,21 @@ async function bootstrap() {
 
   let origins: (string | RegExp)[];
 
-  // Determine environment: only local development uses localhost, everything else uses HTTPS
-  const isLocalDevelopment =
-    process.env.NODE_ENV === 'development' && !process.env.VERCEL;
+  // Determine environment based on NODE_ENV
+  const nodeEnv = getNodeEnv();
 
-  if (isLocalDevelopment) {
+  if (nodeEnv === 'local') {
     // Local development: Allow localhost and any subdomain.localhost
     origins = ['http://localhost:3000', /^http:\/\/[\w-]+\.localhost:3000$/];
+  } else if (nodeEnv === 'development') {
+    // Development environment: Allow development.subago.cl and subdomains
+    origins = [
+      'https://development.subago.cl',
+      'https://www.development.subago.cl',
+      /^https:\/\/[\w-]+\.development\.subago\.cl$/,
+    ];
   } else {
-    // Vercel preview or production: Allow main domain, www, tenant subdomains, and Vercel URLs
+    // Production: Allow main domain, www, tenant subdomains, and Vercel URLs
     const rootDomain = process.env.ROOT_DOMAIN || 'subago.cl';
     origins = [
       `https://${rootDomain}`,

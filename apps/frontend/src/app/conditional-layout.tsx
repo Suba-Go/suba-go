@@ -3,9 +3,16 @@
 import { useEffect, useState } from 'react';
 import { usePathname } from 'next/navigation';
 import NavbarLayout from './navbar-layout';
-import { getSubdomainFromHost } from '@suba-go/shared-components';
+import { getSubdomainFromHost, getNodeEnv } from '@suba-go/shared-components';
 
-const ROOT_DOMAIN = process.env.NEXT_PUBLIC_ROOT_DOMAIN ?? 'subago.cl';
+// Determine ROOT_DOMAIN based on APP_ENV
+const APP_ENV = getNodeEnv();
+const ROOT_DOMAIN =
+  APP_ENV === 'local'
+    ? 'localhost:3000'
+    : APP_ENV === 'development'
+    ? 'development.subago.cl'
+    : process.env.NEXT_PUBLIC_ROOT_DOMAIN ?? 'subago.cl';
 
 export default function ConditionalLayout({
   children,

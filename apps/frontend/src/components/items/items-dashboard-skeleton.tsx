@@ -1,6 +1,10 @@
-import { Card, CardContent, CardHeader } from '@suba-go/shared-components/components/ui/card';
+import {
+  Card,
+  CardContent,
+  CardHeader,
+} from '@suba-go/shared-components/components/ui/card';
 
-export function ProductsDashboardSkeleton() {
+export function ItemsDashboardSkeleton() {
   return (
     <div className="space-y-6">
       {/* Header Actions Skeleton */}
@@ -31,7 +35,7 @@ export function ProductsDashboardSkeleton() {
                 <div className="h-4 bg-gray-200 rounded w-1/2" />
                 <div className="h-4 bg-gray-200 rounded w-2/3" />
               </div>
-              
+
               <div className="flex gap-2 pt-2">
                 <div className="h-8 bg-gray-200 rounded flex-1" />
                 <div className="h-8 bg-gray-200 rounded w-10" />
