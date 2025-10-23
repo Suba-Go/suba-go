@@ -78,7 +78,9 @@ model User {
   company   Company? @relation(fields: [companyId], references: [id])
 
   // Auction-related relations
-  bids      Bid[]
+  bids                 Bid[]
+  auctionRegistrations AuctionRegistration[]
+  auditLogs            AuditLog[]
 
   // Unique constraints matching TypeORM indexes
   @@unique([email], map: "IDX_user_email_unique")
@@ -112,7 +114,8 @@ model Company {
   deletedAt DateTime?
 
   // Company-specific fields matching TypeORM entity
-  name              String @unique
+  name              String  @unique
+  nameLowercase     String  @unique // Lowercase version for case-insensitive subdomain lookup
   logo              String?
   principal_color   String?
   principal_color2  String?
@@ -149,6 +152,7 @@ model Item {
   legal_status LegalStatusEnum?
   state        ItemStateEnum @default(DISPONIBLE)
   basePrice    Decimal? @db.Decimal(10, 2)
+  sellPrice    Decimal? @db.Decimal(10, 2)
 
   // Relations
   tenantId     String
@@ -173,12 +177,18 @@ model Auction {
   status      AuctionStatusEnum   @default(PENDIENTE)
   type        AuctionTypeEnum @default(REAL)
 
-  // Relations
-  tenantId    String
-  tenant      Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  items       AuctionItem[]
-  bids        Bid[]
+  // Global per-auction bid increment (applies to all items in this auction)
+  bidIncrement Decimal @default(50000) @db.Decimal(10, 2)
 
+  // Relations
+  tenantId             String
+  tenant               Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  items                AuctionItem[]
+  bids                 Bid[]
+  registeredUsers      AuctionRegistration[]
+
+  @@index([tenantId, status])
+  @@index([startTime, endTime])
   @@map("auction")
 }
 
@@ -188,18 +198,36 @@ model AuctionItem {
   updatedAt   DateTime @updatedAt
   isDeleted   Boolean  @default(false)
   deletedAt   DateTime?
-  
+
   startingBid Decimal  @db.Decimal(10, 2)
-  reservePrice Decimal? @db.Decimal(10, 2)
-  
+
   // Relations
   auctionId   String
   auction     Auction @relation(fields: [auctionId], references: [id], onDelete: Cascade)
   itemId      String
   item        Item @relation(fields: [itemId], references: [id], onDelete: Cascade)
   bids        Bid[]
-  
+
   @@map("auction_item")
+}
+
+// Many-to-many relation between User and Auction (for registered users)
+model AuctionRegistration {
+  id        String   @id @default(uuid())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  userId    String
+  user      User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  auctionId String
+  auction   Auction @relation(fields: [auctionId], references: [id], onDelete: Cascade)
+
+  // Ensure a user can only register once per auction
+  @@unique([userId, auctionId])
+  @@index([auctionId])
+  @@index([userId])
+  @@map("auction_registration")
 }
 
 model Bid {
@@ -223,6 +251,9 @@ model Bid {
   auctionItemId String
   auctionItem   AuctionItem @relation(fields: [auctionItemId], references: [id])
 
+  @@index([auctionItemId, offered_price(sort: Desc)])
+  @@index([auctionId, createdAt(sort: Desc)])
+  @@index([userId, createdAt(sort: Desc)])
   @@map("bid")
 }
 
@@ -256,7 +287,12 @@ model AuditLog {
   entityType String
   entityId   String
   changes    Json?
-  userId     String?
 
+  // Relations
+  userId String?
+  user   User?   @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@index([entityType, entityId])
   @@map("audit_log")
 }

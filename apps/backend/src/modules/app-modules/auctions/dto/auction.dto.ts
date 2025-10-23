@@ -12,12 +12,7 @@ import {
 import { Transform, Type } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { AuctionStatusEnum } from '@prisma/client';
-
-// Local enum definition to avoid import issues
-enum AuctionTypeEnum {
-  TEST = 'test',
-  REAL = 'real',
-}
+import { AuctionTypeEnum } from '@suba-go/shared-validation';
 
 export class CreateAuctionDto {
   @ApiProperty({

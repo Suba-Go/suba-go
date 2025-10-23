@@ -131,27 +131,31 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
 
       if (trigger === 'update') {
         // Check if any user data has changed
-        const hasChanges = 
-          session.user.name !== token.user.name || 
+        const hasChanges =
+          session.user.name !== token.user.name ||
           session.user.email !== token.user.email ||
           session.user.phone !== token.user.phone ||
           session.user.rut !== token.user.rut;
-        
-        
+
         if (hasChanges) {
           const newToken = {
             tokens: token.tokens,
             updatedAt: Date.now(),
-            user: { 
-              ...token.user, 
+            user: {
+              ...token.user,
               name: session.user.name,
               email: session.user.email,
               phone: session.user.phone,
-              rut: session.user.rut
+              rut: session.user.rut,
             },
           };
           return newToken;
         }
+      }
+
+      // If token doesn't have required properties, return as-is to avoid errors
+      if (!token.tokens || !token.tokens.expiresIn) {
+        return token;
       }
 
       const currentTime = new Date().getTime();
@@ -164,20 +168,34 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       try {
         const newToken = await refreshToken(token);
 
-        // If the refresh token is expired, force logout
+        // If the refresh token is expired, return token as-is
+        // NextAuth will handle the session invalidation
         if (newToken === null) {
-          // Refresh token expired - session will be cleared
-          return null;
+          console.warn('Refresh token expired, session will be invalidated');
+          return token;
         }
         return newToken;
       } catch (error) {
         console.error('Token refresh failed:', error);
-        // Return null to clear session on refresh failures
-        return null;
+        // Return token as-is to prevent breaking the session callback
+        return token;
       }
     },
 
     async session({ session, token }) {
+      // If token is invalid or missing required data, return null
+      // This will cause auth() to return null, which route handlers can handle
+      if (!token || !token.user || !token.tokens) {
+        console.error('Invalid token in session callback:', {
+          hasToken: !!token,
+          hasUser: !!token?.user,
+          hasTokens: !!token?.tokens,
+        });
+        // Return null to signal invalid session
+        // NextAuth will handle this and auth() will return null
+        return null as any;
+      }
+
       session.user = {
         ...token.user,
         emailVerified: token.user.emailVerified ?? null,

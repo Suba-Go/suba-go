@@ -7,7 +7,7 @@ type UserWithRelations = {
   id: string;
   email: string;
   tenant?: { id: string };
-  company?: { name: string; tenant?: { id: string } };
+  company?: { name: string; nameLowercase?: string; tenant?: { id: string } };
 };
 
 interface CompanyLookupResult {
@@ -43,8 +43,9 @@ export class UserLookupService {
         throw new NotFoundException('User exists but has no associated tenant');
       }
 
-      // The company name is the subdomain
-      const subdomain = user.company.name;
+      // The lowercase company name is the subdomain
+      const subdomain =
+        user.company.nameLowercase || user.company.name.toLowerCase();
 
       return {
         companyDomain: subdomain, // Return the company name as subdomain
@@ -81,8 +82,9 @@ export class UserLookupService {
         };
       }
 
-      // The tenant name is the subdomain
-      const userTenantSubdomain = user.company.name;
+      // The lowercase company name is the subdomain
+      const userTenantSubdomain =
+        user.company.nameLowercase || user.company.name.toLowerCase();
 
       // Compare the tenant subdomain with the requested subdomain
       if (userTenantSubdomain !== subdomain) {

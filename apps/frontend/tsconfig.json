@@ -41,7 +41,9 @@
     "next-env.d.ts",
     ".next/types/**/*.ts",
     "../../libs/shared-components/src/**/*.ts",
-    "../../libs/shared-components/src/**/*.tsx"
+    "../../libs/shared-components/src/**/*.tsx",
+    "src/types/env.d.ts",
+    "../../libs/shared-components/src/types/env.d.ts"
   ],
   "exclude": ["node_modules", "**/*.spec.ts", "**/*.test.ts", ".next/**/*"]
 }

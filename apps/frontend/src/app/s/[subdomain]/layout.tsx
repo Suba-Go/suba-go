@@ -72,14 +72,7 @@ export default async function SubdomainLayout({
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Company Navbar - Condicionalmente incluida (no en login) */}
-      <ConditionalNavbar
-        company={{
-          id: company.id,
-          name: company.name,
-          principal_color: company.principal_color || undefined,
-        }}
-        subdomain={subdomain}
-      />
+      <ConditionalNavbar company={company} subdomain={subdomain} />
 
       {/* Contenido de la página */}
       {children}

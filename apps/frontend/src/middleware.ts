@@ -2,7 +2,15 @@ import { NextRequest, NextResponse } from 'next/server';
 import { auth } from './auth';
 import { getSubdomainFromHost } from '@suba-go/shared-components';
 
-const ROOT_DOMAIN = process.env.ROOT_DOMAIN ?? 'subago.cl';
+// Determine ROOT_DOMAIN based on APP_ENV
+const APP_ENV =
+  process.env.APP_ENV || process.env.NEXT_PUBLIC_APP_ENV || 'development';
+const ROOT_DOMAIN =
+  APP_ENV === 'local'
+    ? 'localhost:3000'
+    : APP_ENV === 'development'
+    ? 'development.subago.cl'
+    : process.env.ROOT_DOMAIN ?? 'subago.cl';
 
 export default auth(async function middleware(request: NextRequest) {
   const host = request.headers.get('host') ?? '';

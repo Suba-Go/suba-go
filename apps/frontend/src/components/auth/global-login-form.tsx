@@ -5,6 +5,7 @@ import { Button } from '@suba-go/shared-components/components/ui/button';
 import { Input } from '@suba-go/shared-components/components/ui/input';
 import { Label } from '@suba-go/shared-components/components/ui/label';
 import { useToast } from '@suba-go/shared-components/components/ui/toaster';
+import { getNodeEnv } from '@suba-go/shared-components';
 import Link from 'next/link';
 
 export default function GlobalLoginForm() {
@@ -59,22 +60,25 @@ export default function GlobalLoginForm() {
       }
 
       const data = await response.json();
-
       if (data.success && data.data && data.data.companyDomain) {
-        // Redirect to company-specific login
-        const protocol =
-          process.env.NODE_ENV === 'production' ? 'https' : 'http';
-        const rootDomain =
-          process.env.NEXT_PUBLIC_ROOT_DOMAIN || 'localhost:3000';
-        const port = process.env.NODE_ENV === 'production' ? '' : ':3000';
-
+        // Redirect to company-specific login based on environment
+        const nodeEnv = getNodeEnv();
         let companyLoginUrl: string;
-        if (process.env.NODE_ENV === 'development') {
-          companyLoginUrl = `${protocol}://${
+
+        if (nodeEnv === 'local') {
+          // Local: http://{company}.localhost:3000/login
+          companyLoginUrl = `http://${
             data.data.companyDomain
-          }.localhost${port}/login?email=${encodeURIComponent(email)}`;
+          }.localhost:3000/login?email=${encodeURIComponent(email)}`;
+        } else if (nodeEnv === 'development') {
+          // Development: https://{company}.development.subago.cl
+          companyLoginUrl = `https://${
+            data.data.companyDomain
+          }.development.subago.cl/login?email=${encodeURIComponent(email)}`;
         } else {
-          companyLoginUrl = `${protocol}://${
+          // Production: https://{company}.subago.cl
+          const rootDomain = process.env.NEXT_PUBLIC_ROOT_DOMAIN || 'subago.cl';
+          companyLoginUrl = `https://${
             data.data.companyDomain
           }.${rootDomain}/login?email=${encodeURIComponent(email)}`;
         }

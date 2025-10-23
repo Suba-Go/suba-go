@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter } from 'next-nprogress-bar';
 import {
   Car,
   Calendar,
@@ -18,7 +18,7 @@ import {
   Gavel,
 } from 'lucide-react';
 import Image from 'next/image';
-import { ItemDto, ItemStateEnum } from '@suba-go/shared-validation';
+import { ItemStateEnum } from '@suba-go/shared-validation';
 import {
   getAuctionBadgeColor,
   getAuctionStatusLabel,
@@ -512,14 +512,6 @@ export function ItemDetail({ itemId, userRole }: ItemDetailProps) {
                           {formatPrice(auctionItem.startingBid)}
                         </p>
                       </div>
-                      {auctionItem.reservePrice && (
-                        <div>
-                          <p className="text-gray-600">Precio Reserva</p>
-                          <p className="font-medium">
-                            {formatPrice(auctionItem.reservePrice)}
-                          </p>
-                        </div>
-                      )}
                     </div>
 
                     <Button variant="outline" className="w-full gap-2">

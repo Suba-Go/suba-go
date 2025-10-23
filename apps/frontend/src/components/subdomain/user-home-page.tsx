@@ -1,11 +1,7 @@
 'use client';
 
-import { useState } from 'react';
-import {
-  CompanyDto,
-  AuctionStatusEnum,
-  AuctionDto,
-} from '@suba-go/shared-validation';
+import { useState, useMemo } from 'react';
+import { CompanyDto, AuctionStatusEnum } from '@suba-go/shared-validation';
 import { useFetchData } from '@/hooks/use-fetch-data';
 import { useSession } from 'next-auth/react';
 import {
@@ -16,21 +12,14 @@ import {
   CardTitle,
 } from '@suba-go/shared-components/components/ui/card';
 import { Badge } from '@suba-go/shared-components/components/ui/badge';
-import { Button } from '@suba-go/shared-components/components/ui/button';
 import { Switch } from '@suba-go/shared-components/components/ui/switch';
 import { Label } from '@suba-go/shared-components/components/ui/label';
 import { Spinner } from '@suba-go/shared-components/components/ui/spinner';
-import { Trophy, Gavel, Calendar, Clock, Car, AlertCircle } from 'lucide-react';
-import { format } from 'date-fns';
-import { es } from 'date-fns/locale';
-import { useRouter } from 'next-nprogress-bar';
-import {
-  getAuctionBadgeColor,
-  getAuctionStatusLabel,
-} from '@/lib/auction-badge-colors';
+import { Trophy, Gavel } from 'lucide-react';
 import { useAutoFormat } from '@/hooks/use-auto-format';
-import { useAuctionStatus } from '@/hooks/use-auction-status';
+import { useRouter } from 'next-nprogress-bar';
 import Image from 'next/image';
+import { AuctionCard } from '@/components/auctions/auction-card';
 
 interface UserHomePageProps {
   company: CompanyDto;
@@ -52,27 +41,69 @@ export function UserHomePage({ company, subdomain }: UserHomePageProps) {
     condition: !!userId,
   });
 
-  // Fetch all auctions
-  const { data: allAuctions, isLoading: auctionsLoading } = useFetchData<
-    AuctionDto[]
-  >({
-    url: '/api/auctions',
-    key: ['auctions', subdomain],
+  // Fetch user's registered auctions
+  const {
+    data: userRegistrations,
+    isLoading: registrationsLoading,
+    refetch: refetchRegistrations,
+  } = useFetchData<any[]>({
+    url: `/api/auctions/my-registrations`,
+    key: ['my-registrations', userId || ''],
+    condition: !!userId,
   });
 
   const primaryColor = company.principal_color || '#3B82F6';
 
-  // Filter auctions based on showAllAuctions toggle
-  const filteredAuctions = allAuctions?.filter((auction) => {
+  // Build list of auctions from registrations and bids
+  const filteredAuctions = useMemo(() => {
     if (showAllAuctions) {
-      return true; // Show all auctions
+      // Toggle ON: Show auctions where user has placed bids (regardless of state)
+      // Extract unique auctions from bids using Map to prevent duplicates
+      const auctionMap = new Map();
+      userBids?.forEach((bid: any) => {
+        const auction = bid.auctionItem?.auction;
+        if (auction && !auctionMap.has(auction.id)) {
+          // Map Prisma field names to frontend expected names
+          auctionMap.set(auction.id, {
+            ...auction,
+            start: auction.startTime || auction.start,
+            end: auction.endTime || auction.end,
+            state: auction.status || auction.state,
+            tenantId: auction.tenantId, // Include tenantId for navigation
+          });
+        }
+      });
+      return Array.from(auctionMap.values());
     }
-    // Only show ACTIVA and PENDIENTE (future) auctions
-    return (
-      auction.state === AuctionStatusEnum.ACTIVA ||
-      auction.state === AuctionStatusEnum.PENDIENTE
-    );
-  });
+
+    // Default: Show ACTIVA and PENDIENTE auctions where user is registered
+    // Use Map to prevent duplicates in case of multiple registrations
+    const auctionMap = new Map();
+    userRegistrations?.forEach((reg: any) => {
+      const auction = reg.auction;
+      if (!auction) return;
+
+      // Only include ACTIVA and PENDIENTE auctions
+      const auctionState = auction.status || auction.state;
+      if (
+        auctionState === AuctionStatusEnum.ACTIVA ||
+        auctionState === AuctionStatusEnum.PENDIENTE
+      ) {
+        if (!auctionMap.has(auction.id)) {
+          // Map Prisma field names to frontend expected names
+          auctionMap.set(auction.id, {
+            ...auction,
+            start: auction.startTime || auction.start,
+            end: auction.endTime || auction.end,
+            state: auctionState,
+            tenantId: auction.tenantId, // Include tenantId for navigation
+          });
+        }
+      }
+    });
+
+    return Array.from(auctionMap.values());
+  }, [showAllAuctions, userBids, userRegistrations]);
 
   // Find adjudicated items (items where user has the winning bid in completed auctions)
   const adjudicatedItems = userBids?.filter((bid: any) => {
@@ -92,7 +123,7 @@ export function UserHomePage({ company, subdomain }: UserHomePageProps) {
     return bid.offered_price === highestBid;
   });
 
-  const isLoading = bidsLoading || auctionsLoading;
+  const isLoading = bidsLoading || registrationsLoading;
 
   if (isLoading) {
     return (
@@ -121,7 +152,7 @@ export function UserHomePage({ company, subdomain }: UserHomePageProps) {
             Bienvenido, {session?.user?.name || 'Usuario'}
           </h1>
           <p className="text-gray-600">
-            Gestiona tus items adjudicados y participa en subastas activas
+            Gestiona tus items adjudicados y participa en subastas disponibles
           </p>
         </div>
 
@@ -144,9 +175,7 @@ export function UserHomePage({ company, subdomain }: UserHomePageProps) {
                   <Card
                     key={bid.id}
                     className="hover:shadow-lg transition-shadow cursor-pointer"
-                    onClick={() =>
-                      router.push(`/s/${subdomain}/items/${item?.id}`)
-                    }
+                    onClick={() => router.push(`/items/${item?.id}`)}
                   >
                     <CardHeader className="pb-3">
                       <div className="flex justify-between items-start">
@@ -224,30 +253,31 @@ export function UserHomePage({ company, subdomain }: UserHomePageProps) {
                 onCheckedChange={setShowAllAuctions}
               />
               <Label htmlFor="show-all" className="cursor-pointer">
-                Mostrar todas (incluidas pasadas)
+                Mostrar subastas donde he pujado
               </Label>
             </div>
           </div>
 
           {filteredAuctions && filteredAuctions.length > 0 ? (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {filteredAuctions.map((auction) => {
-                const startTime = new Date(auction.start);
-                const endTime = auction.end
-                  ? new Date(auction.end)
-                  : new Date();
-
-                return (
-                  <AuctionCardComponent
-                    key={auction.id}
-                    auction={auction}
-                    startTime={startTime}
-                    endTime={endTime}
-                    subdomain={subdomain}
-                    router={router}
-                  />
-                );
-              })}
+              {filteredAuctions.map((auction) => (
+                <AuctionCard
+                  key={auction.id}
+                  auction={{
+                    id: auction.id,
+                    title: auction.title || auction.name || 'Sin título',
+                    description: auction.description,
+                    startTime: auction.startTime || auction.start,
+                    endTime: auction.endTime || auction.end,
+                    status: auction.status || auction.state,
+                    type: auction.type,
+                    items: auction.items,
+                    tenantId: auction.tenantId,
+                  }}
+                  subdomain={subdomain}
+                  onUpdate={refetchRegistrations}
+                />
+              ))}
             </div>
           ) : (
             <Card>
@@ -255,7 +285,9 @@ export function UserHomePage({ company, subdomain }: UserHomePageProps) {
                 <div className="text-center py-8">
                   <Gavel className="h-12 w-12 text-gray-400 mx-auto mb-4" />
                   <p className="text-gray-600">
-                    No hay subastas disponibles en este momento
+                    {showAllAuctions
+                      ? 'No has pujado en ninguna subasta todavía'
+                      : 'No tienes subastas activas o pendientes disponibles'}
                   </p>
                 </div>
               </CardContent>
@@ -264,90 +296,5 @@ export function UserHomePage({ company, subdomain }: UserHomePageProps) {
         </div>
       </div>
     </div>
-  );
-}
-
-// Separate component to use hooks properly
-function AuctionCardComponent({
-  auction,
-  startTime,
-  endTime,
-  subdomain,
-  router,
-}: {
-  auction: AuctionDto;
-  startTime: Date;
-  endTime: Date;
-  subdomain: string;
-  router: ReturnType<typeof useRouter>;
-}) {
-  // Use automatic status hook
-  const auctionStatus = useAuctionStatus(
-    auction.state,
-    auction.start,
-    auction.end || new Date()
-  );
-
-  return (
-    <Card
-      className="hover:shadow-lg transition-shadow cursor-pointer"
-      onClick={() => router.push(`/s/${subdomain}/subastas/${auction.id}`)}
-    >
-      <CardHeader className="pb-3">
-        <div className="flex justify-between items-start">
-          <div className="flex-1">
-            <CardTitle className="text-lg mb-1">{auction.name}</CardTitle>
-            <CardDescription className="line-clamp-2">
-              Sin descripción
-            </CardDescription>
-          </div>
-          <Badge className={getAuctionBadgeColor(auctionStatus.displayStatus)}>
-            {getAuctionStatusLabel(auctionStatus.displayStatus)}
-          </Badge>
-        </div>
-      </CardHeader>
-      <CardContent>
-        <div className="space-y-3">
-          {/* Timing Info */}
-          <div className="flex items-center gap-2 text-sm text-gray-600">
-            {auctionStatus.isActive && auctionStatus.timeRemaining ? (
-              <>
-                <Clock className="h-4 w-4 text-green-600" />
-                <span className="text-green-700 font-medium">
-                  Termina en {auctionStatus.timeRemaining}
-                </span>
-              </>
-            ) : auctionStatus.isPending && auctionStatus.timeRemaining ? (
-              <>
-                <Calendar className="h-4 w-4" />
-                <span>Inicia en {auctionStatus.timeRemaining}</span>
-              </>
-            ) : auctionStatus.isCompleted ? (
-              <>
-                <AlertCircle className="h-4 w-4" />
-                <span>
-                  Finalizó el {format(endTime, 'PPP', { locale: es })}
-                </span>
-              </>
-            ) : auctionStatus.isCanceled ? (
-              <>
-                <AlertCircle className="h-4 w-4 text-orange-600" />
-                <span className="text-orange-700">Cancelada</span>
-              </>
-            ) : null}
-          </div>
-
-          <Button
-            className="w-full"
-            onClick={(e) => {
-              e.stopPropagation();
-              router.push(`/s/${subdomain}/subastas/${auction.id}`);
-            }}
-          >
-            Ver Subasta
-          </Button>
-        </div>
-      </CardContent>
-    </Card>
   );
 }

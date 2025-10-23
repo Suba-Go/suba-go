@@ -1,13 +1,14 @@
 'use client';
 
 import { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter } from 'next-nprogress-bar';
 import { signIn } from 'next-auth/react';
 import Link from 'next/link';
 import { Button } from '@suba-go/shared-components/components/ui/button';
 import { Input } from '@suba-go/shared-components/components/ui/input';
 import { Label } from '@suba-go/shared-components/components/ui/label';
 import { useToast } from '@suba-go/shared-components/components/ui/toaster';
+import { getNodeEnv } from '@suba-go/shared-components';
 import { getUserCompanyDomainTrpcAction } from '@/domain/trpc-actions/user/get-user-company-domain-trpc-action';
 import { z } from 'zod';
 import { email } from '@suba-go/shared-validation';
@@ -66,7 +67,7 @@ export default function LoginForm() {
     setIsLoading(true);
 
     // Clear any existing session cookies before login
-    if (process.env.NODE_ENV === 'development') {
+    if (getNodeEnv() === 'local') {
       // Clear cookies for both localhost and .localhost domain
       document.cookie =
         'authjs.session-token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';

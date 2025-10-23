@@ -42,9 +42,10 @@ export class CompanyCreatorService {
       }
     }
 
-    // Create company
+    // Create company with lowercase name for case-insensitive subdomain lookup
     return await this.companyRepository.create({
       name: companyData.name,
+      nameLowercase: companyData.name.toLowerCase(),
       logo: companyData.logo,
       principal_color: companyData.principal_color,
       principal_color2: companyData.principal_color2,

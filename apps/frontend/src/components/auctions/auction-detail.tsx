@@ -43,8 +43,6 @@ import type {
   AuctionItem,
   AuctionBid,
 } from '@/types/auction.types';
-import { formatDistanceToNow, format } from 'date-fns';
-import { es } from 'date-fns/locale';
 import {
   getAuctionBadgeColor,
   getAuctionStatusLabel,
@@ -54,6 +52,7 @@ import Image from 'next/image';
 import { useRouter } from 'next-nprogress-bar';
 import { useAuctionStatus } from '@/hooks/use-auction-status';
 import { AuctionStatusEnum } from '@suba-go/shared-validation';
+import { ParticipantsList } from './participants-list';
 
 interface AuctionDetailProps {
   auctionId: string;
@@ -154,9 +153,6 @@ export function AuctionDetail({ auctionId, userRole }: AuctionDetailProps) {
       </div>
     );
   }
-
-  const startTime = new Date(auction.startTime);
-  const endTime = new Date(auction.endTime);
 
   const getStatusBadge = () => {
     return (
@@ -519,15 +515,13 @@ export function AuctionDetail({ auctionId, userRole }: AuctionDetailProps) {
         </TabsContent>
 
         <TabsContent value="participants">
-          <Card className="p-6">
-            <div className="text-center">
-              <Users className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-              <h3 className="font-medium">Lista de Participantes</h3>
-              <p className="text-sm text-gray-600">
-                Componente ParticipantsList será implementado
-              </p>
-            </div>
-          </Card>
+          {/* TODO: Fetch participants from API*/}
+          <ParticipantsList
+            auctionId={auctionId}
+            participants={[] as any}
+            isManager={userRole === 'AUCTION_MANAGER'}
+            onRefresh={refetch}
+          />
         </TabsContent>
       </Tabs>
 

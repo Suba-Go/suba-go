@@ -12,7 +12,7 @@ export class CompanyGetterService {
 
   async getCompanyBySubdomain(subdomain: string): Promise<Company> {
     // The subdomain is the company name
-    // Find company directly by name
+    // Find company directly by name (case-insensitive)
     const company = await this.companyRepository.findByName(subdomain);
 
     if (!company) {

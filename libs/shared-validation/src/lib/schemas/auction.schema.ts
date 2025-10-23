@@ -59,7 +59,6 @@ export const auctionWithItemsSchema = auctionSchema.extend({
     z.object({
       id: z.string(),
       startingBid: z.number(),
-      reservePrice: z.number().nullable(),
       item: z.object({
         id: z.string(),
         plate: z.string().nullable(),

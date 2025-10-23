@@ -38,6 +38,7 @@ export const connectUserInputSchema = z.object({
   company: z.object({
     id: z.string(),
     name: z.string(),
+    nameLowercase: z.string(),
   }),
 });
 

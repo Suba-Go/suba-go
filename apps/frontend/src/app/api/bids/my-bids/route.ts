@@ -10,19 +10,8 @@ export async function GET() {
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
     }
 
-    // Get user ID and tenant from session
-    const userId = session.user.id;
-    const tenantId = session.user.tenant?.id;
-
-    if (!tenantId) {
-      return NextResponse.json(
-        { error: 'Usuario sin tenant' },
-        { status: 400 }
-      );
-    }
-
-    // Forward request to backend
-    const backendUrl = `${process.env.BACKEND_URL}/bids/user/${userId}`;
+    // Forward request to backend - use endpoint that gets current user's bids
+    const backendUrl = `${process.env.BACKEND_URL}/bids/my-bids`;
 
     const response = await fetch(backendUrl, {
       method: 'GET',
@@ -33,21 +22,35 @@ export async function GET() {
     });
 
     if (!response.ok) {
-      throw new Error(`Backend responded with status: ${response.status}`);
+      const errorText = await response.text();
+      console.error(
+        `Backend error (${response.status}):`,
+        errorText.substring(0, 200)
+      );
+      // Return empty array instead of error to prevent UI breaking
+      return NextResponse.json([]);
     }
 
     const data = await response.json();
 
-    // Parse dates with superjson
-    const parsedData = superjson.parse(JSON.stringify(data));
+    // Handle superjson format from backend
+    let deserializedData = data;
+    if (data && typeof data === 'object' && 'superjson' in data) {
+      try {
+        deserializedData = superjson.deserialize(data.superjson);
+      } catch (error) {
+        console.error('Failed to deserialize superjson response:', error);
+        deserializedData = data;
+      }
+    }
 
-    return NextResponse.json(parsedData);
+    // Ensure we return an array
+    const result = Array.isArray(deserializedData) ? deserializedData : [];
+
+    return NextResponse.json(result);
   } catch (error) {
     console.error('Error fetching user bids:', error);
-    return NextResponse.json(
-      { error: 'Error al obtener las pujas del usuario' },
-      { status: 500 }
-    );
+    // Return empty array instead of error to prevent UI breaking
+    return NextResponse.json([]);
   }
 }
-
