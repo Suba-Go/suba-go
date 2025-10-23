@@ -12,10 +12,14 @@ import {
 } from '../dto/auction.dto';
 import type { Auction } from '@prisma/client';
 import { AuctionTypeEnum } from '@prisma/client';
+import { PrismaService } from '../../../providers-modules/prisma/prisma.service';
 
 @Injectable()
 export class AuctionsService {
-  constructor(private readonly auctionRepository: AuctionPrismaService) {}
+  constructor(
+    private readonly auctionRepository: AuctionPrismaService,
+    private readonly prisma: PrismaService
+  ) {}
 
   async createAuction(
     createAuctionDto: CreateAuctionDto,
@@ -52,6 +56,7 @@ export class AuctionsService {
       endTime: createAuctionDto.endTime,
       tenantId,
       type: auctionType,
+      bidIncrement: createAuctionDto.bidIncrement,
     });
 
     // Add selected items to auction
@@ -71,6 +76,10 @@ export class AuctionsService {
 
   async getAuctionsByTenant(tenantId: string): Promise<Auction[]> {
     return this.auctionRepository.getAuctionsByTenant(tenantId);
+  }
+
+  async getUserAuctionRegistrations(userId: string): Promise<any[]> {
+    return this.auctionRepository.getUserAuctionRegistrations(userId);
   }
 
   async getAuctionById(id: string, tenantId: string): Promise<Auction> {
@@ -130,6 +139,7 @@ export class AuctionsService {
       startTime: updateAuctionDto.startTime,
       endTime: updateAuctionDto.endTime,
       type: auctionType,
+      bidIncrement: updateAuctionDto.bidIncrement,
     });
 
     // If auction was CANCELADA and is being edited, change status to PENDIENTE
@@ -212,14 +222,37 @@ export class AuctionsService {
   async cancelAuction(id: string, tenantId: string): Promise<Auction> {
     const auction = await this.getAuctionById(id, tenantId);
 
-    // Can only cancel PENDIENTE auctions (not started yet)
-    if (auction.status !== 'PENDIENTE') {
+    // Allowed: cancel when PENDIENTE or ACTIVA; disallow COMPLETADA / ELIMINADA / already CANCELADA
+    if (auction.status === 'COMPLETADA' || auction.status === 'ELIMINADA') {
       throw new BadRequestException(
-        'Solo se pueden cancelar subastas que no han iniciado'
+        'No se puede cancelar una subasta finalizada o eliminada'
       );
     }
+    if (auction.status === 'CANCELADA') {
+      // idempotent: return current state
+      return auction;
+    }
 
-    return this.auctionRepository.updateAuctionStatus(id, 'CANCELADA');
+    const updated = await this.auctionRepository.updateAuctionStatus(
+      id,
+      'CANCELADA'
+    );
+
+    // Audit log (server-authoritative cancel)
+    try {
+      await this.prisma.auditLog.create({
+        data: {
+          action: 'AUCTION_CANCELLED',
+          entityType: 'Auction',
+          entityId: id,
+          changes: { previousStatus: auction.status },
+        },
+      });
+    } catch (e) {
+      console.error('Error creating audit log:', e);
+    }
+
+    return updated;
   }
 
   async uncancelAuction(id: string, tenantId: string): Promise<Auction> {
@@ -248,5 +281,59 @@ export class AuctionsService {
     }
 
     return this.auctionRepository.updateAuctionStatus(id, newStatus);
+  }
+
+  async registerUserToAuction(
+    auctionId: string,
+    userId: string,
+    tenantId: string
+  ): Promise<{ success: boolean; message: string }> {
+    // Verify auction exists and belongs to tenant
+    const auction = await this.getAuctionById(auctionId, tenantId);
+
+    if (!auction) {
+      throw new NotFoundException('Subasta no encontrada');
+    }
+
+    // Register user
+    await this.auctionRepository.registerUserToAuction(auctionId, userId);
+
+    return {
+      success: true,
+      message: 'Usuario registrado exitosamente',
+    };
+  }
+
+  async unregisterUserFromAuction(
+    auctionId: string,
+    userId: string,
+    tenantId: string
+  ): Promise<{ success: boolean; message: string }> {
+    // Verify auction exists and belongs to tenant
+    const auction = await this.getAuctionById(auctionId, tenantId);
+
+    if (!auction) {
+      throw new NotFoundException('Subasta no encontrada');
+    }
+
+    // Unregister user
+    await this.auctionRepository.unregisterUserFromAuction(auctionId, userId);
+
+    return {
+      success: true,
+      message: 'Usuario desregistrado exitosamente',
+    };
+  }
+
+  async getAuctionParticipants(auctionId: string, tenantId: string) {
+    // Verify auction exists and belongs to tenant
+    const auction = await this.getAuctionById(auctionId, tenantId);
+
+    if (!auction) {
+      throw new NotFoundException('Subasta no encontrada');
+    }
+
+    // Get registered participants
+    return this.auctionRepository.getAuctionParticipants(auctionId);
   }
 }

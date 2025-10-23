@@ -10,8 +10,8 @@ export async function GET() {
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
     }
 
-    // Forward request to backend - use endpoint that gets current user's bids
-    const backendUrl = `${process.env.BACKEND_URL}/bids/my-bids`;
+    // Forward request to backend - use new endpoint that gets current user's registrations
+    const backendUrl = `${process.env.BACKEND_URL}/auctions/my-registrations`;
 
     const response = await fetch(backendUrl, {
       method: 'GET',
@@ -49,7 +49,7 @@ export async function GET() {
 
     return NextResponse.json(result);
   } catch (error) {
-    console.error('Error fetching user bids:', error);
+    console.error('Error fetching user registrations:', error);
     // Return empty array instead of error to prevent UI breaking
     return NextResponse.json([]);
   }

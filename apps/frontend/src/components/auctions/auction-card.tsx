@@ -43,6 +43,7 @@ interface AuctionCardProps {
     endTime: string;
     status: string;
     type?: string;
+    tenantId?: string;
     items?: Array<{
       id: string;
       item: {
@@ -147,6 +148,11 @@ export function AuctionCard({
           </div>
           <div className="flex items-center gap-2">
             {getStatusBadge()}
+            {auction.type === 'TEST' && (
+              <Badge className="text-xs bg-orange-100 text-orange-600">
+                Prueba
+              </Badge>
+            )}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" size="sm" className="h-8 w-8 p-0">

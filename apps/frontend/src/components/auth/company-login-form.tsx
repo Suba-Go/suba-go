@@ -11,12 +11,14 @@ import { Eye, EyeOff } from 'lucide-react';
 
 interface CompanyLoginFormProps {
   companyName?: string;
+  companyNameLowercase?: string;
   prefilledEmail?: string;
   onLoginSuccess?: () => void;
 }
 
 export default function CompanyLoginForm({
   companyName,
+  companyNameLowercase,
   prefilledEmail,
   onLoginSuccess,
 }: CompanyLoginFormProps) {
@@ -70,14 +72,17 @@ export default function CompanyLoginForm({
     }
 
     setIsLoading(true);
+    // Use the lowercase company name for subdomain validation
+    const subdomainToValidate =
+      companyNameLowercase || companyName?.toLowerCase();
 
     // SECURITY: Validate that the email belongs to this tenant before attempting login
-    if (companyName) {
+    if (subdomainToValidate) {
       try {
         const validationResponse = await fetch(
           `/api/users/validate-email-for-tenant?email=${encodeURIComponent(
             formData.email
-          )}&subdomain=${encodeURIComponent(companyName)}`
+          )}&subdomain=${encodeURIComponent(subdomainToValidate)}`
         );
 
         if (validationResponse.ok) {

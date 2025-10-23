@@ -19,6 +19,7 @@ export class AuctionPrismaService {
     endTime: Date;
     tenantId: string;
     type?: AuctionTypeEnum;
+    bidIncrement?: number;
   }): Promise<Auction> {
     return this.prisma.auction.create({
       data,
@@ -243,8 +244,47 @@ export class AuctionPrismaService {
     });
   }
 
+  // Get user's auction registrations
+  async getUserAuctionRegistrations(userId: string): Promise<any[]> {
+    return this.prisma.auctionRegistration.findMany({
+      where: {
+        userId,
+      },
+      include: {
+        auction: {
+          include: {
+            items: {
+              include: {
+                item: true,
+                bids: {
+                  take: 1,
+                  orderBy: {
+                    offered_price: 'desc',
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+      orderBy: {
+        createdAt: 'desc',
+      },
+    });
+  }
+
   // Update auction
-  async updateAuction(id: string, data: Partial<Auction>): Promise<Auction> {
+  async updateAuction(
+    id: string,
+    data: {
+      title?: string;
+      description?: string;
+      startTime?: Date;
+      endTime?: Date;
+      type?: AuctionTypeEnum;
+      bidIncrement?: number;
+    }
+  ): Promise<Auction> {
     return this.prisma.auction.update({
       where: { id },
       data,
@@ -324,7 +364,7 @@ export class AuctionPrismaService {
   }> {
     const [totalAuctions, activeAuctions, participantsResult, revenueResult] =
       await Promise.all([
-        // Total auctions
+        // Total auctions where are real
         this.prisma.auction.count({
           where: {
             tenantId,
@@ -332,7 +372,7 @@ export class AuctionPrismaService {
           },
         }),
 
-        // Active auctions
+        // Active auctions where are real
         this.prisma.auction.count({
           where: {
             tenantId,
@@ -358,20 +398,27 @@ export class AuctionPrismaService {
           distinct: ['userId'],
         }),
 
-        // Total revenue (sum of winning bids)
-        this.prisma.bid.aggregate({
+        // Total revenue (sum of sellPrice from sold items in completed REAL auctions)
+        this.prisma.item.aggregate({
           where: {
-            auctionItem: {
-              auction: {
-                tenantId,
-                status: 'COMPLETADA',
-                isDeleted: false,
+            isDeleted: false,
+            state: 'VENDIDO',
+            sellPrice: {
+              not: null,
+            },
+            auctionItems: {
+              some: {
+                auction: {
+                  tenantId,
+                  status: 'COMPLETADA',
+                  isDeleted: false,
+                  type: 'REAL',
+                },
               },
             },
-            isDeleted: false,
           },
           _sum: {
-            offered_price: true,
+            sellPrice: true,
           },
         }),
       ]);
@@ -380,7 +427,7 @@ export class AuctionPrismaService {
       totalAuctions,
       activeAuctions,
       totalParticipants: participantsResult.length,
-      totalRevenue: Number(revenueResult._sum.offered_price) || 0,
+      totalRevenue: Number(revenueResult._sum.sellPrice) || 0,
     };
   }
 
@@ -391,7 +438,6 @@ export class AuctionPrismaService {
       auctionId,
       itemId,
       startingBid: 0, // Default starting bid, could be made configurable
-      reservePrice: null, // Optional reserve price
     }));
 
     await this.prisma.auctionItem.createMany({
@@ -409,13 +455,53 @@ export class AuctionPrismaService {
   // Close auction and determine winners
   async closeAuction(auctionId: string): Promise<Auction> {
     return this.prisma.executeTransaction(async (prisma) => {
-      // Update auction status
-      const auction = await prisma.auction.update({
+      // Get auction with items and their highest bids
+      const auction = await prisma.auction.findUnique({
+        where: { id: auctionId },
+        include: {
+          items: {
+            include: {
+              item: true,
+              bids: {
+                where: { isDeleted: false },
+                orderBy: {
+                  offered_price: 'desc',
+                },
+                take: 1,
+              },
+            },
+          },
+        },
+      });
+
+      if (!auction) {
+        throw new Error('Auction not found');
+      }
+
+      // Update each item with winning bid price
+      for (const auctionItem of auction.items) {
+        const winningBid = auctionItem.bids[0];
+
+        if (winningBid && auctionItem.item) {
+          // Update item with sellPrice and mark as VENDIDO
+          await prisma.item.update({
+            where: { id: auctionItem.item.id },
+            data: {
+              sellPrice: winningBid.offered_price,
+              state: 'VENDIDO',
+            },
+          });
+        }
+      }
+
+      // Update auction status to COMPLETADA
+      const updatedAuction = await prisma.auction.update({
         where: { id: auctionId },
         data: { status: 'COMPLETADA' },
         include: {
           items: {
             include: {
+              item: true,
               bids: {
                 orderBy: {
                   offered_price: 'desc',
@@ -430,12 +516,68 @@ export class AuctionPrismaService {
         },
       });
 
-      // Here you could add logic to:
-      // - Send notifications to winners
-      // - Update item statuses
-      // - Create audit logs
-
-      return auction;
+      return updatedAuction;
     });
+  }
+
+  // Register user to auction
+  async registerUserToAuction(
+    auctionId: string,
+    userId: string
+  ): Promise<void> {
+    // Use upsert to handle duplicates gracefully
+    try {
+      await this.prisma.auctionRegistration.create({
+        data: {
+          auctionId,
+          userId,
+        },
+      });
+    } catch (error: any) {
+      // If it's a unique constraint error, the user is already registered
+      if (error?.code === 'P2002') {
+        throw new Error('Usuario ya está registrado en esta subasta');
+      }
+      throw error;
+    }
+  }
+
+  // Unregister user from auction
+  async unregisterUserFromAuction(
+    auctionId: string,
+    userId: string
+  ): Promise<void> {
+    await this.prisma.auctionRegistration.deleteMany({
+      where: {
+        auctionId,
+        userId,
+      },
+    });
+  }
+
+  // Get auction participants
+  async getAuctionParticipants(auctionId: string) {
+    const registrations = await this.prisma.auctionRegistration.findMany({
+      where: { auctionId },
+      include: {
+        user: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            public_name: true,
+            phone: true,
+            rut: true,
+            role: true,
+            createdAt: true,
+          },
+        },
+      },
+      orderBy: {
+        createdAt: 'desc',
+      },
+    });
+
+    return registrations.map((r) => r.user);
   }
 }

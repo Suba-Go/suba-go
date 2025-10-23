@@ -14,7 +14,7 @@ export class PrismaService implements OnModuleInit, OnModuleDestroy {
 
     this.prisma = new PrismaClient({
       datasourceUrl: databaseUrl,
-      log: ['query', 'info', 'warn', 'error'],
+      log: ['info', 'warn', 'error'],
       errorFormat: 'pretty',
     });
 
@@ -76,6 +76,10 @@ export class PrismaService implements OnModuleInit, OnModuleDestroy {
 
   get bid() {
     return this.prisma.bid;
+  }
+
+  get auctionRegistration() {
+    return this.prisma.auctionRegistration;
   }
 
   get auditLog() {

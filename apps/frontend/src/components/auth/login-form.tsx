@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter } from 'next-nprogress-bar';
 import { signIn } from 'next-auth/react';
 import Link from 'next/link';
 import { Button } from '@suba-go/shared-components/components/ui/button';

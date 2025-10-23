@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter } from 'next-nprogress-bar';
 import { Plus, Search, Edit, Trash2, Eye, Package } from 'lucide-react';
 import {
   ItemDto,

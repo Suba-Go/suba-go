@@ -133,6 +133,36 @@ export class AuctionsController {
     return this.auctionsService.getActiveAuctions(tenantId);
   }
 
+  @Get('my-registrations')
+  @UseGuards(RolesGuard)
+  @Roles(UserRolesEnum.USER, UserRolesEnum.AUCTION_MANAGER)
+  @ApiOperation({ summary: 'Obtener mis registros de subasta' })
+  @ApiResponse({
+    status: 200,
+    description: 'Lista de registros de subasta del usuario actual',
+  })
+  async getMyAuctionRegistrations(@Request() req: AuthenticatedRequest) {
+    // Get registrations for the authenticated user
+    return this.auctionsService.getUserAuctionRegistrations(req.user.userId);
+  }
+
+  @Get('user/:userId/registrations')
+  @UseGuards(RolesGuard)
+  @Roles(UserRolesEnum.AUCTION_MANAGER, UserRolesEnum.ADMIN)
+  @ApiOperation({
+    summary:
+      'Obtener registros de subasta de un usuario específico (solo managers)',
+  })
+  @ApiParam({ name: 'userId', description: 'ID del usuario' })
+  @ApiResponse({
+    status: 200,
+    description: 'Lista de registros de subasta',
+  })
+  async getUserAuctionRegistrations(@Param('userId') userId: string) {
+    // Only managers and admins can see other users' registrations
+    return this.auctionsService.getUserAuctionRegistrations(userId);
+  }
+
   @Get(':id')
   @ApiOperation({ summary: 'Obtener subasta por ID' })
   @ApiParam({ name: 'id', description: 'ID de la subasta' })
@@ -268,5 +298,69 @@ export class AuctionsController {
   ) {
     const tenantId = req.user.tenantId;
     return this.auctionsService.uncancelAuction(id, tenantId);
+  }
+
+  @Post(':id/register')
+  @UseGuards(RolesGuard)
+  @Roles(UserRolesEnum.AUCTION_MANAGER)
+  @ApiOperation({ summary: 'Registrar usuario en subasta' })
+  @ApiParam({ name: 'id', description: 'ID de la subasta' })
+  @ApiResponse({
+    status: 200,
+    description: 'Usuario registrado exitosamente',
+  })
+  @ApiResponse({ status: 400, description: 'Error al registrar usuario' })
+  async registerUserToAuction(
+    @Param('id') auctionId: string,
+    @Body() body: { userId: string },
+    @Request() req: AuthenticatedRequest
+  ) {
+    const tenantId = req.user.tenantId;
+    return this.auctionsService.registerUserToAuction(
+      auctionId,
+      body.userId,
+      tenantId
+    );
+  }
+
+  @Delete(':id/register/:userId')
+  @UseGuards(RolesGuard)
+  @Roles(UserRolesEnum.AUCTION_MANAGER)
+  @ApiOperation({ summary: 'Desregistrar usuario de subasta' })
+  @ApiParam({ name: 'id', description: 'ID de la subasta' })
+  @ApiParam({ name: 'userId', description: 'ID del usuario' })
+  @ApiResponse({
+    status: 200,
+    description: 'Usuario desregistrado exitosamente',
+  })
+  @ApiResponse({ status: 400, description: 'Error al desregistrar usuario' })
+  async unregisterUserFromAuction(
+    @Param('id') auctionId: string,
+    @Param('userId') userId: string,
+    @Request() req: AuthenticatedRequest
+  ) {
+    const tenantId = req.user.tenantId;
+    return this.auctionsService.unregisterUserFromAuction(
+      auctionId,
+      userId,
+      tenantId
+    );
+  }
+
+  @Get(':id/participants')
+  @UseGuards(RolesGuard)
+  @Roles(UserRolesEnum.AUCTION_MANAGER)
+  @ApiOperation({ summary: 'Obtener participantes registrados en subasta' })
+  @ApiParam({ name: 'id', description: 'ID de la subasta' })
+  @ApiResponse({
+    status: 200,
+    description: 'Lista de participantes registrados',
+  })
+  async getAuctionParticipants(
+    @Param('id') auctionId: string,
+    @Request() req: AuthenticatedRequest
+  ) {
+    const tenantId = req.user.tenantId;
+    return this.auctionsService.getAuctionParticipants(auctionId, tenantId);
   }
 }
