@@ -4,9 +4,14 @@ import {
   BadRequestException,
 } from '@nestjs/common';
 import { CompanyCreateDto } from '@suba-go/shared-validation';
-import type { Company } from '@prisma/client';
+import type { Company, Prisma } from '@prisma/client';
 import { CompanyPrismaRepository } from './company-prisma-repository.service';
 import { TenantPrismaRepository } from '../../tenants/services/tenant-prisma-repository.service';
+import { normalizeCompanyName } from '../../../../utils/company-normalization';
+
+type CompanyCreateInputWithNormalized = Prisma.CompanyCreateInput & {
+  nameLowercase: string;
+};
 
 @Injectable()
 export class CompanyCreatorService {
@@ -42,10 +47,10 @@ export class CompanyCreatorService {
       }
     }
 
-    // Create company with lowercase name for case-insensitive subdomain lookup
+    // Create company with normalized name for case-insensitive subdomain lookup
     return await this.companyRepository.create({
       name: companyData.name,
-      nameLowercase: companyData.name.toLowerCase(),
+      nameLowercase: normalizeCompanyName(companyData.name),
       logo: companyData.logo,
       principal_color: companyData.principal_color,
       principal_color2: companyData.principal_color2,
@@ -55,7 +60,7 @@ export class CompanyCreatorService {
       tenant: tenant
         ? { connect: { id: tenant.id } }
         : { connect: { id: tenantId } },
-    });
+    } as CompanyCreateInputWithNormalized);
   }
 
   async getCompaniesByTenant(tenantId: string): Promise<Company[]> {

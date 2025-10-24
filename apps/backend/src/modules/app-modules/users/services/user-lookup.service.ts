@@ -1,5 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { UserPrismaRepository } from './user-prisma-repository.service';
+import { normalizeCompanyName } from '../../../../utils/company-normalization';
 
 // Define User with relations type for this service
 // Note: Tenant no longer has a name field - company name is used as subdomain
@@ -20,13 +21,6 @@ interface CompanyLookupResult {
 export class UserLookupService {
   constructor(private readonly userRepository: UserPrismaRepository) {}
 
-  // normalize the company name to match the subdomain format
-  private normalizeCompanyName(name: string): string {
-    return name
-      .toLowerCase()
-      .replace(/[^a-z0-9]/g, '')
-      .substring(0, 20);
-  }
 
   async findCompanyByUserEmail(
     email: string
@@ -52,7 +46,7 @@ export class UserLookupService {
       }
 
       // The normalized company name is the subdomain
-      const subdomain = this.normalizeCompanyName(user.company.name);
+      const subdomain = normalizeCompanyName(user.company.name);
 
       return {
         companyDomain: subdomain, // Return the company name as subdomain
@@ -90,7 +84,7 @@ export class UserLookupService {
       }
 
       // the tenant name is the subdomain, it is normalized to match the subdomain format for comparison
-      const userTenantSubdomain = this.normalizeCompanyName(user.company.name);
+      const userTenantSubdomain = normalizeCompanyName(user.company.name);
 
       // compare the normalized tenant name with the requested subdomain
       if (userTenantSubdomain !== subdomain) {
