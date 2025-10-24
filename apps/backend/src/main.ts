@@ -105,7 +105,18 @@ async function bootstrap() {
     '0.0.0.0'
   );
 
-  logger.log(`Server running on http://localhost:${PORT}`);
+  // Determine the server URL based on environment
+  const serverUrl =
+    nodeEnv === 'local'
+      ? `http://localhost:${PORT}`
+      : process.env.RAILWAY_PUBLIC_DOMAIN
+      ? `https://${process.env.RAILWAY_PUBLIC_DOMAIN}`
+      : process.env.RENDER_EXTERNAL_URL
+      ? process.env.RENDER_EXTERNAL_URL
+      : `http://0.0.0.0:${PORT}`;
+
+  logger.log(`Server running on ${serverUrl}`);
+
   // CRITICAL: Bind WebSocket authentication AFTER the HTTP server has started
   // This ensures the HTTP server is available for the upgrade handler
   wsAdapter.bindAuthenticationAfterInit();
