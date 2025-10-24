@@ -81,7 +81,7 @@ export class UserLookupService {
         };
       }
 
-      // normaliza el nombre de la empresa para que coincida con el formato del subdominio
+      // normalize the company name to match the subdomain format
       const normalizeCompanyName = (name: string): string => {
         return name
           .toLowerCase()
@@ -89,11 +89,11 @@ export class UserLookupService {
           .substring(0, 20);
       };
 
-      // el nombre del tenant es el subdominio se normaliza para que coincida 
-      // con el formato del subdominio para la comparación
+      // the tenant name is the subdomain, it is normalized to match the subdomain format for comparison
+      // for comparison
       const userTenantSubdomain = normalizeCompanyName(user.company.name);
 
-      // se compara el nombre del tenant normalizado con el subdominio solicitado
+      // compare the normalized tenant name with the requested subdomain
       if (userTenantSubdomain !== subdomain) {
         return {
           isValid: false,

@@ -10,7 +10,7 @@ import { User, LogOut, ChevronDown, Gavel, Package, Users } from 'lucide-react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { Spinner } from '@suba-go/shared-components/components/ui/spinner';
-import { isUserProfileComplete } from '@/utils/subdomain-profile-validation';
+import { isUserProfileComplete, isUserAdminOrManager } from '@/utils/subdomain-profile-validation';
 
 interface CompanyNavbarProps {
   company: CompanyDto;
@@ -84,7 +84,7 @@ export default function CompanyNavbar({
           </Link>
 
           {/* Navigation Menu */}
-          {/* verifcar si el perfil está completo */}
+          {/* check if the profile is complete */}
           {isUserProfileComplete(session) && (
           <nav className="hidden md:flex items-center space-x-6">
             <Link href="/subastas">
@@ -96,8 +96,8 @@ export default function CompanyNavbar({
                 Subastas
               </Button>
             </Link>
-            {/* Productos - Solo para AUCTION_MANAGER y ADMIN */}
-            {(session?.user?.role === 'AUCTION_MANAGER' || session?.user?.role === 'ADMIN') && (
+            {/* Products - Only for AUCTION_MANAGER and ADMIN */}
+            {isUserAdminOrManager(session) && (
               <Link href="/productos">
                 <Button
                   variant="ghost"
@@ -108,8 +108,8 @@ export default function CompanyNavbar({
                 </Button>
               </Link>
             )}
-            {/* Usuarios - Solo para AUCTION_MANAGER y ADMIN */}
-            {(session?.user?.role === 'AUCTION_MANAGER' || session?.user?.role === 'ADMIN') && (
+            {/* Users - Only for AUCTION_MANAGER and ADMIN */}
+            {isUserAdminOrManager(session) && (
               <Link href="/usuarios">
                 <Button
                   variant="ghost"
@@ -207,8 +207,8 @@ export default function CompanyNavbar({
               Subastas
             </Button>
           </Link>
-          {/* Productos - Solo para AUCTION_MANAGER y ADMIN */}
-          {(session?.user?.role === 'AUCTION_MANAGER' || session?.user?.role === 'ADMIN') && (
+          {/* Products - Only for AUCTION_MANAGER and ADMIN */}
+          {isUserAdminOrManager(session) && (
             <Link href="/productos">
               <Button
                 variant="ghost"
@@ -219,8 +219,8 @@ export default function CompanyNavbar({
               </Button>
             </Link>
           )}
-          {/* Usuarios - Solo para AUCTION_MANAGER y ADMIN */}
-          {(session?.user?.role === 'AUCTION_MANAGER' || session?.user?.role === 'ADMIN') && (
+          {/* Users - Only for AUCTION_MANAGER and ADMIN */}
+          {isUserAdminOrManager(session) && (
             <Link href="/usuarios">
               <Button
                 variant="ghost"

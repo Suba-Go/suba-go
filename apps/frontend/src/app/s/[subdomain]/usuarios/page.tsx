@@ -11,10 +11,6 @@ export default async function UsuariosPage({
   const { subdomain } = await params;
   const session = await auth();
 
-  if (!session) {
-    redirect('/login');
-  }
-
   // Verify user has AUCTION_MANAGER role or ADMIN role
   if (session.user.role !== 'AUCTION_MANAGER' && session.user.role !== 'ADMIN') {
     redirect('/');

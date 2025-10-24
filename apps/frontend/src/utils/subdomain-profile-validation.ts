@@ -1,8 +1,8 @@
 import { Session } from 'next-auth';
 
 /**
- * Verifica si el perfil del usuario está completo
- * Campos obligatorios: name, phone, rut
+ * Verifies if the user profile is complete
+ * Required fields: name, phone, rut
  */
 export function isUserProfileComplete(session: Session | null): boolean {
   if (!session?.user) {
@@ -32,7 +32,7 @@ export function isUserProfileComplete(session: Session | null): boolean {
 }
 
 /**
- * Obtiene los campos faltantes del perfil del usuario
+ * Gets the missing fields from the user profile
  */
 export function getMissingProfileFields(session: Session | null): string[] {
   if (!session?.user) {
@@ -58,7 +58,7 @@ export function getMissingProfileFields(session: Session | null): string[] {
 }
 
 /**
- * Verifica si el usuario pertenece a la empresa del subdominio
+ * Verifies if the user belongs to the subdomain company
  */
 export function isUserInCorrectCompany(session: Session | null, subdomain: string): boolean {
   if (!session?.user?.company?.name) {
@@ -66,4 +66,15 @@ export function isUserInCorrectCompany(session: Session | null, subdomain: strin
   }
 
   return session.user.company.name === subdomain;
+}
+
+/**
+ * Verifies if the user has admin or auction manager role
+ */
+export function isUserAdminOrManager(session: Session | null): boolean {
+  if (!session?.user?.role) {
+    return false;
+  }
+
+  return session.user.role === 'AUCTION_MANAGER' || session.user.role === 'ADMIN';
 }

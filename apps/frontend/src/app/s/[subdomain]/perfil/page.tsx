@@ -1,5 +1,5 @@
 import { Metadata } from 'next';
-import { notFound, redirect } from 'next/navigation';
+import { notFound} from 'next/navigation';
 import { auth } from '@/auth';
 import { getCompanyBySubdomainServerAction } from '@/domain/server-actions/company/get-company-by-subdomain-server-action';
 import ProfileFormWithUserData from './profile-form-with-user-data';
@@ -43,14 +43,7 @@ export default async function ProfilePage({ params }: ProfilePageProps) {
   let subdomain;
   let userRole = 'Usuario';
 
-  // Obtener la sesión del usuario primero
   const session = await auth();
-  
-  // Redirigir a login si no hay sesión
-  if (!session) {
-    redirect('/login');
-  }
-
   try {
     const resolvedParams = await params;
     subdomain = resolvedParams.subdomain;
@@ -74,7 +67,7 @@ export default async function ProfilePage({ params }: ProfilePageProps) {
     notFound();
   }
 
-  // Función para convertir el rol a texto legible
+  // Function to convert the role to a readable text
   const getRoleLabel = (role: string) => {
     switch (role) {
       case 'ADMIN':
@@ -147,7 +140,7 @@ export default async function ProfilePage({ params }: ProfilePageProps) {
             </div>
           </div>
 
-          {/* Columna Derecha - Información del Usuario */}
+          {/* Right Column - User Information */}
           <div className="bg-white rounded-lg shadow p-6">
             <ProfileFormWithUserData 
               company={{

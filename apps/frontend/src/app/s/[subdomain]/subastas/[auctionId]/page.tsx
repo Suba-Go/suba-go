@@ -12,13 +12,9 @@ export default async function AuctionDetailPage({
   const session = await auth();
   const { subdomain, auctionId } = await params;
 
-  if (!session) {
-    redirect('/login');
-  }
-
   // Verify user has access to auctions (AUCTION_MANAGER or regular user)
   const hasAccess =
-    session.user.role === 'AUCTION_MANAGER' || session.user.role === 'USER';
+    session?.user.role === 'AUCTION_MANAGER' || session?.user.role === 'USER';
 
   if (!hasAccess) {
     redirect('/');
@@ -30,8 +26,8 @@ export default async function AuctionDetailPage({
         <AuctionDetail
           auctionId={auctionId}
           subdomain={subdomain}
-          userRole={session.user.role || 'USER'}
-          userId={session.user.id}
+          userRole={session?.user.role || 'USER'}
+          userId={session?.user.id || ''}
         />
       </Suspense>
     </div>

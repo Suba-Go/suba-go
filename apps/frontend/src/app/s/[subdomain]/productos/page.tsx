@@ -12,10 +12,6 @@ export default async function ProductsPage({ params }: ProductsPageProps) {
   const { subdomain } = await params;
   const session = await auth();
 
-  if (!session) {
-    redirect('/login');
-  }
-
   // Verificar que el usuario tenga rol de AUCTION_MANAGER o ADMIN
   if (session.user.role !== 'AUCTION_MANAGER' && session.user.role !== 'ADMIN') {
     redirect('/');
