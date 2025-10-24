@@ -3,6 +3,7 @@ import { auth } from '@/auth';
 import { redirect } from 'next/navigation';
 import { ItemsDashboard } from '@/components/items/items-dashboard';
 import { ItemsDashboardSkeleton } from '@/components/items/items-dashboard-skeleton';
+import { isUserAdminOrManager } from '@/utils/subdomain-profile-validation';
 
 interface ItemsPageProps {
   params: Promise<{ subdomain: string }>;
@@ -13,7 +14,7 @@ export default async function ItemsPage({ params }: ItemsPageProps) {
   const session = await auth();
 
   // Verificar que el usuario tenga rol de AUCTION_MANAGER o ADMIN
-  if (session.user.role !== 'AUCTION_MANAGER' && session.user.role !== 'ADMIN') {
+  if (!session || !isUserAdminOrManager(session)) {
     redirect('/');
   }
 

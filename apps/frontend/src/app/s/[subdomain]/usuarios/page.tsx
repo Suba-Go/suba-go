@@ -2,6 +2,7 @@ import { UsersTable } from '@/components/users/users-table';
 import { UsersStats } from '@/components/users/users-stats';
 import { auth } from '@/auth';
 import { redirect } from 'next/navigation';
+import { isUserAdminOrManager } from '@/utils/subdomain-profile-validation';
 
 export default async function UsuariosPage({
   params,
@@ -11,7 +12,7 @@ export default async function UsuariosPage({
   const session = await auth();
 
   // Verify user has AUCTION_MANAGER role or ADMIN role
-  if (!session || (session.user.role !== 'AUCTION_MANAGER' && session.user.role !== 'ADMIN')) {
+  if (!session || !isUserAdminOrManager(session)) {
     redirect('/');
   }
   return (

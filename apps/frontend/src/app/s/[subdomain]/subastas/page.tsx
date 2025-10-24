@@ -1,6 +1,4 @@
 import { Suspense } from 'react';
-import { auth } from '@/auth';
-import { redirect } from 'next/navigation';
 import { AuctionDashboard } from '@/components/auctions/auction-dashboard';
 import { AuctionDashboardSkeleton } from '@/components/auctions/auction-dashboard-skeleton';
 
@@ -10,7 +8,6 @@ export default async function SubastasPage({
   params: Promise<{ subdomain: string }>;
 }) {
   const { subdomain } = await params;
-  const session = await auth();
 
   return (
     <div className="container mx-auto px-4 py-8">

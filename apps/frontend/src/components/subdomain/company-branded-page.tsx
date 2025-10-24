@@ -49,7 +49,7 @@ export default function CompanyBrandedPage({
       `}</style>
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-        {/* Mostrar advertencia si el perfil está incompleto */}
+        {/* Show warning if profile is incomplete */}
         {isProfileIncomplete && (
           <ProfileIncompleteWarning 
             missingFieldsCount={missingFields.length}
