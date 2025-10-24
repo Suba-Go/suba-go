@@ -1,6 +1,7 @@
 import CompanyLoginForm from '@/components/auth/company-login-form';
 import { Metadata } from 'next';
 import { getCompanyBySubdomainServerAction } from '@/domain/server-actions/company/get-company-by-subdomain-server-action';
+import { normalizeCompanyName } from '@/utils/company-normalization';
 
 interface CompanyLoginPageProps {
   params: Promise<{
@@ -15,9 +16,9 @@ export async function generateMetadata({
   params,
 }: CompanyLoginPageProps): Promise<Metadata> {
   const resolvedParams = await params;
-  const lowerCaseSubdomain = resolvedParams.subdomain.toLowerCase();
+  const normalizedSubdomain = normalizeCompanyName(resolvedParams.subdomain);
   const companyResponse = await getCompanyBySubdomainServerAction(
-    lowerCaseSubdomain
+    normalizedSubdomain
   );
 
   const companyName =
@@ -39,9 +40,9 @@ export default async function CompanyLoginPage({
   const resolvedSearchParams = await searchParams;
 
   // Fetch company data on the server
-  const lowerCaseSubdomain = resolvedParams.subdomain.toLowerCase();
+  const normalizedSubdomain = normalizeCompanyName(resolvedParams.subdomain);
   const companyResponse = await getCompanyBySubdomainServerAction(
-    lowerCaseSubdomain
+    normalizedSubdomain
   );
 
   const company =
@@ -54,7 +55,7 @@ export default async function CompanyLoginPage({
       <div className="w-full max-w-md space-y-8 px-4">
         <CompanyLoginForm
           companyName={company?.name || ''}
-          companyNameLowercase={company?.nameLowercase || lowerCaseSubdomain}
+          companyNameLowercase={company?.nameLowercase || normalizedSubdomain}
           prefilledEmail={resolvedSearchParams.email}
         />
       </div>

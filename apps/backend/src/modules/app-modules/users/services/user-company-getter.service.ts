@@ -1,5 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { UserPrismaRepository } from './user-prisma-repository.service';
+import { normalizeCompanyName } from '../../../../utils/company-normalization';
 
 // Define User with relations type for this service
 type UserWithRelations = {
@@ -35,7 +36,7 @@ export class UserCompanyGetterService {
       );
     }
 
-    // Return the lowercase company name (which is the subdomain)
-    return user.company.nameLowercase || user.company.name.toLowerCase();
+    // Return the normalized company name (which is the subdomain)
+    return normalizeCompanyName(user.company.name);
   }
 }

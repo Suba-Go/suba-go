@@ -15,7 +15,7 @@ export default function ConditionalNavbar({
 }: ConditionalNavbarProps) {
   const pathname = usePathname();
 
-  // No mostrar navbar en la página de login
+  // Don't show navbar on login page
   const shouldShowNavbar = !pathname.includes('/login');
 
   if (!shouldShowNavbar) {

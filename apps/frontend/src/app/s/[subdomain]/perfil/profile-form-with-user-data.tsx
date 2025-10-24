@@ -9,6 +9,42 @@ import { Button } from '@suba-go/shared-components/components/ui/button';
 import { darkenColor } from '@/utils/color-utils';
 import { Spinner } from '@suba-go/shared-components/components/ui/spinner';
 
+// Funciones de validación
+const validateEmail = (email: string): string | null => {
+  if (!email.trim()) return 'El email es obligatorio';
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if (!emailRegex.test(email)) return 'Debes ingresar un email válido';
+  return null;
+};
+
+const validateName = (name: string): string | null => {
+  if (!name.trim()) return 'El nombre es obligatorio';
+  if (name.trim().length < 3) return 'El nombre debe tener al menos 3 caracteres';
+  return null;
+};
+
+const validatePhone = (phone: string): string | null => {
+  if (!phone.trim()) return 'El teléfono es obligatorio';
+  // Validación básica de teléfono chileno
+  const phoneRegex = /^(\+56|56)?[2-9]\d{8}$/;
+  if (!phoneRegex.test(phone.replace(/\s/g, ''))) {
+    return 'Debes ingresar un teléfono válido (ej: +56 9 1234 5678)';
+  }
+  return null;
+};
+
+const validateRUT = (rut: string): string | null => {
+  if (!rut.trim()) return 'El RUT es obligatorio';
+  
+  // Validación básica: solo verificar que tenga el formato XX.XXX.XXX-X
+  const rutRegex = /^[0-9]{1,2}\.?[0-9]{3}\.?[0-9]{3}-[0-9kK]$/;
+  if (!rutRegex.test(rut)) {
+    return 'Debes ingresar un RUT válido con guión (ej: 12.345.678-9)';
+  }
+  
+  return null;
+};
+
 interface ProfileFormWithUserDataProps {
   company: {
     id: string;
@@ -31,6 +67,12 @@ export default function ProfileFormWithUserData({
     phone: '',
     rut: '',
   });
+  const [validationErrors, setValidationErrors] = useState<{
+    name?: string;
+    email?: string;
+    phone?: string;
+    rut?: string;
+  }>({});
 
   useEffect(() => {
     if (session?.user) {
@@ -53,6 +95,7 @@ export default function ProfileFormWithUserData({
 
   const handleCancel = () => {
     setIsEditing(false);
+    setValidationErrors({});
     // Restaurar datos originales
     if (session?.user) {
       setUserData({
@@ -74,26 +117,61 @@ export default function ProfileFormWithUserData({
       return;
     }
 
+    // Validar todos los campos antes de enviar
+    const errors: { [key: string]: string } = {};
+    
+    // Validar campos obligatorios
+    const nameError = validateName(userData.name);
+    if (nameError) errors.name = nameError;
+    
+    const emailError = validateEmail(userData.email);
+    if (emailError) errors.email = emailError;
+    
+    const phoneError = validatePhone(userData.phone);
+    if (phoneError) errors.phone = phoneError;
+    
+    const rutError = validateRUT(userData.rut);
+    if (rutError) errors.rut = rutError;
+
+    // Si hay errores de validación, mostrarlos y no continuar
+    if (Object.keys(errors).length > 0) {
+      setValidationErrors(errors);
+      toast({
+        title: 'Error de validación',
+        description: 'Por favor corrige los errores en el formulario',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    // Limpiar errores de validación si todo está bien
+    setValidationErrors({});
     setIsLoading(true);
 
     try {
+      // Preparar los datos para enviar - todos los campos son obligatorios
+      const updateData = {
+        name: userData.name.trim(),
+        email: userData.email.trim(),
+        phone: userData.phone.trim(),
+        rut: userData.rut.trim(),
+      };
+
+      console.log('Preparing to send update data:', updateData);
+      console.log('Original userData:', userData);
+
       // Llamar a la API para actualizar el perfil
-      const result = await updateUserProfileAction(session.user.id, {
-        name: userData.name,
-        email: userData.email,
-        phone: userData.phone,
-        rut: userData.rut,
-      });
+      const result = await updateUserProfileAction(session.user.id, updateData);
 
       if (result.success) {
         // Actualizar la sesión de NextAuth con los nuevos datos
         await update({
           user: {
             ...session.user,
-            name: userData.name,
-            email: userData.email,
-            phone: userData.phone,
-            rut: userData.rut,
+            name: updateData.name,
+            email: updateData.email,
+            phone: updateData.phone,
+            rut: updateData.rut,
           },
         });
 
@@ -109,12 +187,27 @@ export default function ProfileFormWithUserData({
       }
     } catch (error) {
       console.error('Error updating profile:', error);
+      console.error('Update data sent:', {
+        name: userData.name,
+        email: userData.email,
+        phone: userData.phone,
+        rut: userData.rut,
+      });
+      
+      let errorMessage = 'Error al actualizar el perfil';
+      
+      if (error instanceof Error) {
+        errorMessage = error.message;
+        
+        // Si es un error interno del servidor, mostrar un mensaje más específico
+        if (error.message.includes('Internal server error')) {
+          errorMessage = 'Error interno del servidor. Por favor verifica que todos los datos estén correctos e intenta nuevamente.';
+        }
+      }
+      
       toast({
         title: 'Error',
-        description:
-          error instanceof Error
-            ? error.message
-            : 'Error al actualizar el perfil',
+        description: errorMessage,
         variant: 'destructive',
       });
     } finally {
@@ -125,10 +218,42 @@ export default function ProfileFormWithUserData({
   const handleInputChange =
     (field: 'name' | 'email' | 'phone' | 'rut') =>
     (e: React.ChangeEvent<HTMLInputElement>) => {
+      const value = e.target.value;
       setUserData((prev) => ({
         ...prev,
-        [field]: e.target.value,
+        [field]: value,
       }));
+      
+      // Validar en tiempo real solo si el campo tiene contenido
+      if (value.trim()) {
+        let error: string | null = null;
+        
+        switch (field) {
+          case 'name':
+            error = validateName(value);
+            break;
+          case 'email':
+            error = validateEmail(value);
+            break;
+          case 'phone':
+            error = validatePhone(value);
+            break;
+          case 'rut':
+            error = validateRUT(value);
+            break;
+        }
+        
+        setValidationErrors((prev) => ({
+          ...prev,
+          [field]: error || undefined,
+        }));
+      } else {
+        // Si el campo está vacío, limpiar el error
+        setValidationErrors((prev) => ({
+          ...prev,
+          [field]: undefined,
+        }));
+      }
     };
 
   if (status === 'loading') {
@@ -170,16 +295,25 @@ export default function ProfileFormWithUserData({
       <div className="space-y-4">
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">
-            Nombre
+            Nombre <span className="text-red-500">*</span>
           </label>
           {isEditing ? (
-            <input
-              type="text"
-              value={userData.name}
-              onChange={handleInputChange('name')}
-              className="w-full px-3 py-2 border border-blue-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-blue-50"
-              placeholder="Tu nombre"
-            />
+            <div>
+              <input
+                type="text"
+                value={userData.name}
+                onChange={handleInputChange('name')}
+                className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 bg-blue-50 ${
+                  validationErrors.name
+                    ? 'border-red-500 focus:ring-red-500'
+                    : 'border-blue-300 focus:ring-blue-500'
+                }`}
+                placeholder="Tu nombre"
+              />
+              {validationErrors.name && (
+                <p className="mt-1 text-sm text-red-600">{validationErrors.name}</p>
+              )}
+            </div>
           ) : (
             <div className="px-3 py-2 bg-gray-50 border border-gray-200 rounded-md text-gray-900">
               {userData.name || 'No especificado'}
@@ -189,16 +323,25 @@ export default function ProfileFormWithUserData({
 
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">
-            Email
+            Email <span className="text-red-500">*</span>
           </label>
           {isEditing ? (
-            <input
-              type="email"
-              value={userData.email}
-              onChange={handleInputChange('email')}
-              className="w-full px-3 py-2 border border-blue-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-blue-50"
-              placeholder="tu@email.com"
-            />
+            <div>
+              <input
+                type="email"
+                value={userData.email}
+                onChange={handleInputChange('email')}
+                className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 bg-blue-50 ${
+                  validationErrors.email
+                    ? 'border-red-500 focus:ring-red-500'
+                    : 'border-blue-300 focus:ring-blue-500'
+                }`}
+                placeholder="tu@email.com"
+              />
+              {validationErrors.email && (
+                <p className="mt-1 text-sm text-red-600">{validationErrors.email}</p>
+              )}
+            </div>
           ) : (
             <div className="px-3 py-2 bg-gray-50 border border-gray-200 rounded-md text-gray-900">
               {userData.email || 'No especificado'}
@@ -208,16 +351,25 @@ export default function ProfileFormWithUserData({
 
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">
-            Teléfono
+            Teléfono <span className="text-red-500">*</span>
           </label>
           {isEditing ? (
-            <input
-              type="tel"
-              value={userData.phone}
-              onChange={handleInputChange('phone')}
-              className="w-full px-3 py-2 border border-blue-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-blue-50"
-              placeholder="+56 9 1234 5678"
-            />
+            <div>
+              <input
+                type="tel"
+                value={userData.phone}
+                onChange={handleInputChange('phone')}
+                className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 bg-blue-50 ${
+                  validationErrors.phone
+                    ? 'border-red-500 focus:ring-red-500'
+                    : 'border-blue-300 focus:ring-blue-500'
+                }`}
+                placeholder="+56 9 1234 5678"
+              />
+              {validationErrors.phone && (
+                <p className="mt-1 text-sm text-red-600">{validationErrors.phone}</p>
+              )}
+            </div>
           ) : (
             <div className="px-3 py-2 bg-gray-50 border border-gray-200 rounded-md text-gray-900">
               {userData.phone || 'No especificado'}
@@ -227,16 +379,25 @@ export default function ProfileFormWithUserData({
 
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">
-            RUT
+            RUT <span className="text-red-500">*</span>
           </label>
           {isEditing ? (
-            <input
-              type="text"
-              value={userData.rut}
-              onChange={handleInputChange('rut')}
-              className="w-full px-3 py-2 border border-blue-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-blue-50"
-              placeholder="12.345.678-9"
-            />
+            <div>
+              <input
+                type="text"
+                value={userData.rut}
+                onChange={handleInputChange('rut')}
+                className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 bg-blue-50 ${
+                  validationErrors.rut
+                    ? 'border-red-500 focus:ring-red-500'
+                    : 'border-blue-300 focus:ring-blue-500'
+                }`}
+                placeholder="12.345.678-9"
+              />
+              {validationErrors.rut && (
+                <p className="mt-1 text-sm text-red-600">{validationErrors.rut}</p>
+              )}
+            </div>
           ) : (
             <div className="px-3 py-2 bg-gray-50 border border-gray-200 rounded-md text-gray-900">
               {userData.rut || 'No especificado'}

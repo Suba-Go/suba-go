@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../../providers-modules/prisma/prisma.service';
 import type { Company, Prisma } from '@prisma/client';
+import { normalizeCompanyName } from '../../../../utils/company-normalization';
 
 @Injectable()
 export class CompanyPrismaRepository {
@@ -40,10 +41,10 @@ export class CompanyPrismaRepository {
   }
 
   async findByName(name: string): Promise<Company | null> {
-    // Case-insensitive search using nameLowercase field
+    // Case-insensitive search using normalized company name
     return this.prisma.company.findFirst({
       where: {
-        nameLowercase: name.toLowerCase(),
+        nameLowercase: normalizeCompanyName(name),
         isDeleted: false,
       },
       include: {
@@ -57,10 +58,10 @@ export class CompanyPrismaRepository {
     name: string,
     tenantId: string
   ): Promise<Company | null> {
-    // Case-insensitive search using nameLowercase field
+    // Case-insensitive search using normalized company name
     return this.prisma.company.findFirst({
       where: {
-        nameLowercase: name.toLowerCase(),
+        nameLowercase: normalizeCompanyName(name),
         tenantId,
         isDeleted: false,
       },
