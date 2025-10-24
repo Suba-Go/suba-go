@@ -93,6 +93,7 @@
     "@trpc/client": "^11.4.4",
     "@trpc/server": "^11.4.4",
     "@types/bcrypt": "^6.0.0",
+    "@vercel/analytics": "^1.5.0",
     "@vercel/blob": "^2.0.0",
     "@vercel/speed-insights": "^1.2.0",
     "axios": "^1.6.0",
