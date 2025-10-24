@@ -11,7 +11,6 @@ import {
   DollarSign,
   Shield,
   Package,
-  X,
 } from 'lucide-react';
 import Image from 'next/image';
 import { Button } from '@suba-go/shared-components/components/ui/button';

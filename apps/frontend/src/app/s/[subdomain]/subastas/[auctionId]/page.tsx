@@ -10,7 +10,7 @@ export default async function AuctionDetailPage({
   params: Promise<{ subdomain: string; auctionId: string }>;
 }) {
   const session = await auth();
-  const { subdomain, auctionId } = await params;
+  const { auctionId } = await params;
 
   if (!session) {
     redirect('/login');

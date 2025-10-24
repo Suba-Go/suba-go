@@ -5,7 +5,7 @@
  */
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import {
   Card,
   CardContent,
@@ -14,7 +14,6 @@ import {
 } from '@suba-go/shared-components/components/ui/card';
 import { Button } from '@suba-go/shared-components/components/ui/button';
 import { Badge } from '@suba-go/shared-components/components/ui/badge';
-import { Switch } from '@suba-go/shared-components/components/ui/switch';
 import { Input } from '@suba-go/shared-components/components/ui/input';
 import { FormattedInput } from '@/components/ui/formatted-input';
 import {
@@ -160,6 +159,178 @@ export function AuctionActiveBiddingView({
     }
   }, [auction.items, auction.bidIncrement]);
 
+  // Handler functions (defined before WebSocket useEffect to avoid hoisting issues)
+  const handleBidPlaced = useCallback(
+    (data: any) => {
+      const {
+        auctionItemId,
+        amount,
+        userId: bidderId,
+        userName,
+        bidId,
+        timestamp,
+      } = data;
+
+      // Update bid history
+      setBidHistory((prev) => ({
+        ...prev,
+        [auctionItemId]: [
+          { id: bidId, amount, userId: bidderId, userName, timestamp },
+          ...(prev[auctionItemId] || []),
+        ].slice(0, 10), // Keep last 10 bids
+      }));
+
+      // Clear pending state if this was our bid
+      setBidStates((prev) => ({
+        ...prev,
+        [auctionItemId]: {
+          ...prev[auctionItemId],
+          isPending: false,
+          error: null,
+          amount: (amount + Number(auction.bidIncrement || 50000)).toString(),
+        },
+      }));
+
+      // Auto-bid logic: if another user bid and we have auto-bid enabled
+      if (bidderId !== userId) {
+        const autoBid = autoBidSettings[auctionItemId];
+        if (autoBid?.enabled && autoBid.maxPrice) {
+          const nextBidAmount = amount + Number(auction.bidIncrement || 50000);
+
+          // Only auto-bid if we haven't reached our max price
+          if (nextBidAmount <= autoBid.maxPrice) {
+            console.log(
+              `[Auto-Bid] Placing automatic bid of $${nextBidAmount} (max: $${autoBid.maxPrice})`
+            );
+
+            // Wait a short delay to make it feel more natural
+            setTimeout(() => {
+              if (wsRef.current && isJoined) {
+                wsRef.current.send(
+                  JSON.stringify({
+                    event: 'PLACE_BID',
+                    data: {
+                      tenantId,
+                      auctionId: auction.id,
+                      auctionItemId,
+                      amount: nextBidAmount,
+                      clientBidId: `${userId}-auto-${Date.now()}`,
+                    },
+                  })
+                );
+              }
+            }, 1000); // 1 second delay
+          } else {
+            console.log(
+              `[Auto-Bid] Max price reached ($${autoBid.maxPrice}), stopping auto-bid`
+            );
+          }
+        }
+      }
+    },
+    [
+      auction.bidIncrement,
+      auction.id,
+      autoBidSettings,
+      isJoined,
+      tenantId,
+      userId,
+    ]
+  );
+
+  const handleBidRejected = useCallback((data: any) => {
+    const { auctionItemId, reason } = data;
+
+    setBidStates((prev) => ({
+      ...prev,
+      [auctionItemId]: {
+        ...prev[auctionItemId],
+        isPending: false,
+        error: reason || 'Puja rechazada',
+      },
+    }));
+
+    // Clear error after 5 seconds
+    setTimeout(() => {
+      setBidStates((prev) => ({
+        ...prev,
+        [auctionItemId]: {
+          ...prev[auctionItemId],
+          error: null,
+        },
+      }));
+    }, 5000);
+  }, []);
+
+  const handleTimeExtension = useCallback((data: any) => {
+    const { newEndTime, extensionSeconds } = data;
+    console.log(
+      `[WS] ⏰ Auction time extended by ${extensionSeconds}s to ${newEndTime}`
+    );
+
+    // Update auction end time in state
+    setAuction((prev) => ({
+      ...prev,
+      endTime: newEndTime,
+    }));
+
+    // Show toast notification
+    // You can add a toast library here if needed
+    console.log(
+      `⏰ Tiempo extendido: +${extensionSeconds} segundos (cierre suave)`
+    );
+  }, []);
+
+  const handleWebSocketMessage = useCallback(
+    (message: any) => {
+      console.log('[WS] Received:', message.event, message.data);
+
+      switch (message.event) {
+        case 'HELLO_OK':
+          setIsConnected(true);
+          break;
+
+        case 'JOINED':
+          setIsJoined(true);
+          if (message.data.participantCount) {
+            setParticipantCount(message.data.participantCount);
+          }
+          break;
+
+        case 'PARTICIPANT_COUNT':
+          setParticipantCount(message.data.count);
+          break;
+
+        case 'BID_PLACED':
+          handleBidPlaced(message.data);
+          break;
+
+        case 'BID_REJECTED':
+          handleBidRejected(message.data);
+          break;
+
+        case 'AUCTION_TIME_EXTENDED':
+          handleTimeExtension(message.data);
+          break;
+
+        case 'AUCTION_STATUS_CHANGED':
+          // Handle status changes (e.g., auction ended)
+          console.log('[WS] Auction status changed:', message.data.status);
+          if (message.data.status === 'COMPLETADA') {
+            // Reload page to show completed view
+            window.location.reload();
+          }
+          break;
+
+        case 'ERROR':
+          console.error('[WS] Server error:', message.data);
+          setConnectionError(message.data.message);
+          break;
+      }
+    },
+    [handleBidPlaced, handleBidRejected, handleTimeExtension]
+  );
+
   // WebSocket connection management
   useEffect(() => {
     const connectWebSocket = () => {
@@ -216,7 +387,7 @@ export function AuctionActiveBiddingView({
         wsRef.current.close();
       }
     };
-  }, [wsEndpoint, accessToken]);
+  }, [wsEndpoint, accessToken, handleWebSocketMessage]);
 
   // Join auction room after connection
   useEffect(() => {
@@ -230,164 +401,6 @@ export function AuctionActiveBiddingView({
       );
     }
   }, [isConnected, isJoined, tenantId, auction.id]);
-
-  const handleWebSocketMessage = (message: any) => {
-    console.log('[WS] Received:', message.event, message.data);
-
-    switch (message.event) {
-      case 'HELLO_OK':
-        setIsConnected(true);
-        break;
-
-      case 'JOINED':
-        setIsJoined(true);
-        if (message.data.participantCount) {
-          setParticipantCount(message.data.participantCount);
-        }
-        break;
-
-      case 'PARTICIPANT_COUNT':
-        setParticipantCount(message.data.count);
-        break;
-
-      case 'BID_PLACED':
-        handleBidPlaced(message.data);
-        break;
-
-      case 'BID_REJECTED':
-        handleBidRejected(message.data);
-        break;
-
-      case 'AUCTION_TIME_EXTENDED':
-        handleTimeExtension(message.data);
-        break;
-
-      case 'AUCTION_STATUS_CHANGED':
-        // Handle status changes (e.g., auction ended)
-        console.log('[WS] Auction status changed:', message.data.status);
-        if (message.data.status === 'COMPLETADA') {
-          // Reload page to show completed view
-          window.location.reload();
-        }
-        break;
-
-      case 'ERROR':
-        console.error('[WS] Server error:', message.data);
-        setConnectionError(message.data.message);
-        break;
-    }
-  };
-
-  const handleBidPlaced = (data: any) => {
-    const {
-      auctionItemId,
-      amount,
-      userId: bidderId,
-      userName,
-      bidId,
-      timestamp,
-    } = data;
-
-    // Update bid history
-    setBidHistory((prev) => ({
-      ...prev,
-      [auctionItemId]: [
-        { id: bidId, amount, userId: bidderId, userName, timestamp },
-        ...(prev[auctionItemId] || []),
-      ].slice(0, 10), // Keep last 10 bids
-    }));
-
-    // Clear pending state if this was our bid
-    setBidStates((prev) => ({
-      ...prev,
-      [auctionItemId]: {
-        ...prev[auctionItemId],
-        isPending: false,
-        error: null,
-        amount: (amount + Number(auction.bidIncrement || 50000)).toString(),
-      },
-    }));
-
-    // Auto-bid logic: if another user bid and we have auto-bid enabled
-    if (bidderId !== userId) {
-      const autoBid = autoBidSettings[auctionItemId];
-      if (autoBid?.enabled && autoBid.maxPrice) {
-        const nextBidAmount = amount + Number(auction.bidIncrement || 50000);
-
-        // Only auto-bid if we haven't reached our max price
-        if (nextBidAmount <= autoBid.maxPrice) {
-          console.log(
-            `[Auto-Bid] Placing automatic bid of $${nextBidAmount} (max: $${autoBid.maxPrice})`
-          );
-
-          // Wait a short delay to make it feel more natural
-          setTimeout(() => {
-            if (wsRef.current && isJoined) {
-              wsRef.current.send(
-                JSON.stringify({
-                  event: 'PLACE_BID',
-                  data: {
-                    tenantId,
-                    auctionId: auction.id,
-                    auctionItemId,
-                    amount: nextBidAmount,
-                    clientBidId: `${userId}-auto-${Date.now()}`,
-                  },
-                })
-              );
-            }
-          }, 1000); // 1 second delay
-        } else {
-          console.log(
-            `[Auto-Bid] Max price reached ($${autoBid.maxPrice}), stopping auto-bid`
-          );
-        }
-      }
-    }
-  };
-
-  const handleBidRejected = (data: any) => {
-    const { auctionItemId, reason, code } = data;
-
-    setBidStates((prev) => ({
-      ...prev,
-      [auctionItemId]: {
-        ...prev[auctionItemId],
-        isPending: false,
-        error: reason || 'Puja rechazada',
-      },
-    }));
-
-    // Clear error after 5 seconds
-    setTimeout(() => {
-      setBidStates((prev) => ({
-        ...prev,
-        [auctionItemId]: {
-          ...prev[auctionItemId],
-          error: null,
-        },
-      }));
-    }, 5000);
-  };
-
-  const handleTimeExtension = (data: any) => {
-    const { newEndTime, extensionSeconds } = data;
-    console.log(
-      `[WS] ⏰ Auction time extended by ${extensionSeconds}s to ${newEndTime}`
-    );
-
-    // Update auction end time in state
-    setAuction((prev) => ({
-      ...prev,
-      endTime: newEndTime,
-    }));
-
-    // Show toast notification
-    // You can add a toast library here if needed
-    console.log(
-      `⏰ Tiempo extendido: +${extensionSeconds} segundos (cierre suave)`
-    );
-  };
 
   const placeBid = (auctionItemId: string, skipWarning = false) => {
     if (!wsRef.current || !isJoined) {

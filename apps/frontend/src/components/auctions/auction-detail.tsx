@@ -6,7 +6,6 @@ import {
   ArrowLeft,
   Calendar,
   Clock,
-  Users,
   AlertCircle,
   Trophy,
   Edit,
@@ -220,14 +219,7 @@ export function AuctionDetail({
         ws.close();
       }
     };
-  }, [
-    userRole,
-    accessToken,
-    tenantId,
-    auction?.id,
-    auction?.status,
-    auctionId,
-  ]);
+  }, [userRole, accessToken, tenantId, auction, auctionId]);
 
   const handleCancelToggle = async (checked: boolean) => {
     try {

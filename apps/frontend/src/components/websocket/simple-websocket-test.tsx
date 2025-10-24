@@ -85,7 +85,7 @@ export function SimpleWebSocketTest({ accessToken }: SimpleWebSocketTestProps) {
           setState('AUTHENTICATED');
           addLog('✅ Handshake complete - AUTHENTICATED');
         }
-      } catch (err) {
+      } catch {
         addLog(`⚠️ Failed to parse message: ${event.data}`);
       }
     };
@@ -258,7 +258,7 @@ export function SimpleWebSocketTest({ accessToken }: SimpleWebSocketTestProps) {
         <div className="p-3 bg-blue-50 border border-blue-200 rounded text-sm">
           <h4 className="font-semibold mb-2">Expected Flow:</h4>
           <ol className="list-decimal list-inside space-y-1 text-xs">
-            <li>Click "Connect" → State: CONNECTING</li>
+            <li>Click &quot;Connect&quot; → State: CONNECTING</li>
             <li>JWT validated during upgrade → State: CONNECTED</li>
             <li>Client sends HELLO message automatically</li>
             <li>Server responds with HELLO_OK → State: AUTHENTICATED ✅</li>

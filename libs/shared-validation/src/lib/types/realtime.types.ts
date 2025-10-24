@@ -21,7 +21,7 @@ export type WsClientMessage =
         amount: number;
       };
     }
-  | { event: 'PING'; data: {} };
+  | { event: 'PING'; data: Record<string, never> };
 
 /**
  * Server-to-Client messages
@@ -52,7 +52,7 @@ export type WsServerMessage =
   | { event: 'AUCTION_ENDED'; data: { auctionId: string; tenantId: string } }
   | { event: 'PARTICIPANT_COUNT'; data: { auctionId: string; count: number } }
   | { event: 'ERROR'; data: { code: string; message: string } }
-  | { event: 'PONG'; data: {} };
+  | { event: 'PONG'; data: Record<string, never> };
 
 /**
  * Bid placed event data
