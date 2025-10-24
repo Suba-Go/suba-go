@@ -77,6 +77,7 @@ export function AuctionActiveBiddingView({
   userId,
 }: AuctionActiveBiddingViewProps) {
   const wsRef = useRef<WebSocket | null>(null);
+  const connectionAttemptedRef = useRef(false); // Prevent duplicate connections
   const [auction, setAuction] = useState<AuctionData>(initialAuction);
   const [isConnected, setIsConnected] = useState(false);
   const [isJoined, setIsJoined] = useState(false);
@@ -101,9 +102,20 @@ export function AuctionActiveBiddingView({
     [auctionItemId: string]: { enabled: boolean; maxPrice: number };
   }>({});
 
-  // WebSocket endpoint - MUST use port 3001 (backend port)
-  const wsEndpoint =
-    process.env.NEXT_PUBLIC_WS_ENDPOINT || 'ws://localhost:3001/ws';
+  // WebSocket endpoint - derive from BACKEND_URL
+  const getWebSocketUrl = () => {
+    // Check for explicit WebSocket URL first
+    if (process.env.NEXT_PUBLIC_WS_ENDPOINT) {
+      return process.env.NEXT_PUBLIC_WS_ENDPOINT;
+    }
+
+    // Derive from BACKEND_URL
+    const backendUrl = process.env.BACKEND_URL || 'http://localhost:3001';
+    // Convert http(s) to ws(s) and add /ws path
+    return backendUrl.replace(/^http/, 'ws') + '/ws';
+  };
+
+  const wsEndpoint = getWebSocketUrl();
 
   // Load auto-bid settings from cookies on mount
   useEffect(() => {
@@ -333,10 +345,28 @@ export function AuctionActiveBiddingView({
 
   // WebSocket connection management
   useEffect(() => {
+    // Prevent duplicate connections
+    if (connectionAttemptedRef.current) {
+      console.log('[WS] Connection already attempted, skipping');
+      return;
+    }
+
+    // Check if already connected
+    if (wsRef.current?.readyState === WebSocket.OPEN) {
+      console.log('[WS] Already connected, skipping');
+      return;
+    }
+
+    connectionAttemptedRef.current = true;
+
     const connectWebSocket = () => {
       try {
         // CRITICAL: Token must be in query parameter for authentication during HTTP upgrade
         const wsUrl = `${wsEndpoint}?token=${encodeURIComponent(accessToken)}`;
+        console.log(
+          '[WS] Connecting to:',
+          wsUrl.replace(/token=.*/, 'token=***')
+        );
         const ws = new WebSocket(wsUrl);
         wsRef.current = ws;
 
@@ -371,10 +401,12 @@ export function AuctionActiveBiddingView({
           console.log('[WS] Disconnected');
           setIsConnected(false);
           setIsJoined(false);
+          connectionAttemptedRef.current = false; // Allow reconnection
         };
       } catch (error) {
         console.error('[WS] Connection failed:', error);
         setConnectionError('No se pudo conectar al servidor');
+        connectionAttemptedRef.current = false; // Allow retry
       }
     };
 
@@ -385,7 +417,9 @@ export function AuctionActiveBiddingView({
       if (wsRef.current) {
         console.log('[WS] Closing connection');
         wsRef.current.close();
+        wsRef.current = null;
       }
+      connectionAttemptedRef.current = false;
     };
   }, [wsEndpoint, accessToken, handleWebSocketMessage]);
 

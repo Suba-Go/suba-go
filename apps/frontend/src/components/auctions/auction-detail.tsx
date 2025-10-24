@@ -78,6 +78,7 @@ export function AuctionDetail({
 
   // WebSocket state for real-time updates (AUCTION_MANAGER only)
   const wsRef = useRef<WebSocket | null>(null);
+  const connectionAttemptedRef = useRef(false); // Prevent duplicate connections
   const [isWsConnected, setIsWsConnected] = useState(false);
   const [isWsJoined, setIsWsJoined] = useState(false);
   const [liveParticipantCount, setLiveParticipantCount] = useState(0);
@@ -138,9 +139,35 @@ export function AuctionDetail({
       return;
     }
 
-    const wsEndpoint =
-      process.env.NEXT_PUBLIC_WS_ENDPOINT || 'ws://localhost:3001/ws';
+    // Prevent duplicate connections
+    if (connectionAttemptedRef.current) {
+      console.log('[Manager WS] Connection already attempted, skipping');
+      return;
+    }
+
+    // Check if already connected
+    if (wsRef.current?.readyState === WebSocket.OPEN) {
+      console.log('[Manager WS] Already connected, skipping');
+      return;
+    }
+
+    connectionAttemptedRef.current = true;
+
+    // Derive WebSocket URL from BACKEND_URL
+    const getWebSocketUrl = () => {
+      if (process.env.NEXT_PUBLIC_WS_ENDPOINT) {
+        return process.env.NEXT_PUBLIC_WS_ENDPOINT;
+      }
+      const backendUrl = process.env.BACKEND_URL || 'http://localhost:3001';
+      return backendUrl.replace(/^http/, 'ws') + '/ws';
+    };
+
+    const wsEndpoint = getWebSocketUrl();
     const wsUrl = `${wsEndpoint}?token=${encodeURIComponent(accessToken)}`;
+    console.log(
+      '[Manager WS] Connecting to:',
+      wsUrl.replace(/token=.*/, 'token=***')
+    );
 
     const ws = new WebSocket(wsUrl);
     wsRef.current = ws;
@@ -211,6 +238,7 @@ export function AuctionDetail({
       console.log('[Manager WS] Disconnected');
       setIsWsConnected(false);
       setIsWsJoined(false);
+      connectionAttemptedRef.current = false; // Allow reconnection
     };
 
     // Cleanup on unmount
@@ -218,6 +246,8 @@ export function AuctionDetail({
       if (ws.readyState === WebSocket.OPEN) {
         ws.close();
       }
+      wsRef.current = null;
+      connectionAttemptedRef.current = false;
     };
   }, [userRole, accessToken, tenantId, auction, auctionId]);
 
