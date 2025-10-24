@@ -1,8 +1,13 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useRouter } from 'next-nprogress-bar';
 import { Plus, Search, Edit, Trash2, Eye, Package } from 'lucide-react';
-import { ItemStateEnum } from '@suba-go/shared-validation';
+import {
+  ItemDto,
+  ItemStateEnum,
+  ShowItemStateEnum,
+} from '@suba-go/shared-validation';
 import { Button } from '@suba-go/shared-components/components/ui/button';
 import { Input } from '@suba-go/shared-components/components/ui/input';
 import {
@@ -13,41 +18,29 @@ import {
 } from '@suba-go/shared-components/components/ui/card';
 import { Badge } from '@suba-go/shared-components/components/ui/badge';
 import { useToast } from '@suba-go/shared-components/components/ui/toaster';
-import { ProductCreateModal } from './product-create-modal';
-import { ProductDetailModal } from './product-detail-modal';
-import { ProductEditModal } from './product-edit-modal';
+import { ItemCreateModal } from './item-create-modal';
+import { ItemEditModal } from './item-edit-modal';
+import { Spinner } from '@suba-go/shared-components/components/ui/spinner';
+import { useAutoFormat } from '@/hooks/use-auto-format';
+import Image from 'next/image';
 
-interface Product {
-  id: string;
-  plate?: string;
-  brand?: string;
-  model?: string;
-  year?: number;
-  version?: string;
-  kilometraje?: number;
-  legal_status?: string;
-  state: string;
-  photos?: string;
-  basePrice?: number;
-  createdAt: string;
-}
-
-interface ProductsDashboardProps {
+interface ItemsDashboardProps {
   subdomain: string;
 }
 
-export function ProductsDashboard({ subdomain }: ProductsDashboardProps) {
-  const [products, setProducts] = useState<Product[]>([]);
+export function ItemsDashboard({ subdomain }: ItemsDashboardProps) {
+  const router = useRouter();
+  const [items, setItems] = useState<ItemDto[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterState, setFilterState] = useState('all');
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
-  const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
-  const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
+  const [selectedItem, setSelectedItem] = useState<ItemDto | null>(null);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const { toast } = useToast();
+  const { formatNumberWithSeparators } = useAutoFormat();
 
-  const fetchProducts = async () => {
+  const fetchItems = async () => {
     try {
       setIsLoading(true);
       const response = await fetch('/api/items');
@@ -57,7 +50,7 @@ export function ProductsDashboard({ subdomain }: ProductsDashboardProps) {
       }
 
       const data = await response.json();
-      setProducts(data);
+      setItems(data);
     } catch (error) {
       console.error('Error fetching products:', error);
       toast({
@@ -71,21 +64,21 @@ export function ProductsDashboard({ subdomain }: ProductsDashboardProps) {
   };
 
   useEffect(() => {
-    fetchProducts();
+    fetchItems();
   }, []);
 
   const handleCreateSuccess = () => {
     setIsCreateModalOpen(false);
-    fetchProducts();
+    fetchItems();
   };
 
-  const handleDeleteProduct = async (productId: string) => {
+  const handleDeleteItem = async (itemId: string) => {
     if (!confirm('¿Estás seguro de que quieres eliminar este producto?')) {
       return;
     }
 
     try {
-      const response = await fetch(`/api/items/${productId}`, {
+      const response = await fetch(`/api/items/${itemId}`, {
         method: 'DELETE',
       });
 
@@ -98,7 +91,7 @@ export function ProductsDashboard({ subdomain }: ProductsDashboardProps) {
         description: 'Producto eliminado correctamente',
       });
 
-      fetchProducts();
+      fetchItems();
     } catch (error) {
       console.error('Error deleting product:', error);
       toast({
@@ -109,14 +102,13 @@ export function ProductsDashboard({ subdomain }: ProductsDashboardProps) {
     }
   };
 
-  const filteredProducts = products.filter((product) => {
+  const filteredItems = items.filter((item) => {
     const matchesSearch =
-      product.plate?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      product.brand?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      product.model?.toLowerCase().includes(searchTerm.toLowerCase());
+      item.plate?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      item.brand?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      item.model?.toLowerCase().includes(searchTerm.toLowerCase());
 
-    const matchesFilter =
-      filterState === 'all' || product.state === filterState;
+    const matchesFilter = filterState === 'all' || item.state === filterState;
 
     return matchesSearch && matchesFilter;
   });
@@ -137,7 +129,13 @@ export function ProductsDashboard({ subdomain }: ProductsDashboardProps) {
   };
 
   if (isLoading) {
-    return <div>Cargando productos...</div>;
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-gray-50">
+        <div className="text-center">
+          <Spinner className="size-8" />
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -160,7 +158,7 @@ export function ProductsDashboard({ subdomain }: ProductsDashboardProps) {
             className="px-3 py-2 border border-gray-300 rounded-md text-sm"
           >
             <option value="all">Todos los estados</option>
-            {Object.entries(ItemStateEnum).map(([key, value]) => (
+            {Object.entries(ShowItemStateEnum).map(([key, value]) => (
               <option key={key} value={key}>
                 {value}
               </option>
@@ -178,24 +176,26 @@ export function ProductsDashboard({ subdomain }: ProductsDashboardProps) {
 
       {/* Products Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {filteredProducts.map((product) => (
-          <Card key={product.id} className="hover:shadow-lg transition-shadow">
+        {filteredItems.map((item) => (
+          <Card key={item.id} className="hover:shadow-lg transition-shadow">
             {/* Image Preview */}
             <div className="relative h-48 overflow-hidden rounded-t-lg bg-gray-100">
-              {product.photos ? (
+              {item.photos ? (
                 <>
-                  <img
-                    src={product.photos.split(',')[0]?.trim()}
-                    alt={`${product.brand} ${product.model}`}
+                  <Image
+                    src={item.photos.split(',')[0]?.trim()}
+                    alt={`${item.brand} ${item.model}`}
+                    width={100}
+                    height={100}
                     className="w-full h-full object-cover"
                     onError={(e) => {
                       e.currentTarget.src =
                         'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgdmlld0JveD0iMCAwIDIwMCAyMDAiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxyZWN0IHdpZHRoPSIyMDAiIGhlaWdodD0iMjAwIiBmaWxsPSIjRjNGNEY2Ii8+CjxwYXRoIGQ9Ik04MCA2MEgxMjBWODBIODBWNjBaIiBmaWxsPSIjOUI5QkEwIi8+CjxwYXRoIGQ9Ik02MCA4MEgxNDBWMTQwSDYwVjgwWiIgZmlsbD0iIzlCOUJBMCIvPgo8L3N2Zz4K';
                     }}
                   />
-                  {product.photos.split(',').length > 1 && (
+                  {item.photos.split(',').length > 1 && (
                     <div className="absolute top-2 right-2 bg-black bg-opacity-60 text-white text-xs px-2 py-1 rounded">
-                      +{product.photos.split(',').length - 1} más
+                      +{item.photos.split(',').length - 1} más
                     </div>
                   )}
                 </>
@@ -222,10 +222,10 @@ export function ProductsDashboard({ subdomain }: ProductsDashboardProps) {
             <CardHeader className="pb-3">
               <div className="flex justify-between items-start">
                 <CardTitle className="text-lg">
-                  {product.plate || 'Sin Patente'}
+                  {item.plate || 'Sin Patente'}
                 </CardTitle>
-                <Badge className={getStateColor(product.state)}>
-                  {product.state}
+                <Badge className={getStateColor(item.state)}>
+                  {item.state}
                 </Badge>
               </div>
             </CardHeader>
@@ -233,26 +233,25 @@ export function ProductsDashboard({ subdomain }: ProductsDashboardProps) {
               <div className="space-y-1">
                 <p className="text-sm text-gray-600">
                   <span className="font-medium">Marca:</span>{' '}
-                  {product.brand || 'N/A'}
+                  {item.brand || 'N/A'}
                 </p>
                 <p className="text-sm text-gray-600">
                   <span className="font-medium">Modelo:</span>{' '}
-                  {product.model || 'N/A'}
+                  {item.model || 'N/A'}
                 </p>
                 <p className="text-sm text-gray-600">
-                  <span className="font-medium">Año:</span>{' '}
-                  {product.year || 'N/A'}
+                  <span className="font-medium">Año:</span> {item.year || 'N/A'}
                 </p>
-                {product.kilometraje && (
+                {item.kilometraje && (
                   <p className="text-sm text-gray-600">
                     <span className="font-medium">Kilometraje:</span>{' '}
-                    {product.kilometraje.toLocaleString()} km
+                    {item.kilometraje.toLocaleString()} km
                   </p>
                 )}
-                {product.basePrice && (
-                  <p className="text-sm font-semibold text-green-600">
+                {item.basePrice && (
+                  <p className="text-sm font-semibold text-black-600">
                     <span className="font-medium">Precio base:</span> $
-                    {product.basePrice.toLocaleString()}
+                    {formatNumberWithSeparators(item.basePrice)}
                   </p>
                 )}
               </div>
@@ -261,10 +260,7 @@ export function ProductsDashboard({ subdomain }: ProductsDashboardProps) {
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => {
-                    setSelectedProduct(product);
-                    setIsDetailModalOpen(true);
-                  }}
+                  onClick={() => router.push(`/items/${item.id}`)}
                   className="flex-1"
                 >
                   <Eye className="h-4 w-4 mr-1" />
@@ -274,7 +270,7 @@ export function ProductsDashboard({ subdomain }: ProductsDashboardProps) {
                   variant="outline"
                   size="sm"
                   onClick={() => {
-                    setSelectedProduct(product);
+                    setSelectedItem(item);
                     setIsEditModalOpen(true);
                   }}
                 >
@@ -283,7 +279,7 @@ export function ProductsDashboard({ subdomain }: ProductsDashboardProps) {
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => handleDeleteProduct(product.id)}
+                  onClick={() => handleDeleteItem(item.id)}
                   className="text-red-600 hover:text-red-700"
                 >
                   <Trash2 className="h-4 w-4" />
@@ -294,7 +290,7 @@ export function ProductsDashboard({ subdomain }: ProductsDashboardProps) {
         ))}
       </div>
 
-      {filteredProducts.length === 0 && (
+      {filteredItems.length === 0 && (
         <div className="text-center py-12">
           <Package className="mx-auto h-12 w-12 text-gray-400" />
           <h3 className="mt-2 text-sm font-medium text-gray-900">
@@ -317,27 +313,21 @@ export function ProductsDashboard({ subdomain }: ProductsDashboardProps) {
       )}
 
       {/* Modals */}
-      <ProductCreateModal
+      <ItemCreateModal
         isOpen={isCreateModalOpen}
         onClose={() => setIsCreateModalOpen(false)}
         onSuccess={handleCreateSuccess}
         subdomain={subdomain}
       />
 
-      <ProductDetailModal
-        isOpen={isDetailModalOpen}
-        onClose={() => setIsDetailModalOpen(false)}
-        product={selectedProduct}
-      />
-
-      <ProductEditModal
+      <ItemEditModal
         isOpen={isEditModalOpen}
         onClose={() => setIsEditModalOpen(false)}
         onSuccess={() => {
           setIsEditModalOpen(false);
-          fetchProducts();
+          fetchItems();
         }}
-        product={selectedProduct}
+        item={selectedItem}
       />
     </div>
   );

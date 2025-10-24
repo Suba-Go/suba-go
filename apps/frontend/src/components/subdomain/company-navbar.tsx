@@ -2,6 +2,7 @@
 
 import { CompanyDto } from '@suba-go/shared-validation';
 import { protocol, rootDomain } from '@suba-go/shared-components/lib/utils';
+import { getNodeEnv } from '@suba-go/shared-components';
 
 import { Button } from '@suba-go/shared-components/components/ui/button';
 import { useSession, signOut } from 'next-auth/react';
@@ -46,9 +47,14 @@ export default function CompanyNavbar({
   };
 
   const handleLoginRedirect = () => {
-    if (process.env.NODE_ENV === 'development') {
-      // Development: redirect to localhost:3000/login
+    const nodeEnv = getNodeEnv();
+
+    if (nodeEnv === 'local') {
+      // Local: redirect to localhost:3000/login
       window.location.href = 'http://localhost:3000/login';
+    } else if (nodeEnv === 'development') {
+      // Development: redirect to development.subago.cl/login
+      window.location.href = 'https://development.subago.cl/login';
     } else {
       // Production: redirect to main domain
       window.location.href = `${protocol}://${rootDomain}/login`;
@@ -98,7 +104,7 @@ export default function CompanyNavbar({
             </Link>
             {/* Products - Only for AUCTION_MANAGER and ADMIN */}
             {isUserAdminOrManager(session) && (
-              <Link href="/productos">
+              <Link href="/items">
                 <Button
                   variant="ghost"
                   className="text-gray-600 hover:text-gray-900 flex items-center gap-2"
@@ -209,7 +215,7 @@ export default function CompanyNavbar({
           </Link>
           {/* Products - Only for AUCTION_MANAGER and ADMIN */}
           {isUserAdminOrManager(session) && (
-            <Link href="/productos">
+            <Link href="/items">
               <Button
                 variant="ghost"
                 className="w-full text-left justify-start text-gray-600 hover:text-gray-900 flex items-center gap-2"

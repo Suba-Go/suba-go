@@ -1,14 +1,14 @@
 import { Suspense } from 'react';
 import { auth } from '@/auth';
 import { redirect } from 'next/navigation';
-import { ProductsDashboard } from '@/components/products/products-dashboard';
-import { ProductsDashboardSkeleton } from '@/components/products/products-dashboard-skeleton';
+import { ItemsDashboard } from '@/components/items/items-dashboard';
+import { ItemsDashboardSkeleton } from '@/components/items/items-dashboard-skeleton';
 
-interface ProductsPageProps {
+interface ItemsPageProps {
   params: Promise<{ subdomain: string }>;
 }
 
-export default async function ProductsPage({ params }: ProductsPageProps) {
+export default async function ItemsPage({ params }: ItemsPageProps) {
   const { subdomain } = await params;
   const session = await auth();
 
@@ -28,8 +28,8 @@ export default async function ProductsPage({ params }: ProductsPageProps) {
         </p>
       </div>
 
-      <Suspense fallback={<ProductsDashboardSkeleton />}>
-        <ProductsDashboard subdomain={subdomain} />
+      <Suspense fallback={<ItemsDashboardSkeleton />}>
+        <ItemsDashboard subdomain={subdomain} />
       </Suspense>
     </div>
   );

@@ -4,6 +4,7 @@ import { CompanyDto } from '@suba-go/shared-validation';
 import { useSession } from 'next-auth/react';
 import { ProfileIncompleteWarning } from '@/components/auth/profile-incomplete-warning';
 import { getMissingProfileFields } from '@/utils/subdomain-profile-validation';
+import { UserHomePage } from './user-home-page';
 
 interface CompanyBrandedPageProps {
   company: CompanyDto;
@@ -12,14 +13,22 @@ interface CompanyBrandedPageProps {
 
 export default function CompanyBrandedPage({
   company,
+  subdomain,
 }: CompanyBrandedPageProps) {
   const { data: session } = useSession();
+  const userRole = session?.user?.role;
   const primaryColor = company.principal_color || '#3B82F6'; // Default blue if no color set
   
-  // Verificar si el perfil está incompleto
+  // check if the profile is incomplete
   const missingFields = getMissingProfileFields(session);
   const isProfileIncomplete = missingFields.length > 0;
 
+  // If user is logged in and is a regular USER, show the user home page
+  if (session && userRole === 'USER') {
+    return <UserHomePage company={company} subdomain={subdomain || ''} />;
+  }
+
+  // For AUCTION_MANAGER or not logged in, show "under development" page
   return (
     <div
       className="min-h-screen"
@@ -56,7 +65,9 @@ export default function CompanyBrandedPage({
             Bienvenido a {company.name}
           </h2>
           <p className="text-xl text-gray-600 mb-8">
-            Esta es la página personalizada de {company.name}
+            {userRole === 'AUCTION_MANAGER'
+              ? 'Página en desarrollo para administradores'
+              : 'Esta es la página personalizada de ' + company.name}
           </p>
 
           {/* Company branding section */}

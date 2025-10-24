@@ -17,7 +17,6 @@ export class CreateBidDto {
   @ApiProperty({ description: 'Precio ofertado', minimum: 1 })
   @IsNumber({}, { message: 'El precio ofertado debe ser un número' })
   @IsPositive({ message: 'El precio ofertado debe ser positivo' })
-  @Min(1000, { message: 'El precio mínimo es $1,000' })
   @Transform(({ value }) => Number(value))
   offeredPrice: number;
 }
@@ -26,7 +25,6 @@ export class UpdateBidDto {
   @ApiProperty({ description: 'Nuevo precio ofertado', minimum: 1 })
   @IsNumber({}, { message: 'El precio ofertado debe ser un número' })
   @IsPositive({ message: 'El precio ofertado debe ser positivo' })
-  @Min(1000, { message: 'El precio mínimo es $1,000' })
   @Transform(({ value }) => Number(value))
   offeredPrice: number;
 }

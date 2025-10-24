@@ -8,6 +8,7 @@ z.setErrorMap(errorMap);
 export const companySchema = baseSchema
   .extend({
     name: name,
+    nameLowercase: z.string(), // Lowercase version for case-insensitive subdomain lookup
     logo: z.string().nullable().optional(),
     principal_color: z.string().nullable().optional(),
     principal_color2: z.string().nullable().optional(),
@@ -24,6 +25,7 @@ export const companyCreateSchema = companySchema
     updatedAt: true,
     deletedAt: true,
     is_deleted: true,
+    nameLowercase: true, // Generated automatically by backend
   })
   .strict();
 

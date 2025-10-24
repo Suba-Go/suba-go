@@ -51,14 +51,22 @@ export function useFileUpload(options: UseFileUploadOptions = {}) {
   };
 
   const uploadFile = async (file: File): Promise<string> => {
-    // Simulate file upload - replace with actual upload logic
-    return new Promise((resolve) => {
-      setTimeout(() => {
-        // Generate a mock URL - replace with actual upload endpoint
-        const mockUrl = 'logo-white.png';
-        resolve(mockUrl);
-      }, 1000 + Math.random() * 2000);
-    });
+    // Upload file to Vercel Blob via API route
+    const response = await fetch(
+      `/api/upload?filename=${encodeURIComponent(file.name)}`,
+      {
+        method: 'POST',
+        body: file,
+      }
+    );
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.error || 'Error al subir archivo');
+    }
+
+    const blob = await response.json();
+    return blob.url;
   };
 
   const addFiles = async (newFiles: FileList | File[]) => {

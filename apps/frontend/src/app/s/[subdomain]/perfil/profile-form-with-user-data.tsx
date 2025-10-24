@@ -1,7 +1,7 @@
 'use client';
 
 import { useSession } from 'next-auth/react';
-import { useRouter } from 'next/navigation';
+import { useRouter } from 'next-nprogress-bar';
 import { useState, useEffect } from 'react';
 import { updateUserProfileAction } from '@/domain/server-actions/user/update-profile';
 import { useToast } from '@suba-go/shared-components/components/ui/toaster';

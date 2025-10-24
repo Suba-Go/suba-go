@@ -43,6 +43,7 @@ Thumbs.db
 .nx
 out
 .env
+*.tsbuildinfo
 
 # Prisma
 **/generated/prisma-client

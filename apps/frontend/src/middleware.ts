@@ -3,7 +3,15 @@ import { auth } from './auth';
 import { getSubdomainFromHost } from '@suba-go/shared-components';
 import { isUserProfileComplete } from './utils/subdomain-profile-validation';
 
-const ROOT_DOMAIN = process.env.ROOT_DOMAIN ?? 'subago.cl';
+// Determine ROOT_DOMAIN based on APP_ENV
+const APP_ENV =
+  process.env.APP_ENV || process.env.NEXT_PUBLIC_APP_ENV || 'development';
+const ROOT_DOMAIN =
+  APP_ENV === 'local'
+    ? 'localhost:3000'
+    : APP_ENV === 'development'
+    ? 'development.subago.cl'
+    : process.env.ROOT_DOMAIN ?? 'subago.cl';
 
 export default auth(async function middleware(request: NextRequest) {
   const host = request.headers.get('host') ?? '';
@@ -42,9 +50,17 @@ export default auth(async function middleware(request: NextRequest) {
     }
 
     // Products page
-    if (pathname === '/productos') {
+    if (pathname === '/items') {
       return NextResponse.rewrite(
-        new URL(`/s/${subdomain}/productos`, request.url)
+        new URL(`/s/${subdomain}/items`, request.url)
+      );
+    }
+
+    // Product detail page
+    if (pathname.startsWith('/items/') && pathname.split('/').length === 3) {
+      const itemId = pathname.split('/')[2];
+      return NextResponse.rewrite(
+        new URL(`/s/${subdomain}/items/${itemId}`, request.url)
       );
     }
 
@@ -59,6 +75,12 @@ export default auth(async function middleware(request: NextRequest) {
     if (pathname === '/subastas') {
       return NextResponse.rewrite(
         new URL(`/s/${subdomain}/subastas`, request.url)
+      );
+    }
+
+    if (pathname === '/usuarios') {
+      return NextResponse.rewrite(
+        new URL(`/s/${subdomain}/usuarios`, request.url)
       );
     }
 

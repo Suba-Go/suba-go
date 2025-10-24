@@ -79,6 +79,7 @@ export class MultiStepFormCreatorService {
       const savedCompany = await prisma.company.create({
         data: {
           name: data.companyData.name,
+          nameLowercase: data.companyData.name.toLowerCase(),
           logo: data.companyData.logo,
           principal_color: data.companyData.principal_color,
           principal_color2: data.companyData.principal_color2,
@@ -103,7 +104,8 @@ export class MultiStepFormCreatorService {
           isDeleted: false,
         },
       });
-      const publicName = data.userData.public_name || `Usuario ${userCount + 1}`;
+      const publicName =
+        data.userData.public_name || `Usuario ${userCount + 1}`;
 
       const savedUser = await prisma.user.create({
         data: {

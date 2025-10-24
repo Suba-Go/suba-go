@@ -13,7 +13,11 @@ import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { LegalStatusEnum, ItemStateEnum } from '@prisma/client';
 
 export class CreateItemDto {
-  @ApiPropertyOptional({ description: 'Patente del vehículo' })
+  @ApiPropertyOptional({
+    description: 'Patente del vehículo',
+    minLength: 6,
+    maxLength: 6,
+  })
   @IsOptional()
   @IsString()
   plate?: string;
@@ -28,7 +32,11 @@ export class CreateItemDto {
   @IsString()
   model?: string;
 
-  @ApiPropertyOptional({ description: 'Año del vehículo' })
+  @ApiPropertyOptional({
+    description: 'Año del vehículo',
+    minLength: 4,
+    maxLength: 4,
+  })
   @IsOptional()
   @IsInt({ message: 'El año debe ser un número entero' })
   @Transform(({ value }) => Number(value))
@@ -83,30 +91,14 @@ export class CreateItemDto {
 
 export class UpdateItemDto {
   @ApiPropertyOptional({
-    description: 'Nombre del item',
-    minLength: 1,
-    maxLength: 100,
-  })
-  @IsOptional()
-  @IsString()
-  @MinLength(1, { message: 'El nombre es requerido' })
-  @MaxLength(100, { message: 'El nombre no puede exceder 100 caracteres' })
-  name?: string;
-
-  @ApiPropertyOptional({ description: 'Descripción del item' })
-  @IsOptional()
-  @IsString()
-  description?: string;
-
-  @ApiPropertyOptional({
     description: 'Placa del vehículo',
-    minLength: 1,
-    maxLength: 20,
+    minLength: 6,
+    maxLength: 6,
   })
   @IsOptional()
   @IsString()
-  @MinLength(1, { message: 'La placa es requerida' })
-  @MaxLength(20, { message: 'La placa no puede exceder 20 caracteres' })
+  @MinLength(6, { message: 'La placa es requerida' })
+  @MaxLength(6, { message: 'La placa no puede exceder 6 caracteres' })
   plate?: string;
 
   @ApiPropertyOptional({ description: 'Marca del vehículo' })
@@ -125,10 +117,24 @@ export class UpdateItemDto {
   @Transform(({ value }) => Number(value))
   year?: number;
 
-  @ApiPropertyOptional({ description: 'Color del vehículo' })
+  @ApiPropertyOptional({ description: 'Versión del vehículo' })
   @IsOptional()
   @IsString()
-  color?: string;
+  version?: string;
+
+  @ApiPropertyOptional({ description: 'Kilometraje del vehículo' })
+  @IsOptional()
+  @IsInt({ message: 'El kilometraje debe ser un número entero' })
+  @Transform(({ value }) => Number(value))
+  kilometraje?: number;
+
+  @ApiPropertyOptional({
+    description: 'Estado legal del vehículo',
+    enum: LegalStatusEnum,
+  })
+  @IsOptional()
+  @IsEnum(LegalStatusEnum, { message: 'Estado legal inválido' })
+  legal_status?: LegalStatusEnum;
 
   @ApiPropertyOptional({ description: 'Precio base del item' })
   @IsOptional()
@@ -136,6 +142,18 @@ export class UpdateItemDto {
   @IsPositive({ message: 'El precio base debe ser positivo' })
   @Transform(({ value }) => Number(value))
   basePrice?: number;
+
+  @ApiPropertyOptional({ description: 'URLs de fotos separadas por comas' })
+  @IsOptional()
+  @IsString()
+  photos?: string;
+
+  @ApiPropertyOptional({
+    description: 'URLs de documentos separadas por comas',
+  })
+  @IsOptional()
+  @IsString()
+  docs?: string;
 
   @ApiPropertyOptional({ description: 'Estado del item', enum: ItemStateEnum })
   @IsOptional()
@@ -161,12 +179,6 @@ export class ItemResponseDto {
   @ApiProperty({ description: 'ID del item' })
   id: string;
 
-  @ApiProperty({ description: 'Nombre del item' })
-  name: string;
-
-  @ApiPropertyOptional({ description: 'Descripción del item' })
-  description?: string;
-
   @ApiProperty({ description: 'Placa del vehículo' })
   plate: string;
 
@@ -179,14 +191,31 @@ export class ItemResponseDto {
   @ApiPropertyOptional({ description: 'Año del vehículo' })
   year?: number;
 
-  @ApiPropertyOptional({ description: 'Color del vehículo' })
-  color?: string;
-
   @ApiPropertyOptional({ description: 'Precio base del item' })
   basePrice?: number;
 
   @ApiProperty({ description: 'Estado del item' })
   state: string;
+
+  @ApiPropertyOptional({ description: 'URLs de fotos separadas por comas' })
+  photos?: string;
+
+  @ApiPropertyOptional({
+    description: 'URLs de documentos separadas por comas',
+  })
+  docs?: string;
+
+  @ApiPropertyOptional({ description: 'Versión del vehículo' })
+  version?: string;
+
+  @ApiPropertyOptional({ description: 'Kilometraje del vehículo' })
+  kilometraje?: number;
+
+  @ApiPropertyOptional({
+    description: 'Estado legal del vehículo',
+    enum: LegalStatusEnum,
+  })
+  legal_status?: LegalStatusEnum;
 
   @ApiProperty({ description: 'Fecha de creación' })
   createdAt: Date;

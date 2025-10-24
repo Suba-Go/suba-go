@@ -7,10 +7,21 @@ export async function GET(
   { params }: { params: Promise<{ auctionId: string }> }
 ) {
   try {
-    const session = await auth();
     const { auctionId } = await params;
 
-    if (!session) {
+    // Wrap auth() in try-catch to handle any errors
+    let session;
+    try {
+      session = await auth();
+    } catch (authError) {
+      console.error('Auth error in GET /api/auctions/[auctionId]:', authError);
+      return NextResponse.json(
+        { error: 'Error de autenticación' },
+        { status: 401 }
+      );
+    }
+
+    if (!session || !session.user) {
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
     }
 
@@ -41,7 +52,11 @@ export async function GET(
           { status: 404 }
         );
       }
-      throw new Error(`Backend responded with status: ${response.status}`);
+      // Return error response instead of throwing
+      return NextResponse.json(
+        { error: `Error del backend: ${response.status}` },
+        { status: response.status }
+      );
     }
 
     const data = await response.json();
@@ -77,10 +92,21 @@ export async function PUT(
   { params }: { params: Promise<{ auctionId: string }> }
 ) {
   try {
-    const session = await auth();
     const { auctionId } = await params;
 
-    if (!session) {
+    // Wrap auth() in try-catch to handle any errors
+    let session;
+    try {
+      session = await auth();
+    } catch (authError) {
+      console.error('Auth error in PUT /api/auctions/[auctionId]:', authError);
+      return NextResponse.json(
+        { error: 'Error de autenticación' },
+        { status: 401 }
+      );
+    }
+
+    if (!session || !session.user) {
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
     }
 
@@ -130,10 +156,24 @@ export async function DELETE(
   { params }: { params: Promise<{ auctionId: string }> }
 ) {
   try {
-    const session = await auth();
     const { auctionId } = await params;
 
-    if (!session) {
+    // Wrap auth() in try-catch to handle any errors
+    let session;
+    try {
+      session = await auth();
+    } catch (authError) {
+      console.error(
+        'Auth error in DELETE /api/auctions/[auctionId]:',
+        authError
+      );
+      return NextResponse.json(
+        { error: 'Error de autenticación' },
+        { status: 401 }
+      );
+    }
+
+    if (!session || !session.user) {
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
     }
 

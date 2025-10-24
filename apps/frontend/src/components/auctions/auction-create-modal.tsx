@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { useForm } from 'react-hook-form';
+import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Calendar, Clock, DollarSign, Package } from 'lucide-react';
 import {
@@ -19,12 +19,13 @@ import { useToast } from '@suba-go/shared-components/components/ui/toaster';
 import { Switch } from '@suba-go/shared-components/components/ui/switch';
 import { ItemSelector } from './item-selector';
 import { useCompany } from '@/hooks/use-company';
+import { DateInput } from '@/components/ui/date-input';
+import { TimeInput } from '@/components/ui/time-input';
 import {
   auctionCreateSchema,
   AuctionTypeEnum,
   type AuctionCreateDto,
 } from '@suba-go/shared-validation';
-// import { ItemSelector } from './item-selector';
 
 interface AuctionCreateModalProps {
   isOpen: boolean;
@@ -48,6 +49,7 @@ export function AuctionCreateModal({
     formState: { errors },
     reset,
     setValue,
+    control,
   } = useForm({
     resolver: zodResolver(auctionCreateSchema),
     defaultValues: {
@@ -83,16 +85,23 @@ export function AuctionCreateModal({
       return;
     }
 
-    // Validar que si es hoy, la hora sea futura
+    // Validar que la fecha y hora de inicio sea futura
     const [hours, minutes] = data.startTime.split(':');
     const startDateTime = new Date(data.startDate);
     startDateTime.setHours(parseInt(hours), parseInt(minutes), 0, 0);
 
     const now = new Date();
+
+    // Allow same-day auctions if the time is in the future
     if (startDateTime <= now) {
+      const isToday = startDateTime.toDateString() === now.toDateString();
+      const errorMessage = isToday
+        ? 'La hora de inicio debe ser posterior a la hora actual'
+        : 'La fecha y hora de inicio debe ser futura';
+
       toast({
         title: 'Error',
-        description: 'La fecha y hora de inicio debe ser futura',
+        description: errorMessage,
         variant: 'destructive',
       });
       return;
@@ -159,7 +168,7 @@ export function AuctionCreateModal({
 
   // Set minimum date to today
   const today = new Date();
-  const minDate = today.toISOString().slice(0, 10);
+  today.setHours(0, 0, 0, 0);
 
   const { company } = useCompany();
   const primaryColor = company?.principal_color || '#3B82F6';
@@ -213,39 +222,54 @@ export function AuctionCreateModal({
               <div>
                 <Label htmlFor="startDate" className="flex items-center gap-2">
                   <Calendar className="h-4 w-4" />
-                  Fecha de Inicio *
+                  Fecha de Inicio * (dd/mm/yyyy)
                 </Label>
-                <Input
-                  id="startDate"
-                  type="date"
-                  {...register('startDate', { valueAsDate: true })}
-                  min={minDate}
-                  className={errors.startDate ? 'border-red-500' : ''}
-                  placeholder="dd/mm/yyyy"
+                <Controller
+                  name="startDate"
+                  control={control}
+                  render={({ field }) => (
+                    <DateInput
+                      value={field.value}
+                      onChange={field.onChange}
+                      minDate={today}
+                      error={!!errors.startDate}
+                    />
+                  )}
                 />
                 {errors.startDate && (
                   <p className="text-sm text-red-600 mt-1">
                     {errors.startDate.message}
                   </p>
                 )}
+                <p className="text-xs text-gray-500 mt-1">
+                  Formato: día/mes/año
+                </p>
               </div>
 
               <div>
                 <Label htmlFor="startTime" className="flex items-center gap-2">
                   <Clock className="h-4 w-4" />
-                  Hora de Inicio *
+                  Hora de Inicio * (HH:MM)
                 </Label>
-                <Input
-                  id="startTime"
-                  type="time"
-                  {...register('startTime')}
-                  className={errors.startTime ? 'border-red-500' : ''}
+                <Controller
+                  name="startTime"
+                  control={control}
+                  render={({ field }) => (
+                    <TimeInput
+                      value={field.value}
+                      onChange={field.onChange}
+                      error={!!errors.startTime}
+                    />
+                  )}
                 />
                 {errors.startTime && (
                   <p className="text-sm text-red-600 mt-1">
                     {errors.startTime.message}
                   </p>
                 )}
+                <p className="text-xs text-gray-500 mt-1">
+                  Formato: 24 horas (ej: 14:30)
+                </p>
               </div>
             </div>
 

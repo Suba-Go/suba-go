@@ -6,16 +6,19 @@ import { Button } from '@suba-go/shared-components/components/ui/button';
 import { Input } from '@suba-go/shared-components/components/ui/input';
 import { Label } from '@suba-go/shared-components/components/ui/label';
 import { useToast } from '@suba-go/shared-components/components/ui/toaster';
+import { getNodeEnv } from '@suba-go/shared-components';
 import { Eye, EyeOff } from 'lucide-react';
 
 interface CompanyLoginFormProps {
   companyName?: string;
+  companyNameLowercase?: string;
   prefilledEmail?: string;
   onLoginSuccess?: () => void;
 }
 
 export default function CompanyLoginForm({
   companyName,
+  companyNameLowercase,
   prefilledEmail,
   onLoginSuccess,
 }: CompanyLoginFormProps) {
@@ -69,14 +72,17 @@ export default function CompanyLoginForm({
     }
 
     setIsLoading(true);
+    // Use the lowercase company name for subdomain validation
+    const subdomainToValidate =
+      companyNameLowercase || companyName?.toLowerCase();
 
     // SECURITY: Validate that the email belongs to this tenant before attempting login
-    if (companyName) {
+    if (subdomainToValidate) {
       try {
         const validationResponse = await fetch(
           `/api/users/validate-email-for-tenant?email=${encodeURIComponent(
             formData.email
-          )}&subdomain=${encodeURIComponent(companyName)}`
+          )}&subdomain=${encodeURIComponent(subdomainToValidate)}`
         );
 
         if (validationResponse.ok) {
@@ -127,7 +133,7 @@ export default function CompanyLoginForm({
     }
 
     // Clear any existing session cookies before login
-    if (process.env.NODE_ENV === 'development') {
+    if (getNodeEnv() === 'local') {
       // Clear cookies for both localhost and .localhost domain
       document.cookie =
         'authjs.session-token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
@@ -265,8 +271,10 @@ export default function CompanyLoginForm({
         <div className="border-t border-gray-200 pt-3">
           <a
             href={
-              process.env.NODE_ENV === 'development'
+              getNodeEnv() === 'local'
                 ? 'http://localhost:3000/login'
+                : getNodeEnv() === 'development'
+                ? 'https://development.subago.cl/login'
                 : `https://${
                     process.env.NEXT_PUBLIC_ROOT_DOMAIN || 'subago.cl'
                   }/login`

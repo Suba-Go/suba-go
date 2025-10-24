@@ -7,7 +7,7 @@ type UserWithRelations = {
   id: string;
   email: string;
   tenant?: { id: string };
-  company?: { name: string; tenant?: { id: string } };
+  company?: { name: string; nameLowercase?: string; tenant?: { id: string } };
 };
 
 interface CompanyLookupResult {
@@ -19,6 +19,14 @@ interface CompanyLookupResult {
 @Injectable()
 export class UserLookupService {
   constructor(private readonly userRepository: UserPrismaRepository) {}
+
+  // normalize the company name to match the subdomain format
+  private normalizeCompanyName(name: string): string {
+    return name
+      .toLowerCase()
+      .replace(/[^a-z0-9]/g, '')
+      .substring(0, 20);
+  }
 
   async findCompanyByUserEmail(
     email: string
@@ -43,8 +51,8 @@ export class UserLookupService {
         throw new NotFoundException('User exists but has no associated tenant');
       }
 
-      // The company name is the subdomain
-      const subdomain = user.company.name;
+      // The normalized company name is the subdomain
+      const subdomain = this.normalizeCompanyName(user.company.name);
 
       return {
         companyDomain: subdomain, // Return the company name as subdomain
@@ -81,17 +89,8 @@ export class UserLookupService {
         };
       }
 
-      // normalize the company name to match the subdomain format
-      const normalizeCompanyName = (name: string): string => {
-        return name
-          .toLowerCase()
-          .replace(/[^a-z0-9]/g, '')
-          .substring(0, 20);
-      };
-
       // the tenant name is the subdomain, it is normalized to match the subdomain format for comparison
-      // for comparison
-      const userTenantSubdomain = normalizeCompanyName(user.company.name);
+      const userTenantSubdomain = this.normalizeCompanyName(user.company.name);
 
       // compare the normalized tenant name with the requested subdomain
       if (userTenantSubdomain !== subdomain) {
