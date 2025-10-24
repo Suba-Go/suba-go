@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   Card,
   CardContent,
@@ -8,8 +8,17 @@ import {
   CardTitle,
 } from '@suba-go/shared-components/components/ui/card';
 import { Button } from '@suba-go/shared-components/components/ui/button';
+import { Badge } from '@suba-go/shared-components/components/ui/badge';
 import { useToast } from '@suba-go/shared-components/components/ui/toaster';
-import { Users, UserPlus, Trash2, Mail, Phone, Calendar } from 'lucide-react';
+import {
+  Users,
+  UserPlus,
+  Trash2,
+  Mail,
+  Phone,
+  Calendar,
+  Wifi,
+} from 'lucide-react';
 import { AddParticipantModal } from './add-participant-modal';
 import {
   Dialog,
@@ -52,6 +61,39 @@ export function ParticipantsList({
   // Ensure participants is always an array
   const participantsList = Array.isArray(participants) ? participants : [];
   const [isRemoving, setIsRemoving] = useState(false);
+  const [connectedUserIds, setConnectedUserIds] = useState<Set<string>>(
+    new Set()
+  );
+
+  // Fetch connected users every 5 seconds
+  useEffect(() => {
+    if (!isManager) return;
+
+    const fetchConnectedUsers = async () => {
+      try {
+        const response = await fetch(
+          `/api/auctions/${auctionId}/connected-users`
+        );
+        if (response.ok) {
+          const data = await response.json();
+          const userIds = new Set<string>(
+            data.connected?.map((u: { userId: string }) => u.userId) || []
+          );
+          setConnectedUserIds(userIds);
+        }
+      } catch (error) {
+        console.error('Error fetching connected users:', error);
+      }
+    };
+
+    // Initial fetch
+    fetchConnectedUsers();
+
+    // Poll every 5 seconds
+    const interval = setInterval(fetchConnectedUsers, 5000);
+
+    return () => clearInterval(interval);
+  }, [auctionId, isManager]);
 
   const handleRemoveParticipant = async () => {
     if (!participantToRemove) return;
@@ -151,64 +193,79 @@ export function ParticipantsList({
             </div>
           ) : (
             <div className="space-y-3">
-              {participantsList.map((participant) => (
-                <div
-                  key={participant.id}
-                  className="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50 transition-colors"
-                >
-                  <div className="flex-1">
-                    <div className="flex items-center gap-3 mb-2">
-                      <div className="h-10 w-10 rounded-full bg-blue-100 flex items-center justify-center">
-                        <span className="text-blue-600 font-semibold text-sm">
-                          {(
-                            participant.public_name ||
-                            participant.name ||
-                            participant.email
-                          )
-                            .charAt(0)
-                            .toUpperCase()}
-                        </span>
-                      </div>
-                      <div>
-                        <h4 className="font-semibold text-gray-900">
-                          {participant.public_name ||
-                            participant.name ||
-                            'Sin nombre'}
-                        </h4>
-                        {participant.rut && (
-                          <p className="text-xs text-gray-500">
-                            RUT: {participant.rut}
-                          </p>
-                        )}
-                      </div>
-                    </div>
-                    <div className="flex flex-wrap gap-4 text-sm text-gray-600 ml-13">
-                      <div className="flex items-center gap-1">
-                        <Mail className="h-3 w-3" />
-                        {participant.email}
-                      </div>
-                      {participant.phone && (
-                        <div className="flex items-center gap-1">
-                          <Phone className="h-3 w-3" />
-                          {participant.phone}
-                        </div>
-                      )}
-                      <div className="flex items-center gap-1">
-                        <Calendar className="h-3 w-3" />
-                        Registrado: {formatDate(participant.createdAt)}
-                      </div>
-                    </div>
-                  </div>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => setParticipantToRemove(participant)}
-                    className="text-red-600 hover:text-red-700 hover:bg-red-50"
+              {participantsList.map((participant) => {
+                const isOnline = connectedUserIds.has(participant.id);
+                return (
+                  <div
+                    key={participant.id}
+                    className="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50 transition-colors"
                   >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                </div>
-              ))}
+                    <div className="flex-1">
+                      <div className="flex items-center gap-3 mb-2">
+                        <div className="h-10 w-10 rounded-full bg-blue-100 flex items-center justify-center relative">
+                          <span className="text-blue-600 font-semibold text-sm">
+                            {(participant.name || participant.email)
+                              .charAt(0)
+                              .toUpperCase()}
+                          </span>
+                          {/* Online status indicator */}
+                          {isOnline && (
+                            <div className="absolute -top-1 -right-1 h-4 w-4 bg-green-500 border-2 border-white rounded-full" />
+                          )}
+                        </div>
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2">
+                            <h4 className="font-semibold text-gray-900">
+                              {participant.name || 'Sin nombre'}
+                            </h4>
+                            {isOnline && (
+                              <Badge
+                                variant="outline"
+                                className="text-xs bg-green-50 text-green-700 border-green-300"
+                              >
+                                <Wifi className="h-3 w-3 mr-1" />
+                                En línea
+                              </Badge>
+                            )}
+                          </div>
+                          <p className="text-sm text-gray-600">
+                            {participant.public_name}
+                          </p>
+                          {participant.rut && (
+                            <p className="text-xs text-gray-500">
+                              RUT: {participant.rut}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                      <div className="flex flex-wrap gap-4 text-sm text-gray-600 ml-13">
+                        <div className="flex items-center gap-1">
+                          <Mail className="h-3 w-3" />
+                          {participant.email}
+                        </div>
+                        {participant.phone && (
+                          <div className="flex items-center gap-1">
+                            <Phone className="h-3 w-3" />
+                            {participant.phone}
+                          </div>
+                        )}
+                        <div className="flex items-center gap-1">
+                          <Calendar className="h-3 w-3" />
+                          Registrado: {formatDate(participant.createdAt)}
+                        </div>
+                      </div>
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setParticipantToRemove(participant)}
+                      className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
+                );
+              })}
             </div>
           )}
         </CardContent>

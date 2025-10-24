@@ -105,23 +105,44 @@ export function UserHomePage({ company, subdomain }: UserHomePageProps) {
     return Array.from(auctionMap.values());
   }, [showAllAuctions, userBids, userRegistrations]);
 
-  // Find adjudicated items (items where user has the winning bid in completed auctions)
-  const adjudicatedItems = userBids?.filter((bid: any) => {
+  // Find adjudicated items (items where user won in completed auctions)
+  // Use a Map to deduplicate by item ID
+  const adjudicatedItemsMap = new Map();
+
+  userBids?.forEach((bid: any) => {
     const auction = bid.auctionItem?.auction;
-    if (!auction || auction.status !== AuctionStatusEnum.COMPLETADA) {
-      return false;
+    const item = bid.auctionItem?.item;
+
+    // Debug logging
+    if (auction?.status === AuctionStatusEnum.COMPLETADA) {
+      console.log('[UserHomePage] Completed auction bid:', {
+        itemId: item?.id,
+        itemState: item?.state,
+        soldToUserId: item?.soldToUserId,
+        currentUserId: userId,
+        matches: item?.soldToUserId === userId,
+      });
     }
 
-    // Check if this bid is the highest for this auction item
-    const allBidsForItem = userBids.filter(
-      (b: any) => b.auctionItemId === bid.auctionItemId
-    );
-    const highestBid = Math.max(
-      ...allBidsForItem.map((b: any) => b.offered_price)
-    );
-
-    return bid.offered_price === highestBid;
+    // Only include if auction is completed and item was sold to this user
+    if (
+      auction?.status === AuctionStatusEnum.COMPLETADA &&
+      item?.soldToUserId === userId &&
+      item?.state === 'VENDIDO'
+    ) {
+      // Use item ID as key to prevent duplicates
+      if (!adjudicatedItemsMap.has(item.id)) {
+        adjudicatedItemsMap.set(item.id, bid);
+      }
+    }
   });
+
+  const adjudicatedItems = Array.from(adjudicatedItemsMap.values());
+
+  console.log(
+    '[UserHomePage] Adjudicated items count:',
+    adjudicatedItems.length
+  );
 
   const isLoading = bidsLoading || registrationsLoading;
 

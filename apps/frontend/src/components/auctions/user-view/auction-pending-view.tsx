@@ -25,7 +25,7 @@ interface AuctionPendingViewProps {
     endTime: string;
     items?: Array<{
       id: string;
-      item: {
+      item?: {
         brand?: string;
         model?: string;
         year?: number;
@@ -120,14 +120,14 @@ export function AuctionPendingView({ auction }: AuctionPendingViewProps) {
                   className="p-4 border rounded-lg bg-gray-50"
                 >
                   <p className="font-semibold text-gray-900">
-                    {auctionItem.item.brand} {auctionItem.item.model}
+                    {auctionItem.item?.brand} {auctionItem.item?.model}
                   </p>
-                  {auctionItem.item.year && (
+                  {auctionItem.item?.year && (
                     <p className="text-sm text-gray-600">
                       Año: {auctionItem.item.year}
                     </p>
                   )}
-                  {auctionItem.item.plate && (
+                  {auctionItem.item?.plate && (
                     <p className="text-sm text-gray-600">
                       Patente: {auctionItem.item.plate}
                     </p>

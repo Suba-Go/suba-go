@@ -106,13 +106,15 @@ export function AuctionCard({
 
   const totalItems = auction.items?.length || 0;
   const totalBids =
-    auction.items?.reduce((sum, item) => sum + item.bids.length, 0) || 0;
+    auction.items?.reduce((sum, item) => sum + (item.bids?.length || 0), 0) ||
+    0;
   const highestBid =
     auction.items?.reduce((max, item) => {
-      const itemMax = item.bids.reduce(
-        (itemMax, bid) => Math.max(itemMax, bid.offered_price),
-        0
-      );
+      const itemMax =
+        item.bids?.reduce(
+          (itemMax, bid) => Math.max(itemMax, Number(bid.offered_price) || 0),
+          0
+        ) || 0;
       return Math.max(max, itemMax);
     }, 0) || 0;
 

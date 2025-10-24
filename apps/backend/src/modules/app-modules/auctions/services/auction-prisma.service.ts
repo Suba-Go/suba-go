@@ -50,13 +50,26 @@ export class AuctionPrismaService {
         tenant: true,
         items: {
           include: {
-            item: true,
+            item: {
+              include: {
+                soldToUser: {
+                  select: {
+                    id: true,
+                    email: true,
+                    public_name: true,
+                    name: true,
+                    // Don't include password
+                  },
+                },
+              },
+            },
             bids: {
               include: {
                 user: {
                   select: {
                     id: true,
                     email: true,
+                    public_name: true,
                     // Don't include password
                   },
                 },
@@ -228,7 +241,18 @@ export class AuctionPrismaService {
       include: {
         items: {
           include: {
-            item: true,
+            item: {
+              include: {
+                soldToUser: {
+                  select: {
+                    id: true,
+                    email: true,
+                    public_name: true,
+                    name: true,
+                  },
+                },
+              },
+            },
             bids: {
               take: 1,
               orderBy: {
@@ -398,12 +422,12 @@ export class AuctionPrismaService {
           distinct: ['userId'],
         }),
 
-        // Total revenue (sum of sellPrice from sold items in completed REAL auctions)
+        // Total revenue (sum of soldPrice from sold items in completed REAL auctions)
         this.prisma.item.aggregate({
           where: {
             isDeleted: false,
             state: 'VENDIDO',
-            sellPrice: {
+            soldPrice: {
               not: null,
             },
             auctionItems: {
@@ -418,7 +442,7 @@ export class AuctionPrismaService {
             },
           },
           _sum: {
-            sellPrice: true,
+            soldPrice: true,
           },
         }),
       ]);
@@ -427,17 +451,24 @@ export class AuctionPrismaService {
       totalAuctions,
       activeAuctions,
       totalParticipants: participantsResult.length,
-      totalRevenue: Number(revenueResult._sum.sellPrice) || 0,
+      totalRevenue: Number(revenueResult._sum.soldPrice) || 0,
     };
   }
 
   // Add items to auction
   async addItemsToAuction(auctionId: string, itemIds: string[]): Promise<void> {
     // Create AuctionItem records for each selected item
-    const auctionItems = itemIds.map((itemId) => ({
+    const items = await this.prisma.item.findMany({
+      where: {
+        id: {
+          in: itemIds,
+        },
+      },
+    });
+    const auctionItems = items.map((item) => ({
       auctionId,
-      itemId,
-      startingBid: 0, // Default starting bid, could be made configurable
+      itemId: item.id,
+      startingBid: item.basePrice,
     }));
 
     await this.prisma.auctionItem.createMany({
@@ -483,11 +514,13 @@ export class AuctionPrismaService {
         const winningBid = auctionItem.bids[0];
 
         if (winningBid && auctionItem.item) {
-          // Update item with sellPrice and mark as VENDIDO
+          // Update item with soldPrice and mark as VENDIDO
           await prisma.item.update({
             where: { id: auctionItem.item.id },
             data: {
-              sellPrice: winningBid.offered_price,
+              soldPrice: winningBid.offered_price,
+              soldAt: new Date(),
+              soldToUserId: winningBid.userId,
               state: 'VENDIDO',
             },
           });
