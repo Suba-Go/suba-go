@@ -7,6 +7,7 @@ import { Input } from '@suba-go/shared-components/components/ui/input';
 import { Label } from '@suba-go/shared-components/components/ui/label';
 import { useToast } from '@suba-go/shared-components/components/ui/toaster';
 import { getNodeEnv } from '@suba-go/shared-components';
+import { normalizeCompanyName } from '@/utils/company-normalization';
 import { Eye, EyeOff } from 'lucide-react';
 
 interface CompanyLoginFormProps {
@@ -72,9 +73,9 @@ export default function CompanyLoginForm({
     }
 
     setIsLoading(true);
-    // Use the lowercase company name for subdomain validation
+    // Use the normalized company name for subdomain validation
     const subdomainToValidate =
-      companyNameLowercase || companyName?.toLowerCase();
+      companyNameLowercase || normalizeCompanyName(companyName || '');
 
     // SECURITY: Validate that the email belongs to this tenant before attempting login
     if (subdomainToValidate) {

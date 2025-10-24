@@ -2,6 +2,7 @@ import { Metadata } from 'next';
 import { notFound} from 'next/navigation';
 import { auth } from '@/auth';
 import { getCompanyBySubdomainServerAction } from '@/domain/server-actions/company/get-company-by-subdomain-server-action';
+import { normalizeCompanyName } from '@/utils/company-normalization';
 import ProfileFormWithUserData from './profile-form-with-user-data';
 
 interface ProfilePageProps {
@@ -15,8 +16,9 @@ export async function generateMetadata({
 }: ProfilePageProps): Promise<Metadata> {
   try {
     const resolvedParams = await params;
+    const normalizedSubdomain = normalizeCompanyName(resolvedParams.subdomain);
     const companyResponse = await getCompanyBySubdomainServerAction(
-      resolvedParams.subdomain
+      normalizedSubdomain
     );
 
     if (companyResponse.success && companyResponse.data) {
@@ -52,8 +54,9 @@ export default async function ProfilePage({ params }: ProfilePageProps) {
       userRole = session.user.role;
     }
     
+    const normalizedSubdomain = normalizeCompanyName(subdomain);
     const companyResponse = await getCompanyBySubdomainServerAction(
-      subdomain
+      normalizedSubdomain
     );
 
     if (!companyResponse.success || !companyResponse.data) {

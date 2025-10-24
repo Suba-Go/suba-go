@@ -4,21 +4,21 @@ import { Button } from '@suba-go/shared-components/components/ui/button';
 import { getNodeEnv } from '@suba-go/shared-components';
 
 // Helper to build company URL based on environment
-function getCompanyUrl(companyName: string): string {
+function getCompanyUrl(companyNameLowercase: string): string {
   if (typeof window === 'undefined') return '#';
 
   const nodeEnv = getNodeEnv();
 
   if (nodeEnv === 'local') {
     // Local: http://{company}.localhost:3000
-    return `http://${companyName}.localhost:3000/login`;
+    return `http://${companyNameLowercase}.localhost:3000/login`;
   } else if (nodeEnv === 'development') {
     // Development: https://{company}.development.subago.cl
-    return `https://${companyName}.development.subago.cl/login`;
+    return `https://${companyNameLowercase}.development.subago.cl/login`;
   } else {
     // Production: https://{company}.subago.cl
     const rootDomain = process.env.NEXT_PUBLIC_ROOT_DOMAIN || 'subago.cl';
-    return `https://${companyName}.${rootDomain}/login`;
+    return `https://${companyNameLowercase}.${rootDomain}/login`;
   }
 }
 
@@ -27,7 +27,7 @@ export default function FormResult({
 }: {
   companyData: CompanyDto;
 }) {
-  const companyUrl = getCompanyUrl(companyData.name);
+  const companyUrl = getCompanyUrl(companyData.nameLowercase);
   return (
     <div className="text-center space-y-6">
       <div className="space-y-2">
