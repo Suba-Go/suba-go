@@ -1,7 +1,7 @@
 import { Suspense } from 'react';
 import { auth } from '@/auth';
 import { redirect } from 'next/navigation';
-import { AuctionDetail } from '@/components/auctions/auction-detail';
+import { AuctionViewRouter } from '@/components/auctions/auction-view-router';
 import { AuctionDetailSkeleton } from '@/components/auctions/auction-detail-skeleton';
 import { isUserRole } from '@/lib/auction-utils';
 
@@ -21,13 +21,30 @@ export default async function AuctionDetailPage({
     redirect('/');
   }
 
+  // Get access token and tenant ID for WebSocket
+  const accessToken = session.tokens.accessToken;
+  const tenantId = session.user.tenant?.id;
+  const userId = session.user.id;
+
+  if (!tenantId) {
+    return (
+      <div className="container mx-auto px-4 py-8">
+        <div className="text-center text-red-600">
+          Error: Usuario sin tenant asignado
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="container mx-auto px-4 py-8">
       <Suspense fallback={<AuctionDetailSkeleton />}>
-        <AuctionDetail
+        <AuctionViewRouter
           auctionId={auctionId}
           userRole={session.user.role || 'USER'}
-          userId={session.user.id}
+          userId={userId}
+          accessToken={accessToken}
+          tenantId={tenantId}
         />
       </Suspense>
     </div>

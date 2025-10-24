@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useRef, useState } from 'react';
-import { Upload, X, FileText, Image, Loader2 } from 'lucide-react';
+import { Upload, X, FileText, Image as ImageIcon, Loader2 } from 'lucide-react';
 import { Button } from '@suba-go/shared-components/components/ui/button';
 import { useFileUpload } from '@/hooks/use-file-upload';
 
@@ -48,7 +48,7 @@ export function FileUpload({
       const urls = getUploadedUrls();
       onFilesChange(urls);
     }
-  }, [allUploaded, files, onFilesChange]);
+  }, [allUploaded, files, onFilesChange, getUploadedUrls]);
 
   const handleDrag = (e: React.DragEvent) => {
     e.preventDefault();
@@ -96,7 +96,7 @@ export function FileUpload({
 
   const getFileIcon = (file: File) => {
     if (file.type.startsWith('image/')) {
-      return <Image className="h-4 w-4" />;
+      return <ImageIcon className="h-4 w-4" />;
     }
     return <FileText className="h-4 w-4" />;
   };

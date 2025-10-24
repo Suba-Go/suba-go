@@ -1,7 +1,12 @@
 'use client';
 
 import { useUsers } from '@/hooks/use-users';
-import { Card, CardContent, CardHeader, CardTitle } from '@suba-go/shared-components/components/ui/card';
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+} from '@suba-go/shared-components/components/ui/card';
 import { UsersIcon, ShieldIcon, UserCheckIcon, ClockIcon } from 'lucide-react';
 
 export function UsersStats() {
@@ -27,11 +32,12 @@ export function UsersStats() {
   }
 
   const totalUsers = users.length;
-  const adminUsers = users.filter(user => user.role === 'ADMIN').length;
-  const managerUsers = users.filter(user => user.role === 'AUCTION_MANAGER').length;
-  const regularUsers = users.filter(user => user.role === 'USER').length;
+  const adminUsers = users.filter((user) => user.role === 'ADMIN').length;
+  const managerUsers = users.filter(
+    (user) => user.role === 'AUCTION_MANAGER'
+  ).length;
 
-  const recentUsers = users.filter(user => {
+  const recentUsers = users.filter((user) => {
     const userDate = new Date(user.createdAt);
     const weekAgo = new Date();
     weekAgo.setDate(weekAgo.getDate() - 7);

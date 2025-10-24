@@ -26,31 +26,48 @@ interface AuctionCompletedViewProps {
     items?: Array<{
       id: string;
       startingBid: number;
-      item: {
+      item?: {
         brand?: string;
         model?: string;
         year?: number;
         plate?: string;
+        soldToUserId?: string;
+        soldPrice?: number;
       };
       bids?: Array<{
         offered_price: number;
+        userId?: string;
         user?: {
           public_name?: string;
         };
       }>;
     }>;
   };
+  userId?: string;
 }
 
-export function AuctionCompletedView({ auction }: AuctionCompletedViewProps) {
+export function AuctionCompletedView({
+  auction,
+  userId,
+}: AuctionCompletedViewProps) {
   const startTime = new Date(auction.startTime);
   const endTime = new Date(auction.endTime);
 
   // Calculate auction statistics
   const totalItems = auction.items?.length || 0;
-  const itemsWithBids =
-    auction.items?.filter((item) => item.bids && item.bids.length > 0).length ||
-    0;
+
+  // Count bids made by THIS user (not unique users)
+  const totalUserBids =
+    auction.items?.reduce((count, item) => {
+      const userBidsForItem =
+        item.bids?.filter((bid) => bid.userId === userId).length || 0;
+      return count + userBidsForItem;
+    }, 0) || 0;
+
+  // Count items won by this user
+  const itemsWonByUser =
+    auction.items?.filter((item) => item.item?.soldToUserId === userId)
+      .length || 0;
   const totalBids =
     auction.items?.reduce((sum, item) => sum + (item.bids?.length || 0), 0) ||
     0;
@@ -58,7 +75,7 @@ export function AuctionCompletedView({ auction }: AuctionCompletedViewProps) {
     auction.items?.reduce((max, item) => {
       const itemMax =
         item.bids?.reduce(
-          (itemMax, bid) => Math.max(itemMax, bid.offered_price),
+          (itemMax, bid) => Math.max(itemMax, Number(bid.offered_price) || 0),
           0
         ) || 0;
       return Math.max(max, itemMax);
@@ -118,16 +135,22 @@ export function AuctionCompletedView({ auction }: AuctionCompletedViewProps) {
           </div>
 
           {/* Auction Statistics */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 pt-4 border-t border-green-200">
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-4 pt-4 border-t border-green-200">
             <div className="text-center">
               <p className="text-2xl font-bold text-gray-900">{totalItems}</p>
               <p className="text-sm text-gray-600">Vehículos</p>
             </div>
             <div className="text-center">
-              <p className="text-2xl font-bold text-gray-900">
-                {itemsWithBids}
+              <p className="text-2xl font-bold text-yellow-600">
+                {itemsWonByUser}
               </p>
-              <p className="text-sm text-gray-600">Con Pujas</p>
+              <p className="text-sm text-gray-600">Items Ganados</p>
+            </div>
+            <div className="text-center">
+              <p className="text-2xl font-bold text-gray-900">
+                {totalUserBids}
+              </p>
+              <p className="text-sm text-gray-600">Tus Pujas</p>
             </div>
             <div className="text-center">
               <p className="text-2xl font-bold text-gray-900">{totalBids}</p>
@@ -157,23 +180,36 @@ export function AuctionCompletedView({ auction }: AuctionCompletedViewProps) {
               {auction.items.map((auctionItem) => {
                 const highBid = auctionItem.bids?.[0];
                 const hasWinner = highBid && highBid.offered_price > 0;
+                const userWonItem = auctionItem.item?.soldToUserId === userId;
 
                 return (
                   <div
                     key={auctionItem.id}
-                    className="p-4 border rounded-lg bg-white"
+                    className={`p-4 border rounded-lg ${
+                      userWonItem
+                        ? 'bg-yellow-50 border-yellow-300'
+                        : 'bg-white'
+                    }`}
                   >
                     <div className="flex justify-between items-start">
-                      <div>
-                        <p className="font-semibold text-gray-900">
-                          {auctionItem.item.brand} {auctionItem.item.model}
-                        </p>
-                        {auctionItem.item.year && (
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 mb-2">
+                          <p className="font-semibold text-gray-900">
+                            {auctionItem.item?.brand} {auctionItem.item?.model}
+                          </p>
+                          {userWonItem && (
+                            <Badge className="bg-yellow-500 text-white">
+                              <Trophy className="h-3 w-3 mr-1" />
+                              ¡Ganaste!
+                            </Badge>
+                          )}
+                        </div>
+                        {auctionItem.item?.year && (
                           <p className="text-sm text-gray-600">
                             Año: {auctionItem.item.year}
                           </p>
                         )}
-                        {auctionItem.item.plate && (
+                        {auctionItem.item?.plate && (
                           <p className="text-sm text-gray-600">
                             Patente: {auctionItem.item.plate}
                           </p>
@@ -185,13 +221,21 @@ export function AuctionCompletedView({ auction }: AuctionCompletedViewProps) {
                             <p className="text-sm text-gray-600">
                               Precio Final
                             </p>
-                            <p className="text-xl font-bold text-green-600">
+                            <p
+                              className={`text-xl font-bold ${
+                                userWonItem
+                                  ? 'text-yellow-600'
+                                  : 'text-green-600'
+                              }`}
+                            >
                               ${highBid.offered_price.toLocaleString('es-CL')}
                             </p>
-                            <p className="text-xs text-gray-500 mt-1">
-                              Ganador:{' '}
-                              {highBid.user?.public_name || 'Participante'}
-                            </p>
+                            {!userWonItem && (
+                              <p className="text-xs text-gray-500 mt-1">
+                                Ganador:{' '}
+                                {highBid.user?.public_name || 'Participante'}
+                              </p>
+                            )}
                           </>
                         ) : (
                           <>

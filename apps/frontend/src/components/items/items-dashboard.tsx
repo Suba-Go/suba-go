@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next-nprogress-bar';
 import { Plus, Search, Edit, Trash2, Eye, Package } from 'lucide-react';
 import {
@@ -40,7 +40,7 @@ export function ItemsDashboard({ subdomain }: ItemsDashboardProps) {
   const { toast } = useToast();
   const { formatNumberWithSeparators } = useAutoFormat();
 
-  const fetchItems = async () => {
+  const fetchItems = React.useCallback(async () => {
     try {
       setIsLoading(true);
       const response = await fetch('/api/items');
@@ -61,11 +61,11 @@ export function ItemsDashboard({ subdomain }: ItemsDashboardProps) {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [toast]);
 
   useEffect(() => {
     fetchItems();
-  }, []);
+  }, [fetchItems]);
 
   const handleCreateSuccess = () => {
     setIsCreateModalOpen(false);

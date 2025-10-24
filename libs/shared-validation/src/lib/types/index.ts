@@ -4,3 +4,4 @@
 
 export * from './auth.types';
 export * from './trpc.types';
+export * from './realtime.types';

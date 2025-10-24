@@ -17,7 +17,7 @@ export interface AuctionItem {
   name: string;
   description?: string;
   basePrice: number;
-  startingBid?: number;
+  startingBid: number;
   state: string;
   photos?: string[];
   bids: AuctionBid[];
@@ -26,8 +26,18 @@ export interface AuctionItem {
     brand?: string;
     model?: string;
     plate?: string;
-    year?: string;
+    year?: number;
     photos?: string;
+    state?: string;
+    soldPrice?: number;
+    soldAt?: string;
+    soldToUserId?: string;
+    soldToUser?: {
+      name?: string;
+      id: string;
+      public_name?: string;
+      email?: string;
+    };
   };
 }
 
@@ -39,6 +49,7 @@ export interface AuctionData {
   endTime: string;
   status: AuctionStatusEnum;
   type: string;
+  bidIncrement?: number;
   items?: AuctionItem[];
   createdAt: string;
   updatedAt: string;
