@@ -81,6 +81,7 @@ model User {
   bids                 Bid[]
   auctionRegistrations AuctionRegistration[]
   auditLogs            AuditLog[]
+  itemsPurchased       Item[] @relation("ItemSales")
 
   // Unique constraints matching TypeORM indexes
   @@unique([email], map: "IDX_user_email_unique")
@@ -152,13 +153,19 @@ model Item {
   legal_status LegalStatusEnum?
   state        ItemStateEnum @default(DISPONIBLE)
   basePrice    Decimal? @db.Decimal(10, 2)
-  sellPrice    Decimal? @db.Decimal(10, 2)
+
+  // Sale tracking fields
+  soldPrice    Decimal? @db.Decimal(10, 2)
+  soldAt       DateTime?
+  soldToUserId String?
+  soldToUser   User? @relation("ItemSales", fields: [soldToUserId], references: [id], onDelete: SetNull)
 
   // Relations
   tenantId     String
   tenant       Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   auctionItems AuctionItem[]
 
+  @@index([soldToUserId])
   @@map("item")
 }
 
@@ -289,10 +296,12 @@ model AuditLog {
   changes    Json?
 
   // Relations
-  userId String?
-  user   User?   @relation(fields: [userId], references: [id], onDelete: SetNull)
+  userId   String?
+  user     User?   @relation(fields: [userId], references: [id], onDelete: SetNull)
+  tenantId String?
 
   @@index([userId])
+  @@index([tenantId])
   @@index([entityType, entityId])
   @@map("audit_log")
 }

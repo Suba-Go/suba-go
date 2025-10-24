@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 
 import {
   ArrowLeft,
@@ -10,6 +10,8 @@ import {
   AlertCircle,
   Trophy,
   Edit,
+  Wifi,
+  WifiOff,
 } from 'lucide-react';
 import { Button } from '@suba-go/shared-components/components/ui/button';
 import { useToast } from '@suba-go/shared-components/components/ui/toaster';
@@ -58,15 +60,36 @@ interface AuctionDetailProps {
   auctionId: string;
   userRole: string;
   userId?: string;
+  accessToken?: string;
+  tenantId?: string;
 }
 
-export function AuctionDetail({ auctionId, userRole }: AuctionDetailProps) {
+export function AuctionDetail({
+  auctionId,
+  userRole,
+  accessToken,
+  tenantId,
+}: AuctionDetailProps) {
   const router = useRouter();
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState('items');
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isCanceled, setIsCanceled] = useState(false);
   const [showCompletedDialog, setShowCompletedDialog] = useState(false);
+
+  // WebSocket state for real-time updates (AUCTION_MANAGER only)
+  const wsRef = useRef<WebSocket | null>(null);
+  const [isWsConnected, setIsWsConnected] = useState(false);
+  const [isWsJoined, setIsWsJoined] = useState(false);
+  const [liveParticipantCount, setLiveParticipantCount] = useState(0);
+  const [liveBidUpdates, setLiveBidUpdates] = useState<
+    Array<{
+      auctionItemId: string;
+      amount: number;
+      userName: string;
+      timestamp: string;
+    }>
+  >([]);
 
   // Fetch auction data
   const {
@@ -79,12 +102,132 @@ export function AuctionDetail({ auctionId, userRole }: AuctionDetailProps) {
     key: ['auction', auctionId],
   });
 
+  // Fetch participants data (only for AUCTION_MANAGER)
+  const { data: participants, refetch: refetchParticipants } = useFetchData<
+    any[]
+  >({
+    url: `/api/auctions/${auctionId}/participants`,
+    key: ['auction-participants', auctionId],
+    condition: userRole === 'AUCTION_MANAGER',
+    fallbackData: [],
+  });
+
   // Use the automatic status hook (must be called before early returns)
   const auctionStatus = useAuctionStatus(
     auction?.status || AuctionStatusEnum.PENDIENTE,
     auction?.startTime || new Date(),
     auction?.endTime || new Date()
   );
+
+  // Store refetch in a ref to avoid recreating WebSocket on every refetch
+  const refetchRef = useRef(refetch);
+  useEffect(() => {
+    refetchRef.current = refetch;
+  }, [refetch]);
+
+  // WebSocket connection for AUCTION_MANAGER real-time updates
+  useEffect(() => {
+    // Only connect if user is AUCTION_MANAGER and we have required data
+    // Don't connect if auction is already completed
+    if (
+      userRole !== 'AUCTION_MANAGER' ||
+      !accessToken ||
+      !tenantId ||
+      !auction ||
+      auction.status === AuctionStatusEnum.COMPLETADA
+    ) {
+      return;
+    }
+
+    const wsEndpoint =
+      process.env.NEXT_PUBLIC_WS_ENDPOINT || 'ws://localhost:3001/ws';
+    const wsUrl = `${wsEndpoint}?token=${encodeURIComponent(accessToken)}`;
+
+    const ws = new WebSocket(wsUrl);
+    wsRef.current = ws;
+
+    ws.onopen = () => {
+      console.log('[Manager WS] Connected');
+      ws.send(JSON.stringify({ event: 'HELLO', data: {} }));
+    };
+
+    ws.onmessage = (event) => {
+      try {
+        const message = JSON.parse(event.data);
+        console.log('[Manager WS] Received:', message.event);
+
+        switch (message.event) {
+          case 'HELLO_OK':
+            setIsWsConnected(true);
+            // Join auction room
+            ws.send(
+              JSON.stringify({
+                event: 'JOIN_AUCTION',
+                data: { tenantId, auctionId: auction.id },
+              })
+            );
+            break;
+
+          case 'JOINED':
+            setIsWsJoined(true);
+            if (message.data.participantCount) {
+              setLiveParticipantCount(message.data.participantCount);
+            }
+            break;
+
+          case 'PARTICIPANT_COUNT':
+            setLiveParticipantCount(message.data.count);
+            break;
+
+          case 'BID_PLACED':
+            // Add to live bid updates
+            setLiveBidUpdates((prev) => [
+              {
+                auctionItemId: message.data.auctionItemId,
+                amount: message.data.amount,
+                userName: message.data.userName || 'Usuario',
+                timestamp: message.data.timestamp || new Date().toISOString(),
+              },
+              ...prev.slice(0, 19), // Keep last 20 bids
+            ]);
+            // Refetch auction data to update highest bids
+            refetchRef.current();
+            break;
+
+          case 'AUCTION_STATUS_CHANGED':
+            console.log('[Manager WS] Status changed:', message.data.status);
+            refetchRef.current();
+            break;
+        }
+      } catch (error) {
+        console.error('[Manager WS] Parse error:', error);
+      }
+    };
+
+    ws.onerror = (error) => {
+      console.error('[Manager WS] Error:', error);
+    };
+
+    ws.onclose = () => {
+      console.log('[Manager WS] Disconnected');
+      setIsWsConnected(false);
+      setIsWsJoined(false);
+    };
+
+    // Cleanup on unmount
+    return () => {
+      if (ws.readyState === WebSocket.OPEN) {
+        ws.close();
+      }
+    };
+  }, [
+    userRole,
+    accessToken,
+    tenantId,
+    auction?.id,
+    auction?.status,
+    auctionId,
+  ]);
 
   const handleCancelToggle = async (checked: boolean) => {
     try {
@@ -197,6 +340,21 @@ export function AuctionDetail({ auctionId, userRole }: AuctionDetailProps) {
               {auction.title}
             </h1>
             {getStatusBadge()}
+            {/* WebSocket connection indicator for AUCTION_MANAGER */}
+            {userRole === 'AUCTION_MANAGER' && isWsConnected && (
+              <Badge variant="outline" className="gap-1">
+                <Wifi className="h-3 w-3 text-green-600" />
+                En vivo
+              </Badge>
+            )}
+            {userRole === 'AUCTION_MANAGER' &&
+              !isWsConnected &&
+              accessToken && (
+                <Badge variant="outline" className="gap-1">
+                  <WifiOff className="h-3 w-3 text-gray-400" />
+                  Sin conexión
+                </Badge>
+              )}
           </div>
           {auction.description && (
             <p className="text-gray-600">{auction.description}</p>
@@ -396,8 +554,13 @@ export function AuctionDetail({ auctionId, userRole }: AuctionDetailProps) {
 
         <Card>
           <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-medium text-gray-600">
+            <CardTitle className="text-sm font-medium text-gray-600 flex items-center gap-2">
               Participantes
+              {isWsConnected && liveParticipantCount > 0 && (
+                <Badge variant="outline" className="text-xs">
+                  {liveParticipantCount} en línea
+                </Badge>
+              )}
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -481,8 +644,10 @@ export function AuctionDetail({ auctionId, userRole }: AuctionDetailProps) {
                             </p>
                             <p className="font-semibold text-blue-600">
                               $
-                              {Number(
-                                auctionItem.bids[0].amount
+                              {Math.max(
+                                ...auctionItem.bids.map((bid: AuctionBid) =>
+                                  Number(bid.offered_price)
+                                )
                               ).toLocaleString()}
                             </p>
                           </div>
@@ -493,6 +658,48 @@ export function AuctionDetail({ auctionId, userRole }: AuctionDetailProps) {
                         <p className="text-xs text-gray-500 pt-1">
                           {auctionItem.bids.length} puja(s) realizadas
                         </p>
+                      )}
+
+                      {/* Sale Status Badge - Only show for completed auctions */}
+                      {auction?.status === AuctionStatusEnum.COMPLETADA && (
+                        <div className="pt-3 border-t mt-3">
+                          {auctionItem.item?.state === 'VENDIDO' &&
+                          auctionItem.item?.soldPrice ? (
+                            <div className="space-y-2">
+                              <Badge className="bg-green-600 hover:bg-green-700">
+                                ✓ Vendido
+                              </Badge>
+                              <div className="text-sm">
+                                <p className="text-gray-600">
+                                  Precio de venta:{' '}
+                                  <span className="font-semibold text-green-700">
+                                    $
+                                    {Number(
+                                      auctionItem.item.soldPrice
+                                    ).toLocaleString()}
+                                  </span>
+                                </p>
+                                {auctionItem.item.soldToUser && (
+                                  <p className="text-gray-600">
+                                    Comprador:{' '}
+                                    <span className="font-semibold text-gray-900">
+                                      {userRole === 'AUCTION_MANAGER' ||
+                                      userRole === 'ADMIN'
+                                        ? auctionItem.item.soldToUser.name ||
+                                          auctionItem.item.soldToUser
+                                            .public_name ||
+                                          'Usuario'
+                                        : auctionItem.item.soldToUser
+                                            .public_name || 'Usuario'}
+                                    </span>
+                                  </p>
+                                )}
+                              </div>
+                            </div>
+                          ) : (
+                            <Badge variant="secondary">Sin ofertas</Badge>
+                          )}
+                        </div>
                       )}
                     </div>
                   </CardContent>
@@ -515,12 +722,14 @@ export function AuctionDetail({ auctionId, userRole }: AuctionDetailProps) {
         </TabsContent>
 
         <TabsContent value="participants">
-          {/* TODO: Fetch participants from API*/}
           <ParticipantsList
             auctionId={auctionId}
-            participants={[] as any}
+            participants={participants || []}
             isManager={userRole === 'AUCTION_MANAGER'}
-            onRefresh={refetch}
+            onRefresh={() => {
+              refetch();
+              refetchParticipants();
+            }}
           />
         </TabsContent>
       </Tabs>

@@ -17,7 +17,23 @@ export class AuthService {
   ) {}
 
   async signIn(user: User): Promise<Tokens> {
-    const payload: JwtPayload = { email: user.email, role: user.role };
+    const payload: JwtPayload = {
+      sub: user.id,
+      email: user.email,
+      role: user.role,
+      tenantId: user.tenantId || undefined,
+      companyId: user.companyId || undefined,
+    };
+
+    // Debug log to verify payload
+    this.logger.verbose(`Creating JWT for user ${user.email} with payload:`, {
+      sub: payload.sub,
+      email: payload.email,
+      role: payload.role,
+      tenantId: payload.tenantId,
+      companyId: payload.companyId,
+    });
+
     const accessToken = this.generateJwtToken(payload);
     const refreshToken = this.generateRefreshToken({ sub: user.id });
     const expiryTime = this.generateExpiryTime();
@@ -39,8 +55,11 @@ export class AuthService {
 
       // Generate new tokens
       const newToken = this.generateJwtToken({
+        sub: user.id,
         email: user.email,
         role: user.role,
+        tenantId: user.tenantId || undefined,
+        companyId: user.companyId || undefined,
       });
 
       const newRefreshToken = this.generateRefreshToken(decode);

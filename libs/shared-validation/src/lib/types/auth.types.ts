@@ -17,8 +17,11 @@ export interface Tokens {
  * JWT payload interface for access tokens
  */
 export interface JwtPayload {
+  sub?: string; // User ID
   email: string;
   role: string;
+  tenantId?: string;
+  companyId?: string;
   iat?: number;
   exp?: number;
 }

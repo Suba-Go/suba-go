@@ -12,6 +12,7 @@ import { NestExpressApplication } from '@nestjs/platform-express';
 import { Serialize } from './common/interceptors/serialize.interceptor';
 import { SuperJsonInterceptor } from './common/interceptors/superjson.interceptor';
 import { getNodeEnv } from './utils/env';
+import { WsAuthAdapter } from './modules/providers-modules/realtime/ws-auth.adapter';
 dotenv.config({
   path: '.env',
 });
@@ -21,6 +22,11 @@ async function bootstrap() {
   const logger = new Logger();
 
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
+
+  // Configure WebSocket adapter with authentication
+  const wsAdapter = new WsAuthAdapter(app);
+  app.useWebSocketAdapter(wsAdapter);
+
   app.use(helmet());
   //limit 2mb
   app.use(bodyParser.json({ limit: '2mb' }));
@@ -98,6 +104,10 @@ async function bootstrap() {
     process.env.PORT ? Number(process.env.PORT) : 3000,
     '0.0.0.0'
   );
+
   logger.log(`Server running on http://localhost:${PORT}`);
+  // CRITICAL: Bind WebSocket authentication AFTER the HTTP server has started
+  // This ensures the HTTP server is available for the upgrade handler
+  wsAdapter.bindAuthenticationAfterInit();
 }
 bootstrap();

@@ -33,7 +33,6 @@ export default auth(async function middleware(request: NextRequest) {
     if (pathname === '/') {
       return NextResponse.rewrite(new URL(`/s/${subdomain}`, request.url));
     }
-
     // Login page
     if (pathname === '/login') {
       const u = new URL(`/s/${subdomain}/login`, request.url);
@@ -45,6 +44,13 @@ export default auth(async function middleware(request: NextRequest) {
     if (pathname === '/perfil') {
       return NextResponse.rewrite(
         new URL(`/s/${subdomain}/perfil`, request.url)
+      );
+    }
+
+    //dashboard
+    if (pathname === '/dashboard') {
+      return NextResponse.rewrite(
+        new URL(`/s/${subdomain}/dashboard`, request.url)
       );
     }
 

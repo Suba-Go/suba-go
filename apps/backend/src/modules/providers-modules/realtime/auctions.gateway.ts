@@ -1,0 +1,687 @@
+/**
+ * @file auctions.gateway.ts
+ * @description WebSocket gateway for auction-specific real-time features
+ * Handles auction rooms, bid placement, and real-time updates
+ * @author Suba&Go
+ */
+import {
+  WebSocketGateway,
+  WebSocketServer,
+  SubscribeMessage,
+  MessageBody,
+  ConnectedSocket,
+  OnGatewayInit,
+  OnGatewayConnection,
+  OnGatewayDisconnect,
+} from '@nestjs/websockets';
+import { Logger, Inject, forwardRef, Optional } from '@nestjs/common';
+import type { Server, WebSocket } from 'ws';
+import type { JwtPayload } from '@suba-go/shared-validation';
+import { WsServerMessage, WsErrorCode } from '@suba-go/shared-validation';
+import { PrismaService } from '../prisma/prisma.service';
+import type { BidRealtimeService } from '../../app-modules/bids/services/bid-realtime.service';
+
+/**
+ * Client metadata stored per connection
+ */
+interface ClientMeta {
+  userId: string;
+  email: string;
+  role: string;
+  tenantId?: string;
+  companyId?: string;
+  isAlive: boolean;
+  // Current auction rooms the client is in
+  rooms: Set<string>; // Format: "tenantId:auctionId"
+}
+
+/**
+ * Room metadata for each auction
+ */
+interface RoomMeta {
+  tenantId: string;
+  auctionId: string;
+  clients: Set<WebSocket>;
+}
+
+/**
+ * Auctions WebSocket Gateway
+ *
+ * Handles:
+ * - Auction room management (join/leave)
+ * - Real-time bid placement
+ * - Bid updates broadcast to room participants
+ * - Auction status changes
+ * - Participant count tracking
+ */
+@WebSocketGateway({ path: '/ws' })
+export class AuctionsGateway
+  implements OnGatewayInit, OnGatewayConnection, OnGatewayDisconnect
+{
+  @WebSocketServer() server!: Server;
+
+  private readonly logger = new Logger(AuctionsGateway.name);
+  private readonly clients = new WeakMap<WebSocket, ClientMeta>();
+  private readonly rooms = new Map<string, RoomMeta>(); // Key: "tenantId:auctionId"
+  private heartbeatInterval?: NodeJS.Timeout;
+
+  constructor(
+    private readonly prisma: PrismaService,
+    @Optional()
+    @Inject(
+      forwardRef(() => {
+        // Lazy load to avoid circular dependency
+        const {
+          BidRealtimeService,
+        } = require('../../app-modules/bids/services/bid-realtime.service');
+        return BidRealtimeService;
+      })
+    )
+    private readonly bidRealtimeService?: BidRealtimeService
+  ) {}
+
+  /**
+   * Called once when the gateway is initialized
+   */
+  afterInit(server: Server) {
+    this.logger.log('Auctions WebSocket Gateway initialized');
+
+    // Heartbeat: ping all clients every 30 seconds
+    this.heartbeatInterval = setInterval(() => {
+      let aliveCount = 0;
+      let deadCount = 0;
+
+      server.clients.forEach((ws: any) => {
+        const meta = this.clients.get(ws);
+        if (!meta) return;
+
+        // If client didn't respond to last ping, terminate
+        if (meta.isAlive === false) {
+          deadCount++;
+          this.logger.debug(`Terminating dead connection: ${meta.email}`);
+          return ws.terminate();
+        }
+
+        // Mark as potentially dead and send ping
+        meta.isAlive = false;
+        this.clients.set(ws, meta);
+        ws.ping();
+        aliveCount++;
+      });
+
+      if (aliveCount > 0 || deadCount > 0) {
+        this.logger.debug(
+          `Heartbeat: ${aliveCount} alive, ${deadCount} terminated`
+        );
+      }
+    }, 30000);
+
+    // Clean up interval when server closes
+    server.on('close', () => {
+      if (this.heartbeatInterval) {
+        clearInterval(this.heartbeatInterval);
+      }
+    });
+  }
+
+  /**
+   * Called when a client connects
+   */
+  handleConnection(client: WebSocket) {
+    // Extract user info that was attached during upgrade auth
+    const user = (client as any).user as JwtPayload | undefined;
+
+    if (!user) {
+      this.logger.warn(
+        'Client connected without user info - should not happen'
+      );
+      client.close(1008, 'Unauthorized');
+      return;
+    }
+
+    // Initialize client metadata
+    const meta: ClientMeta = {
+      userId: user.sub || '',
+      email: user.email,
+      role: user.role,
+      tenantId: user.tenantId,
+      companyId: user.companyId,
+      isAlive: true,
+      rooms: new Set(),
+    };
+
+    this.clients.set(client, meta);
+
+    // Set up pong handler to mark client as alive
+    client.on('pong', () => {
+      const currentMeta = this.clients.get(client);
+      if (currentMeta) {
+        currentMeta.isAlive = true;
+        this.clients.set(client, currentMeta);
+      }
+    });
+
+    this.logger.log(`Client connected: ${user.email} (role: ${user.role})`);
+
+    // Send initial connection acknowledgment
+    this.sendMessage(client, {
+      event: 'CONNECTED',
+      data: {
+        message:
+          'WebSocket connection established. Send HELLO to complete handshake.',
+        email: user.email,
+      },
+    });
+  }
+
+  /**
+   * Called when a client disconnects
+   */
+  handleDisconnect(client: WebSocket) {
+    const meta = this.clients.get(client);
+    if (!meta) return;
+
+    // Remove client from all rooms
+    meta.rooms.forEach((roomKey) => {
+      this.leaveRoom(client, roomKey);
+    });
+
+    this.logger.log(`Client disconnected: ${meta.email}`);
+  }
+
+  /**
+   * Handle HELLO handshake message
+   */
+  @SubscribeMessage('HELLO')
+  handleHello(@MessageBody() data: any, @ConnectedSocket() client: WebSocket) {
+    const meta = this.clients.get(client);
+    if (!meta) {
+      this.sendError(client, WsErrorCode.UNAUTHORIZED, 'Not authenticated');
+      return;
+    }
+
+    this.logger.log(`HELLO received from ${meta.email}`);
+
+    // Send handshake confirmation
+    this.sendMessage(client, {
+      event: 'HELLO_OK',
+      data: {
+        ok: true,
+        user: {
+          email: meta.email,
+          role: meta.role,
+          userId: meta.userId,
+          tenantId: meta.tenantId,
+        },
+      },
+    });
+  }
+
+  /**
+   * Handle JOIN_AUCTION message
+   * Client joins an auction room to receive real-time updates
+   */
+  @SubscribeMessage('JOIN_AUCTION')
+  async handleJoinAuction(
+    @MessageBody() data: { tenantId: string; auctionId: string },
+    @ConnectedSocket() client: WebSocket
+  ) {
+    const meta = this.clients.get(client);
+    if (!meta) {
+      this.sendError(client, WsErrorCode.UNAUTHORIZED, 'Not authenticated');
+      return;
+    }
+
+    const { tenantId, auctionId } = data;
+
+    // Check if auction exists and belongs to the tenant
+    const auction = await this.prisma.auction.findUnique({
+      where: { id: auctionId },
+    });
+
+    if (!auction) {
+      this.sendError(
+        client,
+        WsErrorCode.AUCTION_NOT_FOUND,
+        'Subasta no encontrada'
+      );
+      return;
+    }
+
+    if (auction.tenantId !== tenantId) {
+      this.sendError(
+        client,
+        WsErrorCode.FORBIDDEN,
+        'La subasta no pertenece a este tenant'
+      );
+      return;
+    }
+
+    // Validate access: ADMIN can access all, AUCTION_MANAGER can access their tenant's auctions
+    // Regular users must be registered for the auction
+    const isAdmin = meta.role === 'ADMIN';
+    const isAuctionManager = meta.role === 'AUCTION_MANAGER';
+
+    if (!isAdmin && !isAuctionManager) {
+      // For regular users, check if they're registered for the auction
+      const registration = await this.prisma.auctionRegistration.findUnique({
+        where: {
+          userId_auctionId: {
+            userId: meta.userId,
+            auctionId,
+          },
+        },
+      });
+
+      if (!registration) {
+        this.sendError(
+          client,
+          WsErrorCode.FORBIDDEN,
+          'Debes registrarte en la subasta para acceder'
+        );
+        return;
+      }
+    } else if (isAuctionManager && meta.tenantId !== tenantId) {
+      // Auction managers can only access their own tenant's auctions
+      this.sendError(
+        client,
+        WsErrorCode.FORBIDDEN,
+        'No tienes acceso a esta subasta'
+      );
+      return;
+    }
+
+    const roomKey = this.getRoomKey(tenantId, auctionId);
+
+    // Add client to room
+    this.joinRoom(client, roomKey, tenantId, auctionId);
+
+    const room = this.rooms.get(roomKey);
+    const participantCount = room ? room.clients.size : 0;
+
+    this.logger.log(
+      `${meta.email} joined auction ${auctionId} (${participantCount} participants)`
+    );
+
+    // Send confirmation to client
+    this.sendMessage(client, {
+      event: 'JOINED',
+      data: {
+        room: roomKey,
+        auctionId,
+        participantCount,
+      },
+    });
+
+    // Broadcast participant count to all room members
+    this.broadcastToRoom(roomKey, {
+      event: 'PARTICIPANT_COUNT',
+      data: {
+        auctionId,
+        count: participantCount,
+      },
+    });
+  }
+
+  /**
+   * Handle LEAVE_AUCTION message
+   */
+  @SubscribeMessage('LEAVE_AUCTION')
+  handleLeaveAuction(
+    @MessageBody() data: { tenantId: string; auctionId: string },
+    @ConnectedSocket() client: WebSocket
+  ) {
+    const meta = this.clients.get(client);
+    if (!meta) return;
+
+    const { tenantId, auctionId } = data;
+    const roomKey = this.getRoomKey(tenantId, auctionId);
+
+    this.leaveRoom(client, roomKey);
+
+    const room = this.rooms.get(roomKey);
+    const participantCount = room ? room.clients.size : 0;
+
+    this.logger.log(
+      `${meta.email} left auction ${auctionId} (${participantCount} remaining)`
+    );
+
+    // Send confirmation to client
+    this.sendMessage(client, {
+      event: 'LEFT',
+      data: {
+        room: roomKey,
+        auctionId,
+      },
+    });
+
+    // Broadcast updated participant count
+    if (room) {
+      this.broadcastToRoom(roomKey, {
+        event: 'PARTICIPANT_COUNT',
+        data: {
+          auctionId,
+          count: participantCount,
+        },
+      });
+    }
+  }
+
+  /**
+   * Handle PLACE_BID message
+   * Validates the request and forwards to BidRealtimeService for processing
+   */
+  @SubscribeMessage('PLACE_BID')
+  async handlePlaceBid(
+    @MessageBody()
+    data: {
+      tenantId: string;
+      auctionId: string;
+      auctionItemId: string;
+      amount: number;
+    },
+    @ConnectedSocket() client: WebSocket
+  ) {
+    const meta = this.clients.get(client);
+    if (!meta) {
+      this.sendError(client, WsErrorCode.UNAUTHORIZED, 'Not authenticated');
+      return;
+    }
+
+    // Validate user role (only USER can place bids)
+    if (meta.role !== 'USER') {
+      this.sendError(
+        client,
+        WsErrorCode.FORBIDDEN,
+        'Solo los usuarios pueden realizar pujas'
+      );
+      return;
+    }
+
+    // Validate tenant access (USER must match tenant)
+    if (meta.tenantId !== data.tenantId) {
+      this.sendError(
+        client,
+        WsErrorCode.FORBIDDEN,
+        'No tienes acceso a esta subasta'
+      );
+      return;
+    }
+
+    // Validate client is in the auction room
+    const roomKey = this.getRoomKey(data.tenantId, data.auctionId);
+    if (!meta.rooms.has(roomKey)) {
+      this.sendError(
+        client,
+        WsErrorCode.FORBIDDEN,
+        'Debes unirte a la subasta antes de pujar'
+      );
+      return;
+    }
+
+    // Log the bid attempt
+    this.logger.log(
+      `Bid attempt: ${meta.email} - $${data.amount} on item ${data.auctionItemId}`
+    );
+
+    // Call BidRealtimeService to process the bid
+    // The service will validate, save to DB, and broadcast to all participants
+    try {
+      if (!this.bidRealtimeService) {
+        this.logger.error('BidRealtimeService not injected!');
+        this.sendError(
+          client,
+          WsErrorCode.INTERNAL_ERROR,
+          'Servicio de pujas no disponible'
+        );
+        return;
+      }
+
+      await this.bidRealtimeService.placeBid(
+        data.auctionItemId,
+        data.amount,
+        meta.userId,
+        data.tenantId
+      );
+
+      // Success! The BidRealtimeService will broadcast BID_PLACED to all room participants
+      // No need to send individual response - the broadcast will update all clients
+    } catch (error: any) {
+      this.logger.error(`Bid placement failed: ${error.message}`);
+
+      // Send error to the client who tried to place the bid
+      this.sendError(
+        client,
+        WsErrorCode.INVALID_BID,
+        error.message || 'Error al procesar la puja'
+      );
+    }
+  }
+
+  /**
+   * Broadcast a message to all clients in a room
+   */
+  broadcastToRoom(roomKey: string, message: WsServerMessage) {
+    const room = this.rooms.get(roomKey);
+    if (!room) return;
+
+    room.clients.forEach((client) => {
+      if (client.readyState === 1) {
+        // 1 = OPEN
+        this.sendMessage(client, message);
+      }
+    });
+  }
+
+  /**
+   * Broadcast a message to all clients in a room EXCEPT the sender
+   */
+  broadcastToRoomExcept(
+    roomKey: string,
+    message: WsServerMessage,
+    excludeClient: WebSocket
+  ) {
+    const room = this.rooms.get(roomKey);
+    if (!room) return;
+
+    room.clients.forEach((client) => {
+      if (client !== excludeClient && client.readyState === 1) {
+        this.sendMessage(client, message);
+      }
+    });
+  }
+
+  /**
+   * Broadcast auction status change to all clients in the auction room
+   * Called by external services (e.g., scheduler, cancel endpoint)
+   */
+  broadcastAuctionStatusChange(
+    tenantId: string,
+    auctionId: string,
+    status: string,
+    auction?: any
+  ) {
+    const roomKey = this.getRoomKey(tenantId, auctionId);
+
+    this.logger.log(
+      `📢 Broadcasting status change for auction ${auctionId}: ${status}`
+    );
+
+    this.broadcastToRoom(roomKey, {
+      event: 'AUCTION_STATUS_CHANGED',
+      data: {
+        auctionId,
+        status,
+        auction,
+        timestamp: new Date().toISOString(),
+      },
+    });
+  }
+
+  /**
+   * Join a room
+   */
+  private joinRoom(
+    client: WebSocket,
+    roomKey: string,
+    tenantId: string,
+    auctionId: string
+  ) {
+    const meta = this.clients.get(client);
+    if (!meta) return;
+
+    // Create room if it doesn't exist
+    if (!this.rooms.has(roomKey)) {
+      this.rooms.set(roomKey, {
+        tenantId,
+        auctionId,
+        clients: new Set(),
+      });
+    }
+
+    const room = this.rooms.get(roomKey)!;
+    room.clients.add(client);
+    meta.rooms.add(roomKey);
+    this.clients.set(client, meta);
+  }
+
+  /**
+   * Leave a room
+   */
+  private leaveRoom(client: WebSocket, roomKey: string) {
+    const meta = this.clients.get(client);
+    if (!meta) return;
+
+    const room = this.rooms.get(roomKey);
+    if (room) {
+      room.clients.delete(client);
+
+      // Delete room if empty
+      if (room.clients.size === 0) {
+        this.rooms.delete(roomKey);
+        this.logger.debug(`Room ${roomKey} deleted (empty)`);
+      }
+    }
+
+    meta.rooms.delete(roomKey);
+    this.clients.set(client, meta);
+  }
+
+  /**
+   * Get room key from tenantId and auctionId
+   */
+  private getRoomKey(tenantId: string, auctionId: string): string {
+    return `${tenantId}:${auctionId}`;
+  }
+
+  /**
+   * Send a message to a specific client
+   */
+  private sendMessage(client: WebSocket, message: WsServerMessage) {
+    if (client.readyState === 1) {
+      // 1 = OPEN
+      client.send(JSON.stringify(message));
+    }
+  }
+
+  /**
+   * Send an error message to a client
+   */
+  private sendError(client: WebSocket, code: WsErrorCode, message: string) {
+    this.sendMessage(client, {
+      event: 'ERROR',
+      data: {
+        code,
+        message,
+      },
+    });
+  }
+
+  /**
+   * Get all clients in a room
+   */
+  getRoomClients(tenantId: string, auctionId: string): WebSocket[] {
+    const roomKey = this.getRoomKey(tenantId, auctionId);
+    const room = this.rooms.get(roomKey);
+    return room ? Array.from(room.clients) : [];
+  }
+
+  /**
+   * Get participant count for an auction
+   */
+  getParticipantCount(tenantId: string, auctionId: string): number {
+    const roomKey = this.getRoomKey(tenantId, auctionId);
+    const room = this.rooms.get(roomKey);
+    return room ? room.clients.size : 0;
+  }
+
+  /**
+   * Get connected users for an auction (with userId and metadata)
+   */
+  getConnectedUsers(
+    tenantId: string,
+    auctionId: string
+  ): Array<{
+    userId: string;
+    email: string;
+    role: string;
+    isAlive: boolean;
+  }> {
+    const roomKey = this.getRoomKey(tenantId, auctionId);
+    const room = this.rooms.get(roomKey);
+    if (!room) return [];
+
+    const users: Array<{
+      userId: string;
+      email: string;
+      role: string;
+      isAlive: boolean;
+    }> = [];
+
+    room.clients.forEach((client) => {
+      const meta = this.clients.get(client);
+      if (meta) {
+        users.push({
+          userId: meta.userId,
+          email: meta.email,
+          role: meta.role,
+          isAlive: meta.isAlive,
+        });
+      }
+    });
+
+    return users;
+  }
+
+  /**
+   * Check if a specific user is connected to an auction
+   */
+  isUserConnected(
+    tenantId: string,
+    auctionId: string,
+    userId: string
+  ): boolean {
+    const connectedUsers = this.getConnectedUsers(tenantId, auctionId);
+    return connectedUsers.some((user) => user.userId === userId);
+  }
+
+  /**
+   * Get all active rooms
+   */
+  getActiveRooms(): Array<{
+    tenantId: string;
+    auctionId: string;
+    count: number;
+  }> {
+    const rooms: Array<{ tenantId: string; auctionId: string; count: number }> =
+      [];
+    this.rooms.forEach((room, key) => {
+      rooms.push({
+        tenantId: room.tenantId,
+        auctionId: room.auctionId,
+        count: room.clients.size,
+      });
+    });
+    return rooms;
+  }
+}
