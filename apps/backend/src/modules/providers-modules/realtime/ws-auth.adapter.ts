@@ -35,18 +35,42 @@ export class WsAuthAdapter extends WsAdapter {
   public bindAuthenticationAfterInit() {
     this.logger.log('Binding authentication after application init');
 
-    const httpServer = (this as any).httpServer?.getHttpServer?.();
+    // Try multiple ways to get the HTTP server
+    let httpServer = (this as any).httpServer?.getHttpServer?.();
+
+    // If not found, try to get it from the app
+    if (!httpServer && this.app) {
+      try {
+        const nestApp = this.app as any;
+        httpServer =
+          nestApp.getHttpServer?.() || nestApp.httpAdapter?.getHttpServer?.();
+      } catch (error) {
+        this.logger.debug('Could not get HTTP server from app');
+      }
+    }
+
+    // If still not found, try to get it from the WebSocket server
+    if (!httpServer) {
+      const wsServer = (this as any).wsServer;
+      if (wsServer && (wsServer as any)._server) {
+        httpServer = (wsServer as any)._server;
+        this.logger.debug('Got HTTP server from WebSocket server');
+      }
+    }
+
     const pendingServer = (this as any).pendingServer;
     const pendingCallback = (this as any).pendingCallback;
 
     if (!httpServer) {
-      this.logger.error('Still cannot find HTTP server!');
+      this.logger.warn(
+        'HTTP server not available yet - WebSocket auth will be set up on first connection'
+      );
       return;
     }
 
     if (!pendingServer || !pendingCallback) {
-      this.logger.warn(
-        'No pending WebSocket server to set up authentication for'
+      this.logger.log(
+        'No pending WebSocket server - auth already set up or no WebSocket gateway registered'
       );
       return;
     }

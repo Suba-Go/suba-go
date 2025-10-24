@@ -24,21 +24,22 @@ This guide contains everything you need to know about the Suba&Go real-time auct
 8. **Auction Status Management** - Smart scheduler and automatic transitions
 9. **User Bidding Interface** - Real-time bidding UI with auto-bid
 10. **Integration Guide** - How to integrate with existing services
-11. **Testing** - Complete testing guide with examples
-12. **Deployment** - Production deployment checklist
-13. **Troubleshooting** - Common issues and solutions
+11. **Deployment** - Production deployment checklist
+12. **Troubleshooting** - Common issues and solutions
 
 ---
 
 ## 🚀 Quick Start
 
 ### Backend
+
 ```bash
 pnpm nx serve backend
 # WebSocket available at: ws://localhost:3001/ws
 ```
 
 ### Frontend
+
 ```typescript
 import { useAuctionWebSocket } from '@/hooks/use-auction-websocket';
 
@@ -46,17 +47,6 @@ const { bids, placeBid, isAuthenticated } = useAuctionWebSocket({
   tenantId: 'tenant-id',
   auctionId: 'auction-id',
 });
-```
-
-### Test Connection
-```bash
-# Node.js
-node tools/test-websocket.js <jwt-token> <tenant-id> <auction-id> <item-id>
-
-# Browser Console
-const token = document.cookie.split(';').find(c => c.includes('accessToken'))?.split('=')[1];
-const ws = new WebSocket(`ws://localhost:3001/ws?token=${token}`);
-ws.onmessage = (e) => console.log(JSON.parse(e.data));
 ```
 
 ---
@@ -141,6 +131,7 @@ ws.onmessage = (e) => console.log(JSON.parse(e.data));
 ## 🔐 Environment Variables
 
 ### Backend
+
 ```env
 JWT_SECRET=your-secret-key
 PORT=3001
@@ -148,6 +139,7 @@ DATABASE_URL=postgresql://...
 ```
 
 ### Frontend
+
 ```env
 NEXT_PUBLIC_WS_URL=ws://localhost:3001/ws
 NEXT_PUBLIC_API_URL=http://localhost:3001
@@ -158,25 +150,19 @@ NEXT_PUBLIC_API_URL=http://localhost:3001
 ## 🐛 Common Issues
 
 ### Connection Rejected (401)
+
 - Check JWT token is valid and not expired
 - Verify JWT_SECRET matches between services
 
 ### Messages Not Received
+
 - Verify client has joined the auction room
 - Check auction exists and is active
 
 ### Infinite Loop (200+ Connections)
+
 - Use refs for callback functions in useEffect
 - Pattern: `const refetchRef = useRef(refetch); refetchRef.current = refetch;`
-
----
-
-## 📚 Additional Resources
-
-- **[TODO.md](../TODO.md)** - Feature roadmap and remaining tasks
-- **[tools/test-websocket.js](../tools/test-websocket.js)** - WebSocket testing script
-
----
 
 ## 🎯 Best Practices
 
@@ -193,12 +179,13 @@ NEXT_PUBLIC_API_URL=http://localhost:3001
 ## 🆘 Support
 
 **For questions or issues:**
+
 1. Read the [Complete WebSocket Guide](./WEBSOCKET_COMPLETE_GUIDE.md)
 2. Check the troubleshooting section
 3. Review browser console and server logs
-4. Test with the WebSocket test script
 
 **Key Files:**
+
 - Backend: `apps/backend/src/modules/providers-modules/realtime/`
 - Frontend: `apps/frontend/src/hooks/use-auction-websocket.ts`
 - Frontend: `apps/frontend/src/lib/ws-client.ts`
@@ -206,4 +193,3 @@ NEXT_PUBLIC_API_URL=http://localhost:3001
 ---
 
 **Happy coding! 🚀**
-

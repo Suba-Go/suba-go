@@ -352,14 +352,6 @@ export class AuctionStatusSchedulerService
   }
 
   /**
-   * Manual trigger for testing/debugging
-   */
-  async triggerManualCheck() {
-    this.logger.log('🔧 Manual status check triggered');
-    await this.checkAndUpdateAuctionStatuses();
-  }
-
-  /**
    * Get scheduler status
    */
   getStatus() {

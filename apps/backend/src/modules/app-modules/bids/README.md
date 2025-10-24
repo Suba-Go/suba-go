@@ -9,19 +9,23 @@ The Bids module handles all bid-related functionality in the Suba&Go auction sys
 ### Services
 
 #### 1. **BidRealtimeService** (`services/bid-realtime.service.ts`)
+
 **Purpose**: Handles real-time bid operations with WebSocket integration
 
 **Key Responsibilities:**
+
 - Place bids with full validation (auction status, bid amount, user registration)
 - Broadcast bid events to all auction participants via WebSocket
 - Validate user access and permissions
 - Ensure data consistency with database transactions
 
 **Key Methods:**
+
 - `placeBid(auctionItemId, amount, userId, tenantId)` - Place a bid and broadcast to room
 - `broadcastAuctionStatusChange(auctionId, tenantId, status)` - Notify participants of status changes
 
 **Dependencies:**
+
 - `BidPrismaService` - Database operations
 - `AuctionsGateway` - WebSocket broadcasting
 - `PrismaService` - Direct database access for complex queries
@@ -29,15 +33,18 @@ The Bids module handles all bid-related functionality in the Suba&Go auction sys
 ---
 
 #### 2. **BidPrismaService** (`services/bid-prisma.service.ts`)
+
 **Purpose**: Repository service for bid database operations
 
 **Key Responsibilities:**
+
 - CRUD operations for bids
 - Query bids by various criteria (auction, item, user)
 - Validate bid amounts
 - Calculate bid statistics
 
 **Key Methods:**
+
 - `createBid(data)` - Create a new bid
 - `findBidsByAuctionItem(auctionItemId)` - Get all bids for an item
 - `findBidsByAuction(auctionId)` - Get all bids for an auction
@@ -128,7 +135,7 @@ model Bid {
   updatedAt      DateTime     @updatedAt
   isDeleted      Boolean      @default(false)
   deletedAt      DateTime?
-  
+
   user           User         @relation(fields: [userId], references: [id])
   auction        Auction      @relation(fields: [auctionId], references: [id])
   auctionItem    AuctionItem  @relation(fields: [auctionItemId], references: [id])
@@ -143,6 +150,7 @@ model Bid {
 ### Outgoing Events (Server → Client)
 
 #### `BID_PLACED`
+
 Broadcast when a bid is successfully placed.
 
 ```typescript
@@ -168,6 +176,7 @@ Broadcast when a bid is successfully placed.
 ```
 
 #### `BID_REJECTED`
+
 Sent to the bidder when their bid is rejected.
 
 ```typescript
@@ -186,15 +195,15 @@ Sent to the bidder when their bid is rejected.
 
 ### Common Errors
 
-| Error | Code | Reason |
-|-------|------|--------|
-| Item not found | `NotFoundException` | `auctionItemId` doesn't exist |
-| Forbidden access | `ForbiddenException` | User doesn't belong to tenant |
-| Auction not active | `BadRequestException` | Auction status is not `ACTIVA` |
-| Auction not started | `BadRequestException` | Current time < `startTime` |
-| Auction ended | `BadRequestException` | Current time > `endTime` |
-| Bid too low | `BadRequestException` | Bid < `currentHighest + bidIncrement` |
-| Not registered | `ForbiddenException` | User not in `AuctionRegistration` |
+| Error               | Code                  | Reason                                |
+| ------------------- | --------------------- | ------------------------------------- |
+| Item not found      | `NotFoundException`   | `auctionItemId` doesn't exist         |
+| Forbidden access    | `ForbiddenException`  | User doesn't belong to tenant         |
+| Auction not active  | `BadRequestException` | Auction status is not `ACTIVA`        |
+| Auction not started | `BadRequestException` | Current time < `startTime`            |
+| Auction ended       | `BadRequestException` | Current time > `endTime`              |
+| Bid too low         | `BadRequestException` | Bid < `currentHighest + bidIncrement` |
+| Not registered      | `ForbiddenException`  | User not in `AuctionRegistration`     |
 
 ---
 
@@ -214,10 +223,12 @@ apps/backend/src/modules/app-modules/bids/
 ## Dependencies
 
 ### Internal Modules
+
 - `PrismaModule` - Database access
 - `RealtimeModule` - WebSocket gateway access
 
 ### External Packages
+
 - `@nestjs/common` - NestJS core
 - `@prisma/client` - Database ORM
 - `@suba-go/shared-validation` - Shared types and validation
@@ -227,32 +238,13 @@ apps/backend/src/modules/app-modules/bids/
 ## Future Enhancements
 
 ### Planned Features
+
 - [ ] Soft-close extension (extend auction time when bid placed near end)
 - [ ] Bid retraction (allow users to cancel bids under certain conditions)
 - [ ] Proxy bidding (automatic bidding up to a maximum amount)
 - [ ] Bid history pagination
 - [ ] Bid notifications (email/SMS when outbid)
 - [ ] Bid analytics dashboard
-
----
-
-## Testing
-
-### Unit Tests
-Currently no unit tests. Future tests should cover:
-- Bid validation logic
-- Amount calculation
-- Error handling
-- Database operations
-
-### Integration Tests
-Should test:
-- WebSocket bid flow
-- Real-time broadcasting
-- Multi-user scenarios
-- Race conditions
-
----
 
 ## Notes
 
@@ -266,4 +258,3 @@ Should test:
 
 **Last Updated**: 2025-10-23
 **Maintainer**: Suba&Go Team
-
