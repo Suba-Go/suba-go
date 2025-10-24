@@ -5,6 +5,7 @@ import {
   ForbiddenException,
 } from '@nestjs/common';
 import { AuctionPrismaService } from './auction-prisma.service';
+import { AuctionsGateway } from '../../../providers-modules/realtime/auctions.gateway';
 import {
   CreateAuctionDto,
   UpdateAuctionDto,
@@ -18,7 +19,8 @@ import { PrismaService } from '../../../providers-modules/prisma/prisma.service'
 export class AuctionsService {
   constructor(
     private readonly auctionRepository: AuctionPrismaService,
-    private readonly prisma: PrismaService
+    private readonly prisma: PrismaService,
+    private readonly auctionsGateway: AuctionsGateway
   ) {}
 
   async createAuction(
@@ -222,7 +224,8 @@ export class AuctionsService {
   async cancelAuction(id: string, tenantId: string): Promise<Auction> {
     const auction = await this.getAuctionById(id, tenantId);
 
-    // Allowed: cancel when PENDIENTE or ACTIVA; disallow COMPLETADA / ELIMINADA / already CANCELADA
+    // Validation: Can only cancel PENDIENTE or ACTIVA auctions
+    // Cannot cancel COMPLETADA, ELIMINADA, or already CANCELADA
     if (auction.status === 'COMPLETADA' || auction.status === 'ELIMINADA') {
       throw new BadRequestException(
         'No se puede cancelar una subasta finalizada o eliminada'
@@ -233,9 +236,37 @@ export class AuctionsService {
       return auction;
     }
 
+    // Additional validation: Check if auction has active bids
+    const bidCount = await this.prisma.bid.count({
+      where: {
+        auctionId: id,
+      },
+    });
+
+    if (bidCount > 0 && auction.status === 'ACTIVA') {
+      // Allow cancellation but log warning
+      this.prisma.auditLog.create({
+        data: {
+          action: 'AUCTION_CANCELLED_WITH_BIDS',
+          entityType: 'Auction',
+          entityId: id,
+          changes: { bidCount, previousStatus: auction.status, tenantId },
+        },
+      });
+    }
+
+    // Update status to CANCELADA
     const updated = await this.auctionRepository.updateAuctionStatus(
       id,
       'CANCELADA'
+    );
+
+    // Broadcast status change via WebSocket
+    this.auctionsGateway.broadcastAuctionStatusChange(
+      tenantId,
+      id,
+      'CANCELADA',
+      updated
     );
 
     // Audit log (server-authoritative cancel)

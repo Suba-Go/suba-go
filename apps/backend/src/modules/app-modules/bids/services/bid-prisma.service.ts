@@ -1,3 +1,9 @@
+/**
+ * @file bid-prisma.service.ts
+ * @description Repository service for bid database operations
+ * Provides CRUD operations and queries for bids using Prisma
+ * @author Suba&Go
+ */
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../../providers-modules/prisma/prisma.service';
 import type { Bid, Prisma } from '@prisma/client';

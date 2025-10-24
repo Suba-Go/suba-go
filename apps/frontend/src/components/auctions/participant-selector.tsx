@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Users, Check, Search } from 'lucide-react';
 import { Checkbox } from '@suba-go/shared-components/components/ui/checkbox';
 import { Input } from '@suba-go/shared-components/components/ui/input';
@@ -34,11 +34,7 @@ export function ParticipantSelector({
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
 
-  useEffect(() => {
-    fetchUsers();
-  }, []);
-
-  const fetchUsers = async () => {
+  const fetchUsers = React.useCallback(async () => {
     setIsLoading(true);
     try {
       const response = await fetch('/api/users');
@@ -68,7 +64,11 @@ export function ParticipantSelector({
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [toast]);
+
+  useEffect(() => {
+    fetchUsers();
+  }, [fetchUsers]);
 
   const handleParticipantToggle = (userId: string) => {
     if (selectedParticipants.includes(userId)) {

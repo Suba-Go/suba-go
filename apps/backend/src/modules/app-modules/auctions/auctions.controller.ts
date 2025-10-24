@@ -10,6 +10,8 @@ import {
   Request,
   HttpStatus,
   HttpCode,
+  Inject,
+  Optional,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -28,6 +30,7 @@ import {
   AuctionStatsDto,
   AuctionResponseDto,
 } from './dto/auction.dto';
+import { AuctionsGateway } from '../../providers-modules/realtime/auctions.gateway';
 
 interface AuthenticatedRequest extends Request {
   user: {
@@ -49,7 +52,10 @@ enum UserRolesEnum {
 @UseGuards(JwtAuthGuard)
 @Controller('auctions')
 export class AuctionsController {
-  constructor(private readonly auctionsService: AuctionsService) {}
+  constructor(
+    private readonly auctionsService: AuctionsService,
+    @Optional() private readonly auctionsGateway?: AuctionsGateway
+  ) {}
 
   @Post()
   @UseGuards(RolesGuard)
@@ -362,5 +368,41 @@ export class AuctionsController {
   ) {
     const tenantId = req.user.tenantId;
     return this.auctionsService.getAuctionParticipants(auctionId, tenantId);
+  }
+
+  @Get(':id/connected-users')
+  @UseGuards(RolesGuard)
+  @Roles(UserRolesEnum.AUCTION_MANAGER)
+  @ApiOperation({
+    summary: 'Obtener usuarios conectados al WebSocket de la subasta',
+  })
+  @ApiParam({ name: 'id', description: 'ID de la subasta' })
+  @ApiResponse({
+    status: 200,
+    description: 'Lista de usuarios conectados en tiempo real',
+  })
+  async getConnectedUsers(
+    @Param('id') auctionId: string,
+    @Request() req: AuthenticatedRequest
+  ) {
+    const tenantId = req.user.tenantId;
+
+    if (!this.auctionsGateway) {
+      return {
+        connected: [],
+        count: 0,
+        message: 'WebSocket gateway not available',
+      };
+    }
+
+    const connectedUsers = this.auctionsGateway.getConnectedUsers(
+      tenantId,
+      auctionId
+    );
+
+    return {
+      connected: connectedUsers,
+      count: connectedUsers.length,
+    };
   }
 }
