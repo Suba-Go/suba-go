@@ -10,6 +10,7 @@ import {
   ForbiddenException,
   Logger,
 } from '@nestjs/common';
+import { randomUUID } from 'crypto';
 import { BidPrismaService } from './bid-prisma.service';
 import { AuctionsGateway } from '../../../providers-modules/realtime/auctions.gateway';
 import { PrismaService } from '../../../providers-modules/prisma/prisma.service';
@@ -41,8 +42,11 @@ export class BidRealtimeService {
     auctionItemId: string,
     amount: number,
     userId: string,
-    tenantId: string
+    tenantId: string,
+    requestId: string
   ): Promise<BidWithRelations> {
+    // Idempotency will be handled atomically via INSERT ... ON CONFLICT later to avoid P2002 logs
+
     // Get auction item with relations
     const auctionItem = await this.prisma.auctionItem.findUnique({
       where: { id: auctionItemId },
@@ -109,26 +113,17 @@ export class BidRealtimeService {
       );
     }
 
-    // Soft-close extension: If bid is placed within last 30 seconds, extend by 30 seconds pass to env.
-    const SOFT_CLOSE_THRESHOLD_MS = 30 * 1000; // 2 minutes
-    const SOFT_CLOSE_EXTENSION_MS = 30 * 1000; // 2 minutes
+    // Soft-close extension: If bid is placed within last 30 seconds, extend by 30 seconds
+    const SOFT_CLOSE_THRESHOLD_MS = 30 * 1000;
+    const SOFT_CLOSE_EXTENSION_MS = 30 * 1000;
     const timeUntilEnd = auctionItem.auction.endTime.getTime() - now.getTime();
-    let updatedAuction = auctionItem.auction;
 
     if (timeUntilEnd <= SOFT_CLOSE_THRESHOLD_MS && timeUntilEnd > 0) {
       const newEndTime = new Date(now.getTime() + SOFT_CLOSE_EXTENSION_MS);
 
-      updatedAuction = await this.prisma.auction.update({
+      await this.prisma.auction.update({
         where: { id: auctionItem.auctionId },
         data: { endTime: newEndTime },
-        include: {
-          tenant: true,
-          items: {
-            include: {
-              item: true,
-            },
-          },
-        },
       });
 
       this.logger.log(
@@ -151,58 +146,73 @@ export class BidRealtimeService {
       );
     }
 
-    // Create the bid
-    const bid = await this.prisma.bid.create({
-      data: {
-        offered_price: amount,
-        bid_time: new Date(),
-        userId,
-        auctionId: auctionItem.auctionId,
-        auctionItemId,
-        tenantId,
-      },
+    // Create the bid atomically (insert if not exists) and broadcast only if inserted
+    // Use raw SQL to detect insertion without P2002 logs
+    const bidId = randomUUID();
+    const insertedRows = await this.prisma.client.$queryRaw<
+      Array<{ id: string }>
+    >`
+      INSERT INTO "public"."bid"
+        ("id","requestId","offered_price","bid_time","userId","auctionId","auctionItemId","tenantId","createdAt","updatedAt")
+      VALUES
+        (${bidId}, ${requestId}, ${amount}, NOW(), ${userId}, ${auctionItem.auctionId}, ${auctionItemId}, ${tenantId}, NOW(), NOW())
+      ON CONFLICT ("requestId") DO NOTHING
+      RETURNING "id"
+    `;
+
+    // Fetch the bid (created now or existing)
+    const bid = await this.prisma.bid.findUnique({
+      where: { requestId },
       include: {
         user: true,
         auctionItem: {
-          include: {
-            auction: true,
-            item: true,
-          },
+          include: { auction: true, item: true },
         },
       },
     });
+    if (!bid) {
+      throw new Error('No se pudo crear ni recuperar la puja');
+    }
 
-    this.logger.log(
-      `Bid placed: ${amount} by ${bid.user.email} on item ${
-        auctionItem.item.plate || auctionItemId
-      }`
-    );
+    const createdNow = insertedRows.length > 0;
+    if (createdNow) {
+      this.logger.log(
+        `Bid placed [req=${requestId}]: ${amount} by ${
+          bid.user.email
+        } on item ${bid.auctionItem.item.plate || auctionItemId}`
+      );
 
-    // Broadcast to all clients in the auction room
-    const bidPlacedData: BidPlacedData = {
-      tenantId,
-      auctionId: auctionItem.auctionId,
-      auctionItemId,
-      bidId: bid.id,
-      amount: Number(bid.offered_price),
-      userId: bid.userId,
-      userName: bid.user.public_name || bid.user.name || bid.user.email,
-      timestamp: bid.bid_time.getTime(),
-      item: {
-        id: auctionItem.item.id,
-        plate: auctionItem.item.plate || undefined,
-        brand: auctionItem.item.brand || undefined,
-        model: auctionItem.item.model || undefined,
-      },
-    };
+      // Broadcast to all clients in the auction room
+      const bidPlacedData: BidPlacedData = {
+        tenantId,
+        auctionId: bid.auctionItem.auctionId,
+        auctionItemId,
+        bidId: bid.id,
+        amount: Number(bid.offered_price),
+        userId: bid.userId,
+        userName: bid.user.public_name || bid.user.name || bid.user.email,
+        timestamp: bid.bid_time.getTime(),
+        requestId, // echo back for client correlation
+        item: {
+          id: bid.auctionItem.item.id,
+          plate: bid.auctionItem.item.plate || undefined,
+          brand: bid.auctionItem.item.brand || undefined,
+          model: bid.auctionItem.item.model || undefined,
+        },
+      };
 
-    this.auctionsGateway.broadcastToRoom(
-      `${tenantId}:${auctionItem.auctionId}`,
-      {
-        event: 'BID_PLACED',
-        data: bidPlacedData,
-      }
-    );
+      this.auctionsGateway.broadcastToRoom(
+        `${tenantId}:${bid.auctionItem.auctionId}`,
+        {
+          event: 'BID_PLACED',
+          data: bidPlacedData,
+        }
+      );
+    } else {
+      this.logger.debug(
+        `[placeBid] Reusing existing bid for requestId=${requestId}`
+      );
+    }
 
     return bid as BidWithRelations;
   }
@@ -221,6 +231,7 @@ export class BidRealtimeService {
         tenantId,
         isDeleted: false,
       },
+      distinct: ['id'], // Ensure unique bids by ID
       include: {
         user: {
           select: {
@@ -290,12 +301,17 @@ export class BidRealtimeService {
     auctionId: string,
     tenantId: string
   ): Promise<BidWithRelations[]> {
+    this.logger.log(
+      `[getAuctionBids] Fetching bids for auction ${auctionId}, tenant ${tenantId}`
+    );
+
     const bids = await this.prisma.bid.findMany({
       where: {
         auctionId,
         tenantId,
         isDeleted: false,
       },
+      distinct: ['id'], // Ensure unique bids by ID
       include: {
         user: {
           select: {
@@ -316,6 +332,10 @@ export class BidRealtimeService {
         bid_time: 'desc',
       },
     });
+
+    this.logger.log(
+      `[getAuctionBids] Found ${bids.length} bids for auction ${auctionId}`
+    );
 
     return bids as BidWithRelations[];
   }

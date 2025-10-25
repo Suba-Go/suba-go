@@ -54,6 +54,8 @@ import { useRouter } from 'next-nprogress-bar';
 import { useAuctionStatus } from '@/hooks/use-auction-status';
 import { AuctionStatusEnum } from '@suba-go/shared-validation';
 import { ParticipantsList } from './participants-list';
+import { ItemBidHistory } from './user-view/item-bid-history';
+import { AuctionItemDetailModal } from './auction-item-detail-modal';
 
 interface AuctionDetailProps {
   auctionId: string;
@@ -75,6 +77,9 @@ export function AuctionDetail({
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isCanceled, setIsCanceled] = useState(false);
   const [showCompletedDialog, setShowCompletedDialog] = useState(false);
+  const [selectedItemForDetail, setSelectedItemForDetail] = useState<
+    any | null
+  >(null);
 
   // WebSocket state for real-time updates (AUCTION_MANAGER only)
   const wsRef = useRef<WebSocket | null>(null);
@@ -613,120 +618,148 @@ export function AuctionDetail({
         <TabsContent value="items" className="space-y-6">
           {auction.items && auction.items.length > 0 ? (
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {auction.items.map((auctionItem: AuctionItem) => (
-                <Card
-                  key={auctionItem.id}
-                  className="hover:shadow-lg transition-shadow cursor-pointer"
-                  onClick={() => {
-                    if (auctionItem.item?.id) {
-                      router.push(`/items/${auctionItem.item.id}`);
-                    }
-                  }}
-                >
-                  {/* Item Image */}
-                  {auctionItem.item?.photos && (
-                    <div className="relative h-48 overflow-hidden rounded-t-lg bg-gray-100">
-                      <Image
-                        src={auctionItem.item.photos.split(',')[0]?.trim()}
-                        alt={`${auctionItem.item.brand} ${auctionItem.item.model}`}
-                        fill
-                        className="object-cover"
-                        sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
-                        onError={(e) => {
-                          const target = e.currentTarget as HTMLImageElement;
-                          target.src =
-                            'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgdmlld0JveD0iMCAwIDIwMCAyMDAiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxyZWN0IHdpZHRoPSIyMDAiIGhlaWdodD0iMjAwIiBmaWxsPSIjRjNGNEY2Ii8+CjxwYXRoIGQ9Ik04MCA2MEgxMjBWODBIODBWNjBaIiBmaWxsPSIjOUI5QkEwIi8+CjxwYXRoIGQ9Ik02MCA4MEgxNDBWMTQwSDYwVjgwWiIgZmlsbD0iIzlCOUJBMCIvPgo8L3N2Zz4K';
-                        }}
-                      />
-                    </div>
-                  )}
+              {auction.items.map((auctionItem: AuctionItem) => {
+                const topBid =
+                  auctionItem.bids && auctionItem.bids.length > 0
+                    ? auctionItem.bids.reduce(
+                        (prev: AuctionBid | null, b: AuctionBid) => {
+                          if (!prev) return b;
+                          return Number(b.offered_price) >
+                            Number(prev.offered_price)
+                            ? b
+                            : prev;
+                        },
+                        null as unknown as AuctionBid
+                      )
+                    : null;
+                return (
+                  <Card
+                    key={auctionItem.id}
+                    className="hover:shadow-lg transition-shadow cursor-pointer"
+                    onClick={() => setSelectedItemForDetail(auctionItem)}
+                  >
+                    {/* Item Image */}
+                    {auctionItem.item?.photos && (
+                      <div className="relative h-48 overflow-hidden rounded-t-lg bg-gray-100">
+                        <Image
+                          src={auctionItem.item.photos.split(',')[0]?.trim()}
+                          alt={`${auctionItem.item.brand} ${auctionItem.item.model}`}
+                          fill
+                          className="object-cover"
+                          sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+                          onError={(e) => {
+                            const target = e.currentTarget as HTMLImageElement;
+                            target.src =
+                              'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgdmlld0JveD0iMCAwIDIwMCAyMDAiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxyZWN0IHdpZHRoPSIyMDAiIGhlaWdodD0iMjAwIiBmaWxsPSIjRjNGNEY2Ii8+CjxwYXRoIGQ9Ik04MCA2MEgxMjBWODBIODBWNjBaIiBmaWxsPSIjOUI5QkEwIi8+CjxwYXRoIGQ9Ik02MCA4MEgxNDBWMTQwSDYwVjgwWiIgZmlsbD0iIzlCOUJBMCIvPgo8L3N2Zz4K';
+                          }}
+                        />
+                      </div>
+                    )}
 
-                  <CardContent className="p-4">
-                    <div className="space-y-2">
-                      <h3 className="font-semibold text-lg">
-                        {auctionItem.item?.plate || 'Sin Patente'}
-                      </h3>
-                      <p className="text-sm text-gray-600">
-                        {auctionItem.item?.brand} {auctionItem.item?.model}{' '}
-                        {auctionItem.item?.year}
-                      </p>
+                    <CardContent className="p-4">
+                      <div className="space-y-2">
+                        <h3 className="font-semibold text-lg">
+                          {auctionItem.item?.plate || 'Sin Patente'}
+                        </h3>
+                        <p className="text-sm text-gray-600">
+                          {auctionItem.item?.brand} {auctionItem.item?.model}{' '}
+                          {auctionItem.item?.year}
+                        </p>
 
-                      <div className="flex justify-between items-center pt-2">
-                        <div>
-                          <p className="text-xs text-gray-500">Puja inicial</p>
-                          <p className="font-semibold text-green-600">
-                            ${Number(auctionItem.startingBid).toLocaleString()}
-                          </p>
+                        <div className="flex justify-between items-center pt-2">
+                          <div>
+                            <p className="text-xs text-gray-500">
+                              Puja inicial
+                            </p>
+                            <p className="font-semibold text-green-600">
+                              $
+                              {Number(auctionItem.startingBid).toLocaleString()}
+                            </p>
+                          </div>
+
+                          {auctionItem.bids && auctionItem.bids.length > 0 && (
+                            <div className="text-right">
+                              <p className="text-xs text-gray-500">
+                                Puja más alta
+                              </p>
+                              <p className="font-semibold text-blue-600">
+                                $
+                                {Math.max(
+                                  ...auctionItem.bids.map((bid: AuctionBid) =>
+                                    Number(bid.offered_price)
+                                  )
+                                ).toLocaleString()}
+                              </p>
+                              {topBid && (
+                                <p className="text-xs text-gray-600 mt-1">
+                                  Ganando:{' '}
+                                  <span className="font-medium text-gray-900">
+                                    {topBid.user?.public_name || 'Usuario'}
+                                  </span>
+                                </p>
+                              )}
+                            </div>
+                          )}
                         </div>
 
                         {auctionItem.bids && auctionItem.bids.length > 0 && (
-                          <div className="text-right">
-                            <p className="text-xs text-gray-500">
-                              Puja más alta
+                          <>
+                            <p className="text-xs text-gray-500 pt-1">
+                              {auctionItem.bids.length} puja(s) realizadas
                             </p>
-                            <p className="font-semibold text-blue-600">
-                              $
-                              {Math.max(
-                                ...auctionItem.bids.map((bid: AuctionBid) =>
-                                  Number(bid.offered_price)
-                                )
-                              ).toLocaleString()}
-                            </p>
+                            <ItemBidHistory
+                              bids={auctionItem.bids || []}
+                              maxItems={5}
+                            />
+                          </>
+                        )}
+
+                        {/* Sale Status Badge - Only show for completed auctions */}
+                        {auction?.status === AuctionStatusEnum.COMPLETADA && (
+                          <div className="pt-3 border-t mt-3">
+                            {auctionItem.item?.state === 'VENDIDO' &&
+                            auctionItem.item?.soldPrice ? (
+                              <div className="space-y-2">
+                                <Badge className="bg-green-600 hover:bg-green-700">
+                                  ✓ Vendido
+                                </Badge>
+                                <div className="text-sm">
+                                  <p className="text-gray-600">
+                                    Precio de venta:{' '}
+                                    <span className="font-semibold text-green-700">
+                                      $
+                                      {Number(
+                                        auctionItem.item.soldPrice
+                                      ).toLocaleString()}
+                                    </span>
+                                  </p>
+                                  {auctionItem.item.soldToUser && (
+                                    <p className="text-gray-600">
+                                      Comprador:{' '}
+                                      <span className="font-semibold text-gray-900">
+                                        {userRole === 'AUCTION_MANAGER' ||
+                                        userRole === 'ADMIN'
+                                          ? auctionItem.item.soldToUser.name ||
+                                            auctionItem.item.soldToUser
+                                              .public_name ||
+                                            'Usuario'
+                                          : auctionItem.item.soldToUser
+                                              .public_name || 'Usuario'}
+                                      </span>
+                                    </p>
+                                  )}
+                                </div>
+                              </div>
+                            ) : (
+                              <Badge variant="secondary">Sin ofertas</Badge>
+                            )}
                           </div>
                         )}
                       </div>
-
-                      {auctionItem.bids && auctionItem.bids.length > 0 && (
-                        <p className="text-xs text-gray-500 pt-1">
-                          {auctionItem.bids.length} puja(s) realizadas
-                        </p>
-                      )}
-
-                      {/* Sale Status Badge - Only show for completed auctions */}
-                      {auction?.status === AuctionStatusEnum.COMPLETADA && (
-                        <div className="pt-3 border-t mt-3">
-                          {auctionItem.item?.state === 'VENDIDO' &&
-                          auctionItem.item?.soldPrice ? (
-                            <div className="space-y-2">
-                              <Badge className="bg-green-600 hover:bg-green-700">
-                                ✓ Vendido
-                              </Badge>
-                              <div className="text-sm">
-                                <p className="text-gray-600">
-                                  Precio de venta:{' '}
-                                  <span className="font-semibold text-green-700">
-                                    $
-                                    {Number(
-                                      auctionItem.item.soldPrice
-                                    ).toLocaleString()}
-                                  </span>
-                                </p>
-                                {auctionItem.item.soldToUser && (
-                                  <p className="text-gray-600">
-                                    Comprador:{' '}
-                                    <span className="font-semibold text-gray-900">
-                                      {userRole === 'AUCTION_MANAGER' ||
-                                      userRole === 'ADMIN'
-                                        ? auctionItem.item.soldToUser.name ||
-                                          auctionItem.item.soldToUser
-                                            .public_name ||
-                                          'Usuario'
-                                        : auctionItem.item.soldToUser
-                                            .public_name || 'Usuario'}
-                                    </span>
-                                  </p>
-                                )}
-                              </div>
-                            </div>
-                          ) : (
-                            <Badge variant="secondary">Sin ofertas</Badge>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
+                    </CardContent>
+                  </Card>
+                );
+              })}
             </div>
           ) : (
             <Card className="text-center py-12">
@@ -766,6 +799,23 @@ export function AuctionDetail({
           refetch();
         }}
       />
+
+      {/* Item Detail Modal (read-only for manager) */}
+      {selectedItemForDetail && (
+        <AuctionItemDetailModal
+          auctionItem={selectedItemForDetail}
+          isOpen={!!selectedItemForDetail}
+          onClose={() => setSelectedItemForDetail(null)}
+          currentHighestBid={Number(
+            selectedItemForDetail.bids?.[0]?.offered_price ||
+              selectedItemForDetail.startingBid ||
+              0
+          )}
+          bidIncrement={Number(auction.bidIncrement || 50000)}
+          isUserView={false}
+          showBidHistory={true}
+        />
+      )}
     </div>
   );
 }

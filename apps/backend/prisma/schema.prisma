@@ -239,6 +239,7 @@ model AuctionRegistration {
 
 model Bid {
   id          String   @id @default(uuid())
+  requestId   String?  @unique @default(uuid())
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
   isDeleted   Boolean  @default(false)
