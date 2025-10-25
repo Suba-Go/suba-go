@@ -7,12 +7,13 @@
 import { Module } from '@nestjs/common';
 import { BidPrismaService } from './services/bid-prisma.service';
 import { BidRealtimeService } from './services/bid-realtime.service';
+import { BidsController } from './bids.controller';
 import { PrismaModule } from '../../providers-modules/prisma/prisma.module';
 import { RealtimeModule } from '../../providers-modules/realtime/realtime.module';
 
 @Module({
   imports: [PrismaModule, RealtimeModule],
-  controllers: [],
+  controllers: [BidsController],
   providers: [BidPrismaService, BidRealtimeService],
   exports: [BidPrismaService, BidRealtimeService],
 })

@@ -39,7 +39,7 @@ interface ClientMeta {
  * This is a basic implementation for testing the double handshake pattern.
  * No auction logic, no rooms, just pure WebSocket connection + authentication.
  */
-@WebSocketGateway({ path: '/ws' })
+// @WebSocketGateway({ path: '/ws' })  // Disabled to ensure only AuctionsGateway handles '/ws'
 export class RealtimeGateway
   implements OnGatewayInit, OnGatewayConnection, OnGatewayDisconnect
 {

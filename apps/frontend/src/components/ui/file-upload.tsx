@@ -28,27 +28,28 @@ export function FileUpload({
   const [dragActive, setDragActive] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const {
-    files,
-    isUploading,
-    hasErrors,
-    allUploaded,
-    addFiles,
-    removeFile,
-    getUploadedUrls,
-  } = useFileUpload({
-    maxFiles,
-    maxSizeInMB,
-    acceptedTypes,
-  });
+  const { files, isUploading, hasErrors, allUploaded, addFiles, removeFile } =
+    useFileUpload({
+      maxFiles,
+      maxSizeInMB,
+      acceptedTypes,
+    });
 
-  // Update parent component when files change
+  // Keep a stable reference to the callback to avoid effect loops
+  const onFilesChangeRef = React.useRef(onFilesChange);
+  React.useEffect(() => {
+    onFilesChangeRef.current = onFilesChange;
+  }, [onFilesChange]);
+
+  // Update parent component when uploads complete
   React.useEffect(() => {
     if (allUploaded) {
-      const urls = getUploadedUrls();
-      onFilesChange(urls);
+      const urls = files
+        .filter((f) => !f.uploading && !f.error && f.url)
+        .map((f) => f.url);
+      onFilesChangeRef.current(urls);
     }
-  }, [allUploaded, files, onFilesChange, getUploadedUrls]);
+  }, [allUploaded, files]);
 
   const handleDrag = (e: React.DragEvent) => {
     e.preventDefault();

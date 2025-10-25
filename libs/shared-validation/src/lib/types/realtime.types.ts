@@ -19,6 +19,7 @@ export type WsClientMessage =
         auctionId: string;
         auctionItemId: string;
         amount: number;
+        requestId: string;
       };
     }
   | { event: 'PING'; data: Record<string, never> };
@@ -45,6 +46,7 @@ export type WsServerMessage =
       data: { room: string; auctionId: string; participantCount: number };
     }
   | { event: 'LEFT'; data: { room: string; auctionId: string } }
+  | { event: 'KICKED_DUPLICATE'; data: { room: string; reason: string } }
   | { event: 'BID_PLACED'; data: BidPlacedData }
   | { event: 'BID_REJECTED'; data: { reason: string; code: string } }
   | { event: 'AUCTION_STATUS_CHANGED'; data: AuctionStatusData }
@@ -66,6 +68,7 @@ export interface BidPlacedData {
   userId: string;
   userName?: string;
   timestamp: number;
+  requestId: string; // echo back for client correlation
   item?: {
     id: string;
     plate?: string;

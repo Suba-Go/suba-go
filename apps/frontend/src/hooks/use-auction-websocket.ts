@@ -25,18 +25,18 @@ interface UseAuctionWebSocketReturn {
   connectionState: WsConnectionState;
   isConnected: boolean;
   isAuthenticated: boolean;
-  
+
   // Bid data
   bids: BidPlacedData[];
-  
+
   // Participant count
   participantCount: number;
-  
+
   // Actions
   placeBid: (auctionItemId: string, amount: number) => void;
   connect: () => Promise<void>;
   disconnect: () => void;
-  
+
   // Error state
   error: string | null;
 }
@@ -57,7 +57,7 @@ export function useAuctionWebSocket({
   const [participantCount, setParticipantCount] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [hasJoinedRoom, setHasJoinedRoom] = useState(false);
-  
+
   // Track if we've already connected to prevent duplicate connections
   const connectionAttempted = useRef(false);
 
@@ -120,9 +120,10 @@ export function useAuctionWebSocket({
         return;
       }
 
+      const requestId = crypto.randomUUID();
       wsClient.send({
         event: 'PLACE_BID',
-        data: { tenantId, auctionId, auctionItemId, amount },
+        data: { tenantId, auctionId, auctionItemId, amount, requestId },
       });
     },
     [tenantId, auctionId]
@@ -182,12 +183,12 @@ export function useAuctionWebSocket({
   useEffect(() => {
     const handleStateChange = (state: WsConnectionState) => {
       setConnectionState(state);
-      
+
       // Join room when authenticated
       if (state === 'AUTHENTICATED') {
         joinAuctionRoom();
       }
-      
+
       // Reset room state when disconnected
       if (state === 'DISCONNECTED') {
         setHasJoinedRoom(false);
@@ -219,7 +220,8 @@ export function useAuctionWebSocket({
 
   return {
     connectionState,
-    isConnected: connectionState === 'CONNECTED' || connectionState === 'AUTHENTICATED',
+    isConnected:
+      connectionState === 'CONNECTED' || connectionState === 'AUTHENTICATED',
     isAuthenticated: connectionState === 'AUTHENTICATED',
     bids,
     participantCount,
@@ -229,4 +231,3 @@ export function useAuctionWebSocket({
     error,
   };
 }
-
