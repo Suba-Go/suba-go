@@ -34,12 +34,15 @@ export function UserHomePage({ company, subdomain }: UserHomePageProps) {
 
   const userId = session?.user?.id;
 
+  // TODO: Implement /bids/my-bids endpoint in backend
   // Fetch user's bids to find adjudicated items
-  const { data: userBids, isLoading: bidsLoading } = useFetchData<any[]>({
-    url: '/api/bids/my-bids',
-    key: ['my-bids', userId || ''],
-    condition: !!userId,
-  });
+  // const { data: userBids, isLoading: bidsLoading } = useFetchData<any[]>({
+  //   url: '/api/bids/my-bids',
+  //   key: ['my-bids', userId || ''],
+  //   condition: !!userId,
+  // });
+  const userBids: any[] = [];
+  const bidsLoading = false;
 
   // Fetch user's registered auctions
   const {

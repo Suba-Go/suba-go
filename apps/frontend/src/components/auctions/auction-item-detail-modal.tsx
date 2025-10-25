@@ -31,6 +31,7 @@ import {
 } from '@suba-go/shared-components/components/ui/carousel';
 import { Input } from '@suba-go/shared-components/components/ui/input';
 import { useAutoFormat } from '@/hooks/use-auto-format';
+import { ItemBidHistory } from './user-view/item-bid-history';
 
 interface AuctionItemDetailModalProps {
   isOpen: boolean;
@@ -61,6 +62,13 @@ interface AuctionItemDetailModalProps {
   onPlaceBid?: (amount: number) => void;
   isUserView?: boolean;
   userId?: string;
+  bidHistory?: Array<{
+    id: string;
+    amount: number;
+    userId: string;
+    userName?: string;
+  }>;
+  showBidHistory?: boolean;
 }
 
 export function AuctionItemDetailModal({
@@ -72,6 +80,8 @@ export function AuctionItemDetailModal({
   onPlaceBid,
   isUserView = false,
   userId,
+  bidHistory = [],
+  showBidHistory = true,
 }: AuctionItemDetailModalProps) {
   const { formatPrice } = useAutoFormat();
   const [photoCarouselApi, setPhotoCarouselApi] = useState<CarouselApi>();
@@ -326,12 +336,14 @@ export function AuctionItemDetailModal({
 
               <div className="flex gap-2">
                 <Input
-                  type="number"
-                  value={bidAmount}
-                  onChange={(e) => setBidAmount(Number(e.target.value))}
-                  min={currentHighestBid + bidIncrement}
-                  step={bidIncrement}
+                  type="text"
+                  value={formatPrice(bidAmount)}
+                  onChange={(e) => {
+                    const numericValue = e.target.value.replace(/[^0-9]/g, '');
+                    setBidAmount(Number(numericValue) || 0);
+                  }}
                   className="text-lg"
+                  placeholder={formatPrice(currentHighestBid + bidIncrement)}
                 />
                 <Button
                   onClick={handlePlaceBid}
@@ -346,6 +358,24 @@ export function AuctionItemDetailModal({
               </p>
             </div>
           )}
+
+          {/* Bid History Section */}
+          {showBidHistory &&
+            (bidHistory.length > 0 ||
+              (auctionItem.bids && auctionItem.bids.length > 0)) && (
+              <ItemBidHistory
+                bids={
+                  bidHistory.length > 0 ? bidHistory : auctionItem.bids || []
+                }
+                currentUserId={userId}
+                title={
+                  bidHistory.length > 0
+                    ? 'Historial de Pujas'
+                    : 'Pujas Anteriores'
+                }
+                maxHeight="max-h-96"
+              />
+            )}
         </div>
       </DialogContent>
     </Dialog>

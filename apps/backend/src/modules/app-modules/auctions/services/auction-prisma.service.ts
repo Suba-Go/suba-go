@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { randomUUID } from 'crypto';
 import { PrismaService } from '../../../providers-modules/prisma/prisma.service';
 import type {
   Auction,
@@ -165,6 +166,7 @@ export class AuctionPrismaService {
       // Create the bid
       return prisma.bid.create({
         data: {
+          requestId: randomUUID(),
           userId: data.userId,
           auctionId: data.auctionId,
           auctionItemId: data.auctionItemId,

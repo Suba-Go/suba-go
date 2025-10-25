@@ -20,6 +20,7 @@ import type { JwtPayload } from '@suba-go/shared-validation';
 import { WsServerMessage, WsErrorCode } from '@suba-go/shared-validation';
 import { PrismaService } from '../prisma/prisma.service';
 import type { BidRealtimeService } from '../../app-modules/bids/services/bid-realtime.service';
+import { randomUUID } from 'crypto';
 
 /**
  * Client metadata stored per connection
@@ -64,6 +65,7 @@ export class AuctionsGateway
   private readonly clients = new WeakMap<WebSocket, ClientMeta>();
   private readonly rooms = new Map<string, RoomMeta>(); // Key: "tenantId:auctionId"
   private heartbeatInterval?: NodeJS.Timeout;
+  private readonly instanceId = randomUUID();
 
   constructor(
     private readonly prisma: PrismaService,
@@ -84,7 +86,9 @@ export class AuctionsGateway
    * Called once when the gateway is initialized
    */
   afterInit(server: Server) {
-    this.logger.log('Auctions WebSocket Gateway initialized');
+    this.logger.log(
+      `Auctions WebSocket Gateway initialized (instance ${this.instanceId})`
+    );
 
     // Heartbeat: ping all clients every 30 seconds
     this.heartbeatInterval = setInterval(() => {
@@ -163,12 +167,11 @@ export class AuctionsGateway
 
     this.logger.log(`Client connected: ${user.email} (role: ${user.role})`);
 
-    // Send initial connection acknowledgment
+    // Send initial connection acknowledgment (no handshake needed)
     this.sendMessage(client, {
       event: 'CONNECTED',
       data: {
-        message:
-          'WebSocket connection established. Send HELLO to complete handshake.',
+        message: 'WebSocket connection established. Ready to join auctions.',
         email: user.email,
       },
     });
@@ -187,34 +190,6 @@ export class AuctionsGateway
     });
 
     this.logger.log(`Client disconnected: ${meta.email}`);
-  }
-
-  /**
-   * Handle HELLO handshake message
-   */
-  @SubscribeMessage('HELLO')
-  handleHello(@MessageBody() data: any, @ConnectedSocket() client: WebSocket) {
-    const meta = this.clients.get(client);
-    if (!meta) {
-      this.sendError(client, WsErrorCode.UNAUTHORIZED, 'Not authenticated');
-      return;
-    }
-
-    this.logger.log(`HELLO received from ${meta.email}`);
-
-    // Send handshake confirmation
-    this.sendMessage(client, {
-      event: 'HELLO_OK',
-      data: {
-        ok: true,
-        user: {
-          email: meta.email,
-          role: meta.role,
-          userId: meta.userId,
-          tenantId: meta.tenantId,
-        },
-      },
-    });
   }
 
   /**
@@ -258,12 +233,22 @@ export class AuctionsGateway
     }
 
     // Validate access: ADMIN can access all, AUCTION_MANAGER can access their tenant's auctions
-    // Regular users must be registered for the auction
+    // Regular users will be auto-registered if they belong to the same tenant
     const isAdmin = meta.role === 'ADMIN';
     const isAuctionManager = meta.role === 'AUCTION_MANAGER';
 
     if (!isAdmin && !isAuctionManager) {
-      // For regular users, check if they're registered for the auction
+      // For regular users, check if they belong to the same tenant
+      if (meta.tenantId !== tenantId) {
+        this.sendError(
+          client,
+          WsErrorCode.FORBIDDEN,
+          'No tienes acceso a esta subasta'
+        );
+        return;
+      }
+
+      // Auto-register user if not already registered
       const registration = await this.prisma.auctionRegistration.findUnique({
         where: {
           userId_auctionId: {
@@ -274,12 +259,15 @@ export class AuctionsGateway
       });
 
       if (!registration) {
-        this.sendError(
-          client,
-          WsErrorCode.FORBIDDEN,
-          'Debes registrarte en la subasta para acceder'
+        this.logger.log(
+          `Auto-registering user ${meta.email} for auction ${auctionId}`
         );
-        return;
+        await this.prisma.auctionRegistration.create({
+          data: {
+            userId: meta.userId,
+            auctionId,
+          },
+        });
       }
     } else if (isAuctionManager && meta.tenantId !== tenantId) {
       // Auction managers can only access their own tenant's auctions
@@ -292,6 +280,44 @@ export class AuctionsGateway
     }
 
     const roomKey = this.getRoomKey(tenantId, auctionId);
+
+    // Ensure only one connection per user per auction room
+    const existingRoom = this.rooms.get(roomKey);
+    if (existingRoom) {
+      const duplicates: WebSocket[] = [];
+      existingRoom.clients.forEach((c) => {
+        const m = this.clients.get(c);
+        if (c !== client && m && m.userId === meta.userId) {
+          duplicates.push(c);
+        }
+      });
+
+      if (duplicates.length > 0) {
+        this.logger.warn(
+          `Duplicate connections for user ${meta.email} in room ${roomKey} -> removing ${duplicates.length} old connection(s)`
+        );
+        for (const dup of duplicates) {
+          // Inform the old connection and remove it from the room
+          this.sendMessage(dup, {
+            event: 'KICKED_DUPLICATE',
+            data: {
+              room: roomKey,
+              reason:
+                'Se detectó otra pestaña conectada a esta subasta con tu usuario. Esta conexión será removida de la sala.',
+            },
+          });
+          this.leaveRoom(dup, roomKey);
+        }
+      }
+    }
+
+    // If already joined this room, avoid sending duplicate JOINED events
+    if (meta.rooms.has(roomKey)) {
+      this.logger.debug(
+        `[${this.instanceId}] [JOIN] Ignoring duplicate join from ${meta.email} for room ${roomKey}`
+      );
+      return;
+    }
 
     // Add client to room
     this.joinRoom(client, roomKey, tenantId, auctionId);
@@ -379,6 +405,7 @@ export class AuctionsGateway
       auctionId: string;
       auctionItemId: string;
       amount: number;
+      requestId: string;
     },
     @ConnectedSocket() client: WebSocket
   ) {
@@ -419,13 +446,19 @@ export class AuctionsGateway
       return;
     }
 
-    // Log the bid attempt
+    // Validate requestId for idempotency
+    if (!data.requestId) {
+      this.sendError(client, WsErrorCode.INVALID_BID, 'requestId requerido');
+      return;
+    }
+
+    // Log the bid attempt with instance identifier
     this.logger.log(
-      `Bid attempt: ${meta.email} - $${data.amount} on item ${data.auctionItemId}`
+      `[${this.instanceId}] Bid attempt req=${data.requestId}: ${meta.email} - $${data.amount} on item ${data.auctionItemId}`
     );
 
     // Call BidRealtimeService to process the bid
-    // The service will validate, save to DB, and broadcast to all participants
+    // The service will validate, save to DB with requestId, and broadcast
     try {
       if (!this.bidRealtimeService) {
         this.logger.error('BidRealtimeService not injected!');
@@ -441,20 +474,20 @@ export class AuctionsGateway
         data.auctionItemId,
         data.amount,
         meta.userId,
-        data.tenantId
+        data.tenantId,
+        data.requestId
       );
 
-      // Success! The BidRealtimeService will broadcast BID_PLACED to all room participants
-      // No need to send individual response - the broadcast will update all clients
-    } catch (error: any) {
-      this.logger.error(`Bid placement failed: ${error.message}`);
-
-      // Send error to the client who tried to place the bid
-      this.sendError(
-        client,
-        WsErrorCode.INVALID_BID,
-        error.message || 'Error al procesar la puja'
+      this.logger.log(
+        `[${this.instanceId}] Bid accepted req=${data.requestId} for item ${data.auctionItemId} amount=$${data.amount}`
       );
+
+      // Success: BidRealtimeService will broadcast BID_PLACED to all room participants
+    } catch (error: unknown) {
+      const message =
+        error instanceof Error ? error.message : 'Error al procesar la puja';
+      this.logger.error(`Bid placement failed: ${message}`);
+      this.sendError(client, WsErrorCode.INVALID_BID, message);
     }
   }
 
