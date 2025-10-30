@@ -86,6 +86,14 @@ export function useAutoFormat() {
     return value.replace(/\D/g, '');
   }, []);
 
+  // Format email: lowercase, trim spaces, collapse internal spaces
+  const formatEmailLower = useCallback((value: string | number) => {
+    const str = value.toString();
+    // Remove leading/trailing spaces and unnecessary internal spaces
+    const cleaned = str.trim().replace(/\s+/g, '');
+    return cleaned.toLowerCase();
+  }, []);
+
   // Format Chilean RUT: 12.345.678-9 (accepts inputs without format and with k/K)
   const formatRut = useCallback((value: string) => {
     if (!value) return '';
@@ -131,5 +139,6 @@ export function useAutoFormat() {
     formatPhoneChile,
     composeIntlPhone,
     parseFormattedPhone,
+    formatEmailLower,
   };
 }

@@ -13,6 +13,7 @@ type FormatType =
   | 'price'
   | 'rut'
   | 'phone'
+  | 'email'
   | 'none';
 
 interface FormattedInputProps
@@ -42,6 +43,7 @@ export function FormattedInput({
     formatRut,
     parseFormattedRut,
     formatPhoneChile,
+    formatEmailLower,
   } = useAutoFormat();
 
   useEffect(() => {
@@ -67,6 +69,9 @@ export function FormattedInput({
           break;
         case 'phone':
           setDisplayValue(formatPhoneChile(value.toString()));
+          break;
+        case 'email':
+          setDisplayValue(formatEmailLower(value));
           break;
         default:
           setDisplayValue(value.toString());
@@ -135,6 +140,12 @@ export function FormattedInput({
       case 'phone': {
         formattedValue = formatPhoneChile(inputValue);
         parsedValue = formattedValue; // return formatted string; who consumes can clean if needed  
+        break;
+      }
+
+      case 'email': {
+        formattedValue = formatEmailLower(inputValue);
+        parsedValue = formattedValue;
         break;
       }
 

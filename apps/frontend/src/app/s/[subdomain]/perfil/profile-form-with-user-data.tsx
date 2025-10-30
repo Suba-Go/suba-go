@@ -68,7 +68,6 @@ export default function ProfileFormWithUserData({
   const router = useRouter();
   const { toast } = useToast();
   const { formatRut } = useAutoFormat();
-  const [formattedRut, setFormattedRut] = useState('');
   const [isEditing, setIsEditing] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [userData, setUserData] = useState({
@@ -162,9 +161,10 @@ export default function ProfileFormWithUserData({
       // Prepare the data to send - all fields are required
       const updateData = {
         name: userData.name.trim(),
-        email: userData.email.trim(),
+        email: userData.email.trim().toLowerCase(),
         phone: userData.phone.trim(),
-        rut: userData.rut.trim(),
+        //  Rut saved formatted
+        rut: formatRut(userData.rut.trim()),
       };
 
       console.log('Preparing to send update data:', updateData);
@@ -337,10 +337,20 @@ export default function ProfileFormWithUserData({
           </label>
           {isEditing ? (
             <div>
-              <input
+              <FormattedInput
                 type="email"
+                formatType="email"
                 value={userData.email}
-                onChange={handleInputChange('email')}
+                onChange={(val) => {
+                  const value = (val ?? '').toString();
+                  setUserData((prev) => ({ ...prev, email: value }));
+                  if (value.trim()) {
+                    const err = validateEmail(value);
+                    setValidationErrors((prev) => ({ ...prev, email: err || undefined }));
+                  } else {
+                    setValidationErrors((prev) => ({ ...prev, email: undefined }));
+                  }
+                }}
                 className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 bg-blue-50 ${
                   validationErrors.email
                     ? 'border-red-500 focus:ring-red-500'
@@ -381,7 +391,7 @@ export default function ProfileFormWithUserData({
                     ? 'border-red-500 focus-within:ring-red-500'
                     : 'border-blue-300 focus-within:ring-blue-500'
                 }`}
-                placeholder="+56 9 1234 5678"
+                placeholder="9 1234 5678"
               />
               {validationErrors.phone && (
                 <p className="mt-1 text-sm text-red-600">{validationErrors.phone}</p>
@@ -405,7 +415,6 @@ export default function ProfileFormWithUserData({
                 value={userData.rut}
                 onChange={(val) => {
                   const value = (val ?? '').toString();
-                  setFormattedRut(formatRut(value));
                   setUserData((prev) => ({ ...prev, rut: value }));
                   if (value.trim()) {
                     const error = validateRUT(value);
@@ -427,7 +436,7 @@ export default function ProfileFormWithUserData({
             </div>
           ) : (
             <div className="px-3 py-2 bg-gray-50 border border-gray-200 rounded-md text-gray-900">
-              {userData.rut ? formatRut(userData.rut) : 'No especificado'}
+              {userData.rut || 'No especificado'}
             </div>
           )}
         </div>
