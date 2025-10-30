@@ -1,7 +1,8 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
+import { useSession } from 'next-auth/react';
 import NavbarLayout from './navbar-layout';
 import { getSubdomainFromHost, getNodeEnv } from '@suba-go/shared-components';
 
@@ -22,6 +23,8 @@ export default function ConditionalLayout({
   const [isSubdomain, setIsSubdomain] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const pathname = usePathname();
+  const router = useRouter();
+  const { data: session, status } = useSession();
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -38,6 +41,20 @@ export default function ConditionalLayout({
     setIsSubdomain(subdomain !== null);
     setIsLoading(false);
   }, [pathname]);
+
+  // Global client-side trap to keep user in onboarding if profile is incomplete
+  // Only applies when inside a subdomain (not on root domain)
+  useEffect(() => {
+    if (status === 'loading' || isLoading) return;
+    // Only enforce onboarding guard when inside a subdomain
+    if (!isSubdomain) return;
+    
+    const user = session?.user;
+    const isIncomplete = !user || !user.name || user.name.trim().length < 3 || !user.phone || !user.rut;
+    if (isIncomplete && pathname !== '/onboarding') {
+      router.replace('/onboarding');
+    }
+  }, [status, session, pathname, router, isSubdomain, isLoading]);
 
   if (isLoading) {
     return (

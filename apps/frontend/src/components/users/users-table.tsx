@@ -11,7 +11,8 @@ import {
   MailIcon,
   PhoneIcon,
   CalendarIcon,
-  ShieldIcon
+  ShieldIcon,
+  IdCardIcon,
 } from 'lucide-react';
 import { UsersTableSkeleton } from './users-table-skeleton';
 import { UsersSearchBar } from './users-search-bar';
@@ -185,6 +186,7 @@ export function UsersTable({ className }: UsersTableProps) {
               </th>
               <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                 <SortButton field="rut">
+                  <IdCardIcon className="h-4 w-4 mr-1" />
                   RUT
                 </SortButton>
               </th>

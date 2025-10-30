@@ -7,6 +7,7 @@ import { Input } from '@suba-go/shared-components/components/ui/input';
 import { Label } from '@suba-go/shared-components/components/ui/label';
 import { useToast } from '@suba-go/shared-components/components/ui/toaster';
 import { getNodeEnv } from '@suba-go/shared-components';
+import { normalizeCompanyName } from '@/utils/company-normalization';
 import { Eye, EyeOff } from 'lucide-react';
 
 interface CompanyLoginFormProps {
@@ -72,9 +73,9 @@ export default function CompanyLoginForm({
     }
 
     setIsLoading(true);
-    // Use the lowercase company name for subdomain validation
+    // Use the normalized company name for subdomain validation
     const subdomainToValidate =
-      companyNameLowercase || companyName?.toLowerCase();
+      companyNameLowercase || normalizeCompanyName(companyName || '');
 
     // SECURITY: Validate that the email belongs to this tenant before attempting login
     if (subdomainToValidate) {
@@ -163,24 +164,32 @@ export default function CompanyLoginForm({
           variant: 'destructive',
         });
       } else if (result?.ok) {
-        // Force refresh to get the session
+        // Wait for session to be established
         await new Promise((resolve) => setTimeout(resolve, 500));
-
-        toast({
-          title: 'Inicio de sesión exitoso',
-          description: `Bienvenido a ${companyName || 'tu empresa'}`,
-        });
-
-        // Delay to ensure session is established
-        setTimeout(() => {
-          // Call success callback or redirect
-          if (onLoginSuccess) {
-            onLoginSuccess();
+        
+        // Fetch the session to check if profile is complete
+        const sessionResponse = await fetch('/api/auth/session');
+        const session = await sessionResponse.json();
+        
+        // Check if profile is complete
+        const user = session?.user;
+        const isProfileComplete = user?.name && 
+          user.name.trim().length >= 3 && 
+          user.phone && 
+          user.phone.trim().length > 0 && 
+          user.rut && 
+          user.rut.trim().length > 0;
+        
+        if (onLoginSuccess) {
+          onLoginSuccess();
+        } else {
+          // Redirect based on profile completion status
+          if (isProfileComplete) {
+            window.location.replace('/');
           } else {
-            // Force a full page reload to ensure session is recognized
-            window.location.href = '/';
+            window.location.replace('/onboarding');
           }
-        }, 1500);
+        }
       }
     } catch (error) {
       console.error('Login error:', error);

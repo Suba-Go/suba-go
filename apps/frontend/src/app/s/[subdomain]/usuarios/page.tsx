@@ -1,7 +1,20 @@
 import { UsersTable } from '@/components/users/users-table';
 import { UsersStats } from '@/components/users/users-stats';
+import { auth } from '@/auth';
+import { redirect } from 'next/navigation';
+import { isUserAdminOrManager } from '@/utils/subdomain-profile-validation';
 
-export default async function UsuariosPage() {
+export default async function UsuariosPage({
+  params,
+}: {
+  params: Promise<{ subdomain: string }>;
+}) {
+  const session = await auth();
+
+  // Verify user has AUCTION_MANAGER role or ADMIN role
+  if (!session || !isUserAdminOrManager(session)) {
+    redirect('/');
+  }
   return (
     <div className="container mx-auto px-4 py-8">
       <div className="flex justify-between items-center mb-8">

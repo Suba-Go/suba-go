@@ -1,8 +1,9 @@
 import { Metadata } from 'next';
-import { notFound } from 'next/navigation';
+import { notFound} from 'next/navigation';
 import { auth } from '@/auth';
 import { getCompanyBySubdomainServerAction } from '@/domain/server-actions/company/get-company-by-subdomain-server-action';
-import ProfileFormWithUserData from './profile-form-with-user-data';
+import { normalizeCompanyName } from '@/utils/company-normalization';
+import ProfileFormWithUserData from '../../../../components/perfil/profile-form-with-user-data';
 
 interface ProfilePageProps {
   params: Promise<{
@@ -15,8 +16,9 @@ export async function generateMetadata({
 }: ProfilePageProps): Promise<Metadata> {
   try {
     const resolvedParams = await params;
+    const normalizedSubdomain = normalizeCompanyName(resolvedParams.subdomain);
     const companyResponse = await getCompanyBySubdomainServerAction(
-      resolvedParams.subdomain
+      normalizedSubdomain
     );
 
     if (companyResponse.success && companyResponse.data) {
@@ -43,18 +45,18 @@ export default async function ProfilePage({ params }: ProfilePageProps) {
   let subdomain;
   let userRole = 'Usuario';
 
+  const session = await auth();
   try {
     const resolvedParams = await params;
     subdomain = resolvedParams.subdomain;
     
-    // Obtener la sesión del usuario
-    const session = await auth();
     if (session?.user?.role) {
       userRole = session.user.role;
     }
     
+    const normalizedSubdomain = normalizeCompanyName(subdomain);
     const companyResponse = await getCompanyBySubdomainServerAction(
-      subdomain
+      normalizedSubdomain
     );
 
     if (!companyResponse.success || !companyResponse.data) {
@@ -68,7 +70,7 @@ export default async function ProfilePage({ params }: ProfilePageProps) {
     notFound();
   }
 
-  // Función para convertir el rol a texto legible
+  // Function to convert the role to a readable text
   const getRoleLabel = (role: string) => {
     switch (role) {
       case 'ADMIN':
@@ -88,7 +90,7 @@ export default async function ProfilePage({ params }: ProfilePageProps) {
         <h1 className="text-3xl font-bold text-gray-900 mb-8">Mi Perfil</h1>
         
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-          {/* Columna Izquierda - Información de la Empresa */}
+          {/* Left Column - Company Information */}
           <div className="bg-white rounded-lg shadow p-6">
             <h2 className="text-xl font-semibold text-gray-900 mb-6 border-b border-gray-200 pb-4">
               Información de la Empresa
@@ -141,7 +143,7 @@ export default async function ProfilePage({ params }: ProfilePageProps) {
             </div>
           </div>
 
-          {/* Columna Derecha - Información del Usuario */}
+          {/* Right Column - User Information */}
           <div className="bg-white rounded-lg shadow p-6">
             <ProfileFormWithUserData 
               company={{

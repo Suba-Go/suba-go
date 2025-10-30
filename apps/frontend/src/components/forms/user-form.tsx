@@ -7,6 +7,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Button } from '@suba-go/shared-components/components/ui/button';
 import { Input } from '@suba-go/shared-components/components/ui/input';
+import { FormattedInput } from '@/components/ui/formatted-input';
 import { Label } from '@suba-go/shared-components/components/ui/label';
 import { UserCreateDto, userCreateSchema } from '@suba-go/shared-validation';
 
@@ -74,6 +75,7 @@ export default function UserForm({
     formState: { errors, isValid },
     watch,
     getValues,
+    setValue,
   } = useForm<UserCreateDto>({
     resolver: zodResolver(userCreateSchema),
     defaultValues: defaultData,
@@ -99,7 +101,11 @@ export default function UserForm({
   const onFormSubmit = (data: UserCreateDto) => {
     // Clear cache on successful submit
     clearUserCache();
-    onSubmit(data);
+    const normalized: UserCreateDto = {
+      ...data,
+      email: (data.email || '').trim().toLowerCase(),
+    };
+    onSubmit(normalized);
   };
 
   return (
@@ -121,10 +127,15 @@ export default function UserForm({
 
       <div className="space-y-2">
         <Label htmlFor="email">Email</Label>
-        <Input
+        <FormattedInput
           id="email"
           type="email"
-          {...register('email')}
+          formatType="email"
+          value={emailValue || ''}
+          onChange={(val) => {
+            const v = (val ?? '').toString();
+            setValue('email', v, { shouldValidate: true, shouldDirty: true });
+          }}
           className={`border-gray-300 focus:border-primary ${
             errors.email ? 'border-red-500 focus:border-red-500' : ''
           }`}

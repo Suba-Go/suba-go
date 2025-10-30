@@ -55,7 +55,7 @@ export function ItemCreateModal({
       // Prepare data with file URLs and convert enum key to Prisma enum value
       const submitData = {
         ...data,
-        // Convertir la key del enum a la key de Prisma (que son iguales)
+        // Convert enum key to Prisma enum key (they are the same)
         legal_status: data.legal_status || undefined,
         photos: photoUrls.length > 0 ? photoUrls.join(',') : undefined,
         docs: docUrls.length > 0 ? docUrls.join(',') : undefined,
@@ -115,7 +115,7 @@ export function ItemCreateModal({
         </DialogHeader>
 
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
-          {/* Información Básica */}
+          {/* Basic Information */}
           <div className="space-y-4">
             <h3 className="text-lg font-medium">Información Básica</h3>
 
@@ -261,7 +261,7 @@ export function ItemCreateModal({
             </div>
           </div>
 
-          {/* Archivos */}
+          {/* Files */}
           <div className="space-y-4">
             <h3 className="text-lg font-medium">Archivos</h3>
 
