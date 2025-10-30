@@ -8,8 +8,12 @@ import { useToast } from '@suba-go/shared-components/components/ui/toaster';
 import { Button } from '@suba-go/shared-components/components/ui/button';
 import { darkenColor } from '@/utils/color-utils';
 import { Spinner } from '@suba-go/shared-components/components/ui/spinner';
+import { validateRUT as validateRUTUtil } from '@suba-go/shared-validation';
+import { FormattedInput } from '@/components/ui/formatted-input';
+import { PhoneInput } from '@/components/ui/phone-input';
+import { useAutoFormat } from '@/hooks/use-auto-format';
 
-// Funciones de validación
+// functions to validate the form fields
 const validateEmail = (email: string): string | null => {
   if (!email.trim()) return 'El email es obligatorio';
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -25,7 +29,7 @@ const validateName = (name: string): string | null => {
 
 const validatePhone = (phone: string): string | null => {
   if (!phone.trim()) return 'El teléfono es obligatorio';
-  // Validación básica de teléfono chileno
+  // Basic validation for Chilean phone number
   const phoneRegex = /^(\+56|56)?[2-9]\d{8}$/;
   if (!phoneRegex.test(phone.replace(/\s/g, ''))) {
     return 'Debes ingresar un teléfono válido (ej: +56 9 1234 5678)';
@@ -36,12 +40,16 @@ const validatePhone = (phone: string): string | null => {
 const validateRUT = (rut: string): string | null => {
   if (!rut.trim()) return 'El RUT es obligatorio';
   
-  // Validación básica: solo verificar que tenga el formato XX.XXX.XXX-X
+  // Validation rut format and validate the rut
   const rutRegex = /^[0-9]{1,2}\.?[0-9]{3}\.?[0-9]{3}-[0-9kK]$/;
   if (!rutRegex.test(rut)) {
     return 'Debes ingresar un RUT válido con guión (ej: 12.345.678-9)';
   }
-  
+
+  // Validate the rut digit verifier
+  const isValid = validateRUTUtil(rut);
+  if (!isValid) return 'El RUT no es válido';
+
   return null;
 };
 
@@ -59,6 +67,8 @@ export default function ProfileFormWithUserData({
   const { data: session, status, update } = useSession();
   const router = useRouter();
   const { toast } = useToast();
+  const { formatRut } = useAutoFormat();
+  const [formattedRut, setFormattedRut] = useState('');
   const [isEditing, setIsEditing] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [userData, setUserData] = useState({
@@ -96,7 +106,7 @@ export default function ProfileFormWithUserData({
   const handleCancel = () => {
     setIsEditing(false);
     setValidationErrors({});
-    // Restaurar datos originales
+    // Restore original data
     if (session?.user) {
       setUserData({
         name: session.user.name || '',
@@ -117,10 +127,10 @@ export default function ProfileFormWithUserData({
       return;
     }
 
-    // Validar todos los campos antes de enviar
+    // Validate all fields before sending
     const errors: { [key: string]: string } = {};
     
-    // Validar campos obligatorios
+    // Validate required fields
     const nameError = validateName(userData.name);
     if (nameError) errors.name = nameError;
     
@@ -133,7 +143,7 @@ export default function ProfileFormWithUserData({
     const rutError = validateRUT(userData.rut);
     if (rutError) errors.rut = rutError;
 
-    // Si hay errores de validación, mostrarlos y no continuar
+    // If there are validation errors, show them and do not continue
     if (Object.keys(errors).length > 0) {
       setValidationErrors(errors);
       toast({
@@ -144,12 +154,12 @@ export default function ProfileFormWithUserData({
       return;
     }
 
-    // Limpiar errores de validación si todo está bien
+    // Clean validation errors if everything is ok
     setValidationErrors({});
     setIsLoading(true);
 
     try {
-      // Preparar los datos para enviar - todos los campos son obligatorios
+      // Prepare the data to send - all fields are required
       const updateData = {
         name: userData.name.trim(),
         email: userData.email.trim(),
@@ -160,11 +170,11 @@ export default function ProfileFormWithUserData({
       console.log('Preparing to send update data:', updateData);
       console.log('Original userData:', userData);
 
-      // Llamar a la API para actualizar el perfil
+      // Call the API to update the profile
       const result = await updateUserProfileAction(session.user.id, updateData);
 
       if (result.success) {
-        // Actualizar la sesión de NextAuth con los nuevos datos
+        // Update the NextAuth session with the new data
         await update({
           user: {
             ...session.user,
@@ -199,7 +209,7 @@ export default function ProfileFormWithUserData({
       if (error instanceof Error) {
         errorMessage = error.message;
         
-        // Si es un error interno del servidor, mostrar un mensaje más específico
+        // If it is an internal server error, show a more specific message
         if (error.message.includes('Internal server error')) {
           errorMessage = 'Error interno del servidor. Por favor verifica que todos los datos estén correctos e intenta nuevamente.';
         }
@@ -224,7 +234,7 @@ export default function ProfileFormWithUserData({
         [field]: value,
       }));
       
-      // Validar en tiempo real solo si el campo tiene contenido
+      // Validate in real time only if the field has content
       if (value.trim()) {
         let error: string | null = null;
         
@@ -248,7 +258,7 @@ export default function ProfileFormWithUserData({
           [field]: error || undefined,
         }));
       } else {
-        // Si el campo está vacío, limpiar el error
+        // If the field is empty, clean the error
         setValidationErrors((prev) => ({
           ...prev,
           [field]: undefined,
@@ -355,14 +365,21 @@ export default function ProfileFormWithUserData({
           </label>
           {isEditing ? (
             <div>
-              <input
-                type="tel"
+              <PhoneInput
                 value={userData.phone}
-                onChange={handleInputChange('phone')}
-                className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 bg-blue-50 ${
+                onChange={(val) => {
+                  setUserData((prev) => ({ ...prev, phone: val }));
+                  if (val.trim()) {
+                    const error = validatePhone(val);
+                    setValidationErrors((prev) => ({ ...prev, phone: error || undefined }));
+                  } else {
+                    setValidationErrors((prev) => ({ ...prev, phone: undefined }));
+                  }
+                }}
+                className={`w-full ${
                   validationErrors.phone
-                    ? 'border-red-500 focus:ring-red-500'
-                    : 'border-blue-300 focus:ring-blue-500'
+                    ? 'border-red-500 focus-within:ring-red-500'
+                    : 'border-blue-300 focus-within:ring-blue-500'
                 }`}
                 placeholder="+56 9 1234 5678"
               />
@@ -383,10 +400,20 @@ export default function ProfileFormWithUserData({
           </label>
           {isEditing ? (
             <div>
-              <input
-                type="text"
+              <FormattedInput
+                formatType="rut"
                 value={userData.rut}
-                onChange={handleInputChange('rut')}
+                onChange={(val) => {
+                  const value = (val ?? '').toString();
+                  setFormattedRut(formatRut(value));
+                  setUserData((prev) => ({ ...prev, rut: value }));
+                  if (value.trim()) {
+                    const error = validateRUT(value);
+                    setValidationErrors((prev) => ({ ...prev, rut: error || undefined }));
+                  } else {
+                    setValidationErrors((prev) => ({ ...prev, rut: undefined }));
+                  }
+                }}
                 className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 bg-blue-50 ${
                   validationErrors.rut
                     ? 'border-red-500 focus:ring-red-500'
@@ -400,13 +427,13 @@ export default function ProfileFormWithUserData({
             </div>
           ) : (
             <div className="px-3 py-2 bg-gray-50 border border-gray-200 rounded-md text-gray-900">
-              {userData.rut || 'No especificado'}
+              {userData.rut ? formatRut(userData.rut) : 'No especificado'}
             </div>
           )}
         </div>
       </div>
 
-      {/* Botones de acción */}
+      {/* Action buttons */}
       <div className="flex justify-end space-x-4 pt-4">
         <Button
           onClick={handleGoBack}

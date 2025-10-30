@@ -11,6 +11,8 @@ type FormatType =
   | 'number'
   | 'simple-number'
   | 'price'
+  | 'rut'
+  | 'phone'
   | 'none';
 
 interface FormattedInputProps
@@ -37,6 +39,9 @@ export function FormattedInput({
     parseFormattedNumber,
     formatPrice,
     parseFormattedPrice,
+    formatRut,
+    parseFormattedRut,
+    formatPhoneChile,
   } = useAutoFormat();
 
   useEffect(() => {
@@ -56,6 +61,12 @@ export function FormattedInput({
           break;
         case 'price':
           setDisplayValue(formatPrice(value));
+          break;
+        case 'rut':
+          setDisplayValue(formatRut(value.toString()))
+          break;
+        case 'phone':
+          setDisplayValue(formatPhoneChile(value.toString()));
           break;
         default:
           setDisplayValue(value.toString());
@@ -112,6 +123,18 @@ export function FormattedInput({
         const priceNumbersOnly = inputValue.replace(/[^0-9]/g, '');
         formattedValue = formatPrice(priceNumbersOnly);
         parsedValue = parseFormattedPrice(formattedValue);
+        break;
+      }
+
+      case 'rut': {
+        formattedValue = formatRut(inputValue);
+        parsedValue = parseFormattedRut(formattedValue);
+        break;
+      }
+
+      case 'phone': {
+        formattedValue = formatPhoneChile(inputValue);
+        parsedValue = formattedValue; // return formatted string; who consumes can clean if needed  
         break;
       }
 
