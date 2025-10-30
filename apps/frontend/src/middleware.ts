@@ -83,10 +83,11 @@ export default auth(async function middleware(request: NextRequest) {
         new URL(`/s/${subdomain}/subastas`, request.url)
       );
     }
-
-    if (pathname === '/usuarios') {
+    
+    // Onboarding page
+    if (pathname === '/onboarding') {
       return NextResponse.rewrite(
-        new URL(`/s/${subdomain}/usuarios`, request.url)
+        new URL(`/s/${subdomain}/onboarding`, request.url)
       );
     }
 
@@ -120,9 +121,9 @@ export default auth(async function middleware(request: NextRequest) {
       return NextResponse.redirect(login);
     }
 
-    // Check if user profile is complete - redirect to /perfil if not
+    // Check if user profile is complete - redirect to /onboarding if not
     if (!isUserProfileComplete(session)) {
-      console.log('Profile incomplete, redirecting to /perfil', {
+      console.log('Profile incomplete, redirecting to /onboarding', {
         user: session.user?.email,
         name: session.user?.name,
         phone: session.user?.phone,
@@ -130,8 +131,8 @@ export default auth(async function middleware(request: NextRequest) {
         pathname: pathname,
       });
       
-      // Si está en la página de inicio, permitir acceso pero mostrar advertencia
-      return NextResponse.redirect(new URL('/perfil', request.url));
+      // redirect to public onboarding route
+      return NextResponse.redirect(new URL(`/onboarding`, request.url));
     }
     }
 

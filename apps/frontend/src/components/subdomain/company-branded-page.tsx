@@ -2,8 +2,6 @@
 
 import { CompanyDto } from '@suba-go/shared-validation';
 import { useSession } from 'next-auth/react';
-import { ProfileIncompleteWarning } from '@/components/auth/profile-incomplete-warning';
-import { getMissingProfileFields } from '@/utils/subdomain-profile-validation';
 import { UserHomePage } from './user-home-page';
 
 interface CompanyBrandedPageProps {
@@ -19,9 +17,6 @@ export default function CompanyBrandedPage({
   const userRole = session?.user?.role;
   const primaryColor = company.principal_color || '#3B82F6'; // Default blue if no color set
   
-  // check if the profile is incomplete
-  const missingFields = getMissingProfileFields(session);
-  const isProfileIncomplete = missingFields.length > 0;
 
   // If user is logged in and is a regular USER, show the user home page
   if (session && userRole === 'USER') {
@@ -49,14 +44,6 @@ export default function CompanyBrandedPage({
       `}</style>
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-        {/* Show warning if profile is incomplete */}
-        {isProfileIncomplete && (
-          <ProfileIncompleteWarning 
-            missingFieldsCount={missingFields.length}
-            companyName={company.name}
-          />
-        )}
-        
         <div className="text-center">
           <h2
             className="text-4xl font-bold mb-4"

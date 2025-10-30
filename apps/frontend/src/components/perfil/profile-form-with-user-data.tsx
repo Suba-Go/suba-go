@@ -59,10 +59,12 @@ interface ProfileFormWithUserDataProps {
     name: string;
     principal_color?: string;
   };
+  hideBackButton?: boolean;
 }
 
 export default function ProfileFormWithUserData({
   company,
+  hideBackButton,
 }: ProfileFormWithUserDataProps) {
   const { data: session, status, update } = useSession();
   const router = useRouter();
@@ -192,6 +194,11 @@ export default function ProfileFormWithUserData({
         });
 
         setIsEditing(false);
+
+        // if is onboarding, redirect to home
+        if (hideBackButton) {
+          router.replace('/');
+        }
       } else {
         throw new Error(result.error || 'Error al actualizar el perfil');
       }
@@ -298,6 +305,20 @@ export default function ProfileFormWithUserData({
 
   return (
     <div className="space-y-6">
+      {/* warning missing fields */}
+      {session?.user && (() => {
+        const missing: string[] = [];
+        const u = session.user;
+        if (!u?.name || u.name.trim().length < 3) missing.push('name');
+        if (!u?.phone || u.phone.trim().length === 0) missing.push('phone');
+        if (!u?.rut || u.rut.trim().length === 0) missing.push('rut');
+        return missing.length > 0 ? (
+          <div className="rounded-md border border-yellow-300 bg-yellow-50 px-4 py-3 text-yellow-900">
+            <p className="font-medium">Completa tu perfil para continuar</p>
+            <p className="text-sm mt-1">Campos faltantes: {missing.join(', ')}</p>
+          </div>
+        ) : null;
+      })()}
       <h2 className="text-xl font-semibold text-gray-900 mb-6 border-b border-gray-200 pb-4">
         Información Personal
       </h2>
@@ -444,29 +465,31 @@ export default function ProfileFormWithUserData({
 
       {/* Action buttons */}
       <div className="flex justify-end space-x-4 pt-4">
-        <Button
-          onClick={handleGoBack}
-          className="px-4 py-2 text-white rounded-md transition-colors"
-          style={{
-            backgroundColor: company.principal_color,
-            borderColor: company.principal_color,
-          }}
-          onMouseEnter={(e) => {
-            if (company.principal_color) {
-              e.currentTarget.style.backgroundColor = darkenColor(
-                company.principal_color,
-                10
-              );
-            }
-          }}
-          onMouseLeave={(e) => {
-            if (company.principal_color) {
-              e.currentTarget.style.backgroundColor = company.principal_color;
-            }
-          }}
-        >
-          Volver
-        </Button>
+        {!hideBackButton && (
+          <Button
+            onClick={handleGoBack}
+            className="px-4 py-2 text-white rounded-md transition-colors"
+            style={{
+              backgroundColor: company.principal_color,
+              borderColor: company.principal_color,
+            }}
+            onMouseEnter={(e) => {
+              if (company.principal_color) {
+                e.currentTarget.style.backgroundColor = darkenColor(
+                  company.principal_color,
+                  10
+                );
+              }
+            }}
+            onMouseLeave={(e) => {
+              if (company.principal_color) {
+                e.currentTarget.style.backgroundColor = company.principal_color;
+              }
+            }}
+          >
+            Volver
+          </Button>
+        )}
 
         {isEditing ? (
           <>

@@ -3,7 +3,7 @@ import { notFound} from 'next/navigation';
 import { auth } from '@/auth';
 import { getCompanyBySubdomainServerAction } from '@/domain/server-actions/company/get-company-by-subdomain-server-action';
 import { normalizeCompanyName } from '@/utils/company-normalization';
-import ProfileFormWithUserData from './profile-form-with-user-data';
+import ProfileFormWithUserData from '../../../../components/perfil/profile-form-with-user-data';
 
 interface ProfilePageProps {
   params: Promise<{
