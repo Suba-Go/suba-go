@@ -12,7 +12,7 @@ export async function updateUserProfileAction(
       method: 'PATCH',
       body: updateData,
       requireAuth: true,
-    });
+    }, 'ProfileUpdateErrors');
 
     if (!result.success) {
       throw new Error(result.error || 'Error al actualizar el perfil');

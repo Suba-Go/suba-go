@@ -6,6 +6,7 @@ ignoredBuiltDependencies:
 onlyBuiltDependencies:
   - '@nestjs/core'
   - '@parcel/watcher'
+  - '@prisma/client'
   - '@swc/core'
   - esbuild
   - nx

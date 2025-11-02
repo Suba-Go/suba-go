@@ -16,6 +16,7 @@ export default function CompanyBrandedPage({
   const { data: session } = useSession();
   const userRole = session?.user?.role;
   const primaryColor = company.principal_color || '#3B82F6'; // Default blue if no color set
+  
 
   // If user is logged in and is a regular USER, show the user home page
   if (session && userRole === 'USER') {

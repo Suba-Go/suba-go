@@ -11,6 +11,7 @@ import { User, LogOut, ChevronDown, Gavel, Package, Users } from 'lucide-react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { Spinner } from '@suba-go/shared-components/components/ui/spinner';
+import { isUserProfileComplete, isUserAdminOrManager } from '@/utils/subdomain-profile-validation';
 
 interface CompanyNavbarProps {
   company: CompanyDto;
@@ -89,6 +90,8 @@ export default function CompanyNavbar({
           </Link>
 
           {/* Navigation Menu */}
+          {/* check if the profile is complete */}
+          {isUserProfileComplete(session) && (
           <nav className="hidden md:flex items-center space-x-6">
             <Link href="/subastas">
               <Button
@@ -99,8 +102,8 @@ export default function CompanyNavbar({
                 Subastas
               </Button>
             </Link>
-            {/* Productos - Solo para AUCTION_MANAGER */}
-            {session?.user?.role === 'AUCTION_MANAGER' && (
+            {/* Products - Only for AUCTION_MANAGER and ADMIN */}
+            {isUserAdminOrManager(session) && (
               <Link href="/items">
                 <Button
                   variant="ghost"
@@ -111,9 +114,9 @@ export default function CompanyNavbar({
                 </Button>
               </Link>
             )}
-            {/* Usuarios - Solo para AUCTION_MANAGER */}
-            {session?.user?.role === 'AUCTION_MANAGER' && (
-              <Link href={`/usuarios`}>
+            {/* Users - Only for AUCTION_MANAGER and ADMIN */}
+            {isUserAdminOrManager(session) && (
+              <Link href="/usuarios">
                 <Button
                   variant="ghost"
                   className="text-gray-600 hover:text-gray-900 flex items-center gap-2"
@@ -124,6 +127,7 @@ export default function CompanyNavbar({
               </Link>
             )}
           </nav>
+          )}
 
           {/* Right side actions */}
           <div className="flex items-center space-x-4">
@@ -209,8 +213,8 @@ export default function CompanyNavbar({
               Subastas
             </Button>
           </Link>
-          {/* Productos - Solo para AUCTION_MANAGER */}
-          {session?.user?.role === 'AUCTION_MANAGER' && (
+          {/* Products - Only for AUCTION_MANAGER and ADMIN */}
+          {isUserAdminOrManager(session) && (
             <Link href="/items">
               <Button
                 variant="ghost"
@@ -221,9 +225,9 @@ export default function CompanyNavbar({
               </Button>
             </Link>
           )}
-          {/* Usuarios - Solo para AUCTION_MANAGER */}
-          {session?.user?.role === 'AUCTION_MANAGER' && (
-            <Link href={`/usuarios`}>
+          {/* Users - Only for AUCTION_MANAGER and ADMIN */}
+          {isUserAdminOrManager(session) && (
+            <Link href="/usuarios">
               <Button
                 variant="ghost"
                 className="w-full text-left justify-start text-gray-600 hover:text-gray-900 flex items-center gap-2"
