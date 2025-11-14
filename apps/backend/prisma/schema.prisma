@@ -153,6 +153,7 @@ model Item {
   legal_status LegalStatusEnum?
   state        ItemStateEnum @default(DISPONIBLE)
   basePrice    Decimal? @db.Decimal(10, 2)
+  description  String?
 
   // Sale tracking fields
   soldPrice    Decimal? @db.Decimal(10, 2)

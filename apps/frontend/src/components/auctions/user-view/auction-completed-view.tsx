@@ -16,33 +16,10 @@ import {
 import { Badge } from '@suba-go/shared-components/components/ui/badge';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
+import { AuctionDto } from '@suba-go/shared-validation';
 
 interface AuctionCompletedViewProps {
-  auction: {
-    title: string;
-    description?: string;
-    startTime: string;
-    endTime: string;
-    items?: Array<{
-      id: string;
-      startingBid: number;
-      item?: {
-        brand?: string;
-        model?: string;
-        year?: number;
-        plate?: string;
-        soldToUserId?: string;
-        soldPrice?: number;
-      };
-      bids?: Array<{
-        offered_price: number;
-        userId?: string;
-        user?: {
-          public_name?: string;
-        };
-      }>;
-    }>;
-  };
+  auction: AuctionDto;
   userId?: string;
 }
 

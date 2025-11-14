@@ -15,7 +15,8 @@ export default async function AuctionDetailPage({
 
   // Verify user has access to auctions (AUCTION_MANAGER or regular user)
   const hasAccess =
-    session && (session.user.role === 'AUCTION_MANAGER' || isUserRole(session.user.role));
+    session &&
+    (session.user.role === 'AUCTION_MANAGER' || isUserRole(session.user.role));
 
   if (!hasAccess) {
     redirect('/');
@@ -23,7 +24,7 @@ export default async function AuctionDetailPage({
 
   // Get access token and tenant ID for WebSocket
   const accessToken = session.tokens.accessToken;
-  const tenantId = session.user.tenant?.id;
+  const tenantId = session.user.tenantId;
   const userId = session.user.id;
 
   if (!tenantId) {

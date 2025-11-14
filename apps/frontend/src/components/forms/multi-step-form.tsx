@@ -53,6 +53,7 @@ export default function MultiStepForm() {
     secondary_color: null,
     secondary_color2: null,
     secondary_color3: null,
+    tenantId: null,
   });
   const [isLoading, setIsLoading] = useState(false);
   const [completedData, setCompletedData] = useState<{

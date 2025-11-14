@@ -16,8 +16,7 @@ import {
   AlertDescription,
 } from '@suba-go/shared-components/components/ui/alert';
 import { AlertCircle } from 'lucide-react';
-import type { AuctionData } from '@/types/auction.types';
-import { AuctionStatusEnum } from '@suba-go/shared-validation';
+import { AuctionDto, AuctionStatusEnum } from '@suba-go/shared-validation';
 
 interface AuctionViewRouterProps {
   auctionId: string;
@@ -39,7 +38,7 @@ export function AuctionViewRouter({
     data: auction,
     isLoading,
     error,
-  } = useFetchData<AuctionData>({
+  } = useFetchData<AuctionDto>({
     url: `/api/auctions/${auctionId}`,
     key: ['auction', auctionId],
   });

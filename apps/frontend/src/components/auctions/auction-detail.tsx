@@ -39,11 +39,6 @@ import {
 } from '@suba-go/shared-components/components/ui/tabs';
 import { Spinner } from '@suba-go/shared-components/components/ui/spinner';
 import { useFetchData } from '@/hooks/use-fetch-data';
-import type {
-  AuctionData,
-  AuctionItem,
-  AuctionBid,
-} from '@/types/auction.types';
 import {
   getAuctionBadgeColor,
   getAuctionStatusLabel,
@@ -52,7 +47,15 @@ import { AuctionEditModal } from './auction-edit-modal';
 import Image from 'next/image';
 import { useRouter } from 'next-nprogress-bar';
 import { useAuctionStatus } from '@/hooks/use-auction-status';
-import { AuctionStatusEnum } from '@suba-go/shared-validation';
+import {
+  AuctionDto,
+  AuctionItemDto,
+  AuctionStatusEnum,
+  AuctionTypeEnum,
+  BidDto,
+  ItemStateEnum,
+  UserSafeDto,
+} from '@suba-go/shared-validation';
 import { ParticipantsList } from './participants-list';
 import { ItemBidHistory } from './user-view/item-bid-history';
 import { AuctionItemDetailModal } from './auction-item-detail-modal';
@@ -77,9 +80,8 @@ export function AuctionDetail({
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isCanceled, setIsCanceled] = useState(false);
   const [showCompletedDialog, setShowCompletedDialog] = useState(false);
-  const [selectedItemForDetail, setSelectedItemForDetail] = useState<
-    any | null
-  >(null);
+  const [selectedItemForDetail, setSelectedItemForDetail] =
+    useState<AuctionItemDto | null>(null);
 
   // WebSocket state for real-time updates (AUCTION_MANAGER only)
   const wsRef = useRef<WebSocket | null>(null);
@@ -102,14 +104,14 @@ export function AuctionDetail({
     isLoading,
     error,
     refetch,
-  } = useFetchData<AuctionData>({
+  } = useFetchData<AuctionDto>({
     url: `/api/auctions/${auctionId}`,
     key: ['auction', auctionId],
   });
 
   // Fetch participants data (only for AUCTION_MANAGER)
   const { data: participants, refetch: refetchParticipants } = useFetchData<
-    any[]
+    UserSafeDto[]
   >({
     url: `/api/auctions/${auctionId}/participants`,
     key: ['auction-participants', auctionId],
@@ -339,13 +341,11 @@ export function AuctionDetail({
   const totalItems = auction.items?.length || 0;
   const totalBids =
     auction.items?.reduce(
-      (sum: number, item: AuctionItem) => sum + item.bids.length,
+      (sum: number, item) => sum + (item.bids?.length || 0),
       0
     ) || 0;
   const totalParticipants = new Set(
-    auction.items?.flatMap((item: AuctionItem) =>
-      item.bids.map((bid: AuctionBid) => bid.userId)
-    )
+    auction.items?.flatMap((item) => item.bids?.map((bid) => bid.userId) || [])
   ).size;
 
   return (
@@ -404,8 +404,8 @@ export function AuctionDetail({
             ) : (
               <>
                 {/* Edit button - only show if auction is PENDIENTE or CANCELADA */}
-                {(auction.status === 'PENDIENTE' ||
-                  auction.status === 'CANCELADA') && (
+                {(auction.status === AuctionStatusEnum.PENDIENTE ||
+                  auction.status === AuctionStatusEnum.CANCELADA) && (
                   <Button
                     variant="outline"
                     onClick={() => setIsEditModalOpen(true)}
@@ -417,9 +417,9 @@ export function AuctionDetail({
                 )}
 
                 {/* Cancel switch - only show if auction is PENDIENTE, CANCELADA, or TEST */}
-                {(auction.status === 'PENDIENTE' ||
-                  auction.status === 'CANCELADA' ||
-                  auction.type === 'TEST') && (
+                {(auction.status === AuctionStatusEnum.PENDIENTE ||
+                  auction.status === AuctionStatusEnum.CANCELADA ||
+                  auction.type === AuctionTypeEnum.TEST) && (
                   <div className="flex items-center gap-2">
                     <Switch
                       id="cancel-auction"
@@ -575,7 +575,9 @@ export function AuctionDetail({
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-blue-600">{totalBids}</div>
+            <div className="text-2xl font-bold text-blue-600">
+              {typeof totalBids === 'number' ? totalBids : 0}
+            </div>
           </CardContent>
         </Card>
 
@@ -618,18 +620,18 @@ export function AuctionDetail({
         <TabsContent value="items" className="space-y-6">
           {auction.items && auction.items.length > 0 ? (
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {auction.items.map((auctionItem: AuctionItem) => {
+              {auction.items.map((auctionItem: AuctionItemDto) => {
                 const topBid =
                   auctionItem.bids && auctionItem.bids.length > 0
                     ? auctionItem.bids.reduce(
-                        (prev: AuctionBid | null, b: AuctionBid) => {
+                        (prev: BidDto | null, b: BidDto) => {
                           if (!prev) return b;
                           return Number(b.offered_price) >
                             Number(prev.offered_price)
                             ? b
                             : prev;
                         },
-                        null as unknown as AuctionBid
+                        null as unknown as BidDto
                       )
                     : null;
                 return (
@@ -685,7 +687,7 @@ export function AuctionDetail({
                               <p className="font-semibold text-blue-600">
                                 $
                                 {Math.max(
-                                  ...auctionItem.bids.map((bid: AuctionBid) =>
+                                  ...auctionItem.bids.map((bid: BidDto) =>
                                     Number(bid.offered_price)
                                   )
                                 ).toLocaleString()}
@@ -717,7 +719,8 @@ export function AuctionDetail({
                         {/* Sale Status Badge - Only show for completed auctions */}
                         {auction?.status === AuctionStatusEnum.COMPLETADA && (
                           <div className="pt-3 border-t mt-3">
-                            {auctionItem.item?.state === 'VENDIDO' &&
+                            {auctionItem.item?.state ===
+                              ItemStateEnum.VENDIDO &&
                             auctionItem.item?.soldPrice ? (
                               <div className="space-y-2">
                                 <Badge className="bg-green-600 hover:bg-green-700">

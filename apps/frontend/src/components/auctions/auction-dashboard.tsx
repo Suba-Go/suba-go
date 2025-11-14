@@ -13,7 +13,7 @@ import { AuctionCreateModal } from './auction-create-modal';
 import { AuctionEditModal } from './auction-edit-modal';
 import { AuctionCard } from './auction-card';
 import { useFetchData } from '@/hooks/use-fetch-data';
-import type { AuctionListItem, AuctionData } from '@/types/auction.types';
+import { AuctionDto } from '@suba-go/shared-validation';
 
 interface AuctionDashboardProps {
   subdomain: string;
@@ -22,8 +22,9 @@ interface AuctionDashboardProps {
 export function AuctionDashboard({ subdomain }: AuctionDashboardProps) {
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
-  const [selectedAuction, setSelectedAuction] =
-    useState<AuctionListItem | null>(null);
+  const [selectedAuction, setSelectedAuction] = useState<AuctionDto | null>(
+    null
+  );
 
   // Fetch auctions data
   const {
@@ -31,7 +32,7 @@ export function AuctionDashboard({ subdomain }: AuctionDashboardProps) {
     isLoading,
     error,
     refetch,
-  } = useFetchData<AuctionListItem[]>({
+  } = useFetchData<AuctionDto[]>({
     url: `/api/auctions`,
     key: ['auctions', subdomain],
   });
@@ -163,10 +164,9 @@ export function AuctionDashboard({ subdomain }: AuctionDashboardProps) {
             <AuctionCard
               key={auction.id}
               auction={auction}
-              subdomain={subdomain}
               onUpdate={refetch}
               onEdit={(auction) => {
-                setSelectedAuction(auction as AuctionListItem);
+                setSelectedAuction(auction);
                 setIsEditModalOpen(true);
               }}
             />
@@ -198,15 +198,17 @@ export function AuctionDashboard({ subdomain }: AuctionDashboardProps) {
       />
 
       {/* Edit Auction Modal */}
-      <AuctionEditModal
-        isOpen={isEditModalOpen}
-        onClose={() => setIsEditModalOpen(false)}
-        onSuccess={() => {
-          setIsEditModalOpen(false);
-          refetch();
-        }}
-        auction={selectedAuction as AuctionData}
-      />
+      {selectedAuction && (
+        <AuctionEditModal
+          isOpen={isEditModalOpen}
+          onClose={() => setIsEditModalOpen(false)}
+          onSuccess={() => {
+            setIsEditModalOpen(false);
+            refetch();
+          }}
+          auction={selectedAuction}
+        />
+      )}
     </div>
   );
 }

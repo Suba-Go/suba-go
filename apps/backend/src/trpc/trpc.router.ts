@@ -7,11 +7,11 @@ import { CompanyCreatorService } from '../modules/app-modules/companies/services
 import { TenantCreatorService } from '../modules/app-modules/tenants/services/tenant-creator.service';
 import { MultiStepFormCreatorService } from '../modules/app-modules/multi-step-form/services/multi-step-form-creator.service';
 import {
-  userCreateInputSchema,
-  companyCreateInputSchema,
-  tenantCreateInputSchema,
-  connectUserInputSchema,
+  companyCreateSchema,
   multiStepFormInputSchema,
+  tenantCreateSchema,
+  userCreateTrcpSchema,
+  userWithTenantAndCompanySchema,
 } from '@suba-go/shared-validation';
 
 @Injectable()
@@ -29,7 +29,7 @@ export class TrpcRouter {
     // User procedures
     user: this.trpc.router({
       create: this.trpc.procedure
-        .input(userCreateInputSchema)
+        .input(userCreateTrcpSchema)
         .mutation(async ({ input }) => {
           try {
             const result = await this.userCreatorService.createUser(input);
@@ -48,17 +48,12 @@ export class TrpcRouter {
         }),
 
       connectToCompanyAndTenant: this.trpc.procedure
-        .input(connectUserInputSchema)
+        .input(userWithTenantAndCompanySchema)
         .mutation(async ({ input }) => {
           try {
-            const connectionData = {
-              ...input.user,
-              tenant: input.tenant,
-              company: input.company,
-            };
             const result =
               await this.userCreatorService.connectUserToCompanyAndTenant(
-                connectionData
+                input
               );
             return {
               success: true,
@@ -100,7 +95,7 @@ export class TrpcRouter {
     // Company procedures
     company: this.trpc.router({
       create: this.trpc.procedure
-        .input(companyCreateInputSchema)
+        .input(companyCreateSchema)
         .mutation(async ({ input }) => {
           try {
             const result = await this.companyCreatorService.createCompany(
@@ -124,7 +119,7 @@ export class TrpcRouter {
     // Tenant procedures
     tenant: this.trpc.router({
       create: this.trpc.procedure
-        .input(tenantCreateInputSchema)
+        .input(tenantCreateSchema)
         .mutation(async ({ input }) => {
           try {
             const result = await this.tenantCreatorService.createTenant(input);

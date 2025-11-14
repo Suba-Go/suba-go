@@ -58,7 +58,7 @@ export default function UserForm({
   const getCachedOrInitialData = (): UserCreateDto => {
     const cached = loadUserFromCache();
     if (cached) {
-      return cached;
+      return cached as UserCreateDto;
     }
     return initialData;
   };
@@ -87,7 +87,7 @@ export default function UserForm({
   const emailValue = watch('email');
 
   useEffect(() => {
-    setShowConfirmPassword(!!passwordValue && passwordValue.length > 0);
+    setShowConfirmPassword(!!passwordValue);
   }, [passwordValue]);
 
   // Save form data to cache whenever form values change

@@ -6,22 +6,13 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { Button } from '@suba-go/shared-components/components/ui/button';
 import { Input } from '@suba-go/shared-components/components/ui/input';
 import { Label } from '@suba-go/shared-components/components/ui/label';
-import { CompanyCreateDto, TenantCreateDto } from '@suba-go/shared-validation';
-import { z } from 'zod';
+import {
+  companyCompactCreateSchema,
+  CompanyCreateCompactDto,
+  CompanyCreateDto,
+  TenantCreateDto,
+} from '@suba-go/shared-validation';
 import { useEffect } from 'react';
-
-// Simplified schema for company name and auto-generated subdomain
-const simplifiedCompanySchema = z.object({
-  companyName: z
-    .string()
-    .min(3, 'El nombre de la empresa debe tener al menos 3 caracteres'),
-  subdomain: z
-    .string()
-    .min(3, 'El subdominio debe tener al menos 3 caracteres'),
-  principal_color: z.string().optional(),
-});
-
-type SimplifiedFormData = z.infer<typeof simplifiedCompanySchema>;
 
 // Cache keys for localStorage
 const CACHE_KEYS = {
@@ -29,7 +20,7 @@ const CACHE_KEYS = {
 } as const;
 
 // Helper functions for cache management
-const saveToCache = (data: SimplifiedFormData) => {
+const saveToCache = (data: CompanyCreateCompactDto) => {
   try {
     localStorage.setItem(CACHE_KEYS.COMPANY_FORM, JSON.stringify(data));
   } catch (error) {
@@ -37,7 +28,7 @@ const saveToCache = (data: SimplifiedFormData) => {
   }
 };
 
-const loadFromCache = (): SimplifiedFormData | null => {
+const loadFromCache = (): CompanyCreateCompactDto | null => {
   try {
     const cached = localStorage.getItem(CACHE_KEYS.COMPANY_FORM);
     return cached ? JSON.parse(cached) : null;
@@ -72,14 +63,13 @@ export default function CompanyForm({
   onBack,
 }: CompanyFormProps) {
   // Load cached data or use initial data
-  const getCachedOrInitialData = (): SimplifiedFormData => {
+  const getCachedOrInitialData = (): CompanyCreateCompactDto => {
     const cached = loadFromCache();
     if (cached) {
       return cached;
     }
     return {
-      companyName: initialData.name || '',
-      subdomain: '',
+      name: initialData.name || '',
       principal_color: initialData.principal_color || '#3B82F6',
     };
   };
@@ -88,34 +78,22 @@ export default function CompanyForm({
     register,
     handleSubmit,
     formState: { errors, isValid },
-    setValue,
     watch,
     getValues,
-  } = useForm<SimplifiedFormData>({
-    resolver: zodResolver(simplifiedCompanySchema),
+  } = useForm<CompanyCreateCompactDto>({
+    resolver: zodResolver(companyCompactCreateSchema),
     defaultValues: getCachedOrInitialData(),
     mode: 'onChange',
   });
 
   // Auto-generate subdomain from company name
-  const companyName = watch('companyName');
+  const companyName = watch('name');
   const principal_color = watch('principal_color');
-
-  // Auto-generate subdomain when company name changes
-  useEffect(() => {
-    if (companyName) {
-      const subdomain = companyName
-        .toLowerCase()
-        .replace(/[^a-z0-9]/g, '')
-        .substring(0, 20);
-      setValue('subdomain', subdomain);
-    }
-  }, [companyName, setValue]);
 
   // Save form data to cache whenever form values change
   useEffect(() => {
     const currentData = getValues();
-    if (currentData.companyName || currentData.principal_color) {
+    if (currentData.name || currentData.principal_color) {
       saveToCache(currentData);
     }
   }, [companyName, principal_color, getValues]);
@@ -127,15 +105,16 @@ export default function CompanyForm({
     onBack();
   };
 
-  const onFormSubmit = (data: SimplifiedFormData) => {
+  const onFormSubmit = (data: CompanyCreateCompactDto) => {
     const companyData: CompanyCreateDto = {
-      name: data.companyName,
+      name: data.name,
       logo: null,
       principal_color: data.principal_color || null,
       principal_color2: null,
       secondary_color: null,
       secondary_color2: null,
       secondary_color3: null,
+      tenantId: null,
     };
 
     // Tenant no longer has a name field - company name is used as subdomain
@@ -155,16 +134,14 @@ export default function CompanyForm({
           <Input
             id="companyName"
             type="text"
-            {...register('companyName')}
+            {...register('name')}
             placeholder="Ingresa el nombre de tu empresa"
             className={`border-gray-300 focus:border-primary ${
-              errors.companyName ? 'border-red-500 focus:border-red-500' : ''
+              errors.name ? 'border-red-500 focus:border-red-500' : ''
             }`}
           />
-          {errors.companyName && (
-            <p className="text-sm text-red-600 mt-1">
-              {errors.companyName.message}
-            </p>
+          {errors.name && (
+            <p className="text-sm text-red-600 mt-1">{errors.name.message}</p>
           )}
         </div>
         <div className="space-y-2">
@@ -181,10 +158,6 @@ export default function CompanyForm({
             </p>
           </div>
         </div>
-      </div>
-
-      <div className="hidden">
-        <Input id="subdomain" type="hidden" {...register('subdomain')} />
       </div>
 
       <div className="flex justify-between pt-4">

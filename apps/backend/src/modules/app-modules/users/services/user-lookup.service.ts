@@ -1,15 +1,10 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { UserPrismaRepository } from './user-prisma-repository.service';
 import { normalizeCompanyName } from '../../../../utils/company-normalization';
+import { UserDto } from '@suba-go/shared-validation';
 
 // Define User with relations type for this service
 // Note: Tenant no longer has a name field - company name is used as subdomain
-type UserWithRelations = {
-  id: string;
-  email: string;
-  tenant?: { id: string };
-  company?: { name: string; nameLowercase?: string; tenant?: { id: string } };
-};
 
 interface CompanyLookupResult {
   companyDomain: string;
@@ -21,7 +16,6 @@ interface CompanyLookupResult {
 export class UserLookupService {
   constructor(private readonly userRepository: UserPrismaRepository) {}
 
-
   async findCompanyByUserEmail(
     email: string
   ): Promise<CompanyLookupResult | null> {
@@ -29,19 +23,19 @@ export class UserLookupService {
       // Find user by email with company and tenant relations
       const user = (await this.userRepository.findByEmailWithRelations(
         email
-      )) as UserWithRelations;
+      )) as UserDto;
 
       if (!user) {
         return null;
       }
 
-      if (!user.company) {
+      if (!user.companyId) {
         throw new NotFoundException(
           'User exists but has no associated company'
         );
       }
 
-      if (!user.tenant) {
+      if (!user.tenantId) {
         throw new NotFoundException('User exists but has no associated tenant');
       }
 
@@ -67,7 +61,7 @@ export class UserLookupService {
       // Find user by email with relations
       const user = (await this.userRepository.findByEmailWithRelations(
         email
-      )) as UserWithRelations;
+      )) as UserDto;
       if (!user) {
         return {
           isValid: false,
@@ -76,7 +70,7 @@ export class UserLookupService {
       }
 
       // Check if user has a tenant
-      if (!user.tenant) {
+      if (!user.tenantId) {
         return {
           isValid: false,
           message: 'Usuario no está asociado a ninguna empresa',

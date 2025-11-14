@@ -1,7 +1,12 @@
 'use client';
 
 import { useState, useMemo } from 'react';
-import { CompanyDto, AuctionStatusEnum } from '@suba-go/shared-validation';
+import {
+  CompanyDto,
+  AuctionStatusEnum,
+  BidDto,
+  ItemStateEnum,
+} from '@suba-go/shared-validation';
 import { useFetchData } from '@/hooks/use-fetch-data';
 import { useSession } from 'next-auth/react';
 import {
@@ -23,10 +28,9 @@ import { AuctionCard } from '@/components/auctions/auction-card';
 
 interface UserHomePageProps {
   company: CompanyDto;
-  subdomain: string;
 }
 
-export function UserHomePage({ company, subdomain }: UserHomePageProps) {
+export function UserHomePage({ company }: UserHomePageProps) {
   const { data: session } = useSession();
   const router = useRouter();
   const { formatPrice } = useAutoFormat();
@@ -41,7 +45,7 @@ export function UserHomePage({ company, subdomain }: UserHomePageProps) {
   //   key: ['my-bids', userId || ''],
   //   condition: !!userId,
   // });
-  const userBids: any[] = [];
+  const userBids: BidDto[] = [];
   const bidsLoading = false;
 
   // Fetch user's registered auctions
@@ -49,7 +53,7 @@ export function UserHomePage({ company, subdomain }: UserHomePageProps) {
     data: userRegistrations,
     isLoading: registrationsLoading,
     refetch: refetchRegistrations,
-  } = useFetchData<any[]>({
+  } = useFetchData<BidDto[]>({
     url: `/api/auctions/my-registrations`,
     key: ['my-registrations', userId || ''],
     condition: !!userId,
@@ -63,15 +67,15 @@ export function UserHomePage({ company, subdomain }: UserHomePageProps) {
       // Toggle ON: Show auctions where user has placed bids (regardless of state)
       // Extract unique auctions from bids using Map to prevent duplicates
       const auctionMap = new Map();
-      userBids?.forEach((bid: any) => {
-        const auction = bid.auctionItem?.auction;
-        if (auction && !auctionMap.has(auction.id)) {
+      userBids?.forEach((bid) => {
+        const auction = bid.auction;
+        if (auction && !auction.id) {
           // Map Prisma field names to frontend expected names
           auctionMap.set(auction.id, {
             ...auction,
-            start: auction.startTime || auction.start,
-            end: auction.endTime || auction.end,
-            state: auction.status || auction.state,
+            start: auction.startTime,
+            end: auction.endTime,
+            state: auction.status,
             tenantId: auction.tenantId, // Include tenantId for navigation
           });
         }
@@ -82,12 +86,12 @@ export function UserHomePage({ company, subdomain }: UserHomePageProps) {
     // Default: Show ACTIVA and PENDIENTE auctions where user is registered
     // Use Map to prevent duplicates in case of multiple registrations
     const auctionMap = new Map();
-    userRegistrations?.forEach((reg: any) => {
+    userRegistrations?.forEach((reg) => {
       const auction = reg.auction;
       if (!auction) return;
 
       // Only include ACTIVA and PENDIENTE auctions
-      const auctionState = auction.status || auction.state;
+      const auctionState = auction?.status;
       if (
         auctionState === AuctionStatusEnum.ACTIVA ||
         auctionState === AuctionStatusEnum.PENDIENTE
@@ -96,8 +100,8 @@ export function UserHomePage({ company, subdomain }: UserHomePageProps) {
           // Map Prisma field names to frontend expected names
           auctionMap.set(auction.id, {
             ...auction,
-            start: auction.startTime || auction.start,
-            end: auction.endTime || auction.end,
+            start: auction.startTime,
+            end: auction.endTime,
             state: auctionState,
             tenantId: auction.tenantId, // Include tenantId for navigation
           });
@@ -112,7 +116,7 @@ export function UserHomePage({ company, subdomain }: UserHomePageProps) {
   // Use a Map to deduplicate by item ID
   const adjudicatedItemsMap = new Map();
 
-  userBids?.forEach((bid: any) => {
+  userBids?.forEach((bid) => {
     const auction = bid.auctionItem?.auction;
     const item = bid.auctionItem?.item;
 
@@ -131,7 +135,7 @@ export function UserHomePage({ company, subdomain }: UserHomePageProps) {
     if (
       auction?.status === AuctionStatusEnum.COMPLETADA &&
       item?.soldToUserId === userId &&
-      item?.state === 'VENDIDO'
+      item?.state === ItemStateEnum.VENDIDO
     ) {
       // Use item ID as key to prevent duplicates
       if (!adjudicatedItemsMap.has(item.id)) {
@@ -191,7 +195,7 @@ export function UserHomePage({ company, subdomain }: UserHomePageProps) {
 
           {adjudicatedItems && adjudicatedItems.length > 0 ? (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {adjudicatedItems.map((bid: any) => {
+              {adjudicatedItems.map((bid: BidDto) => {
                 const item = bid.auctionItem?.item;
                 const photoUrl = item?.photos?.split(',')[0]?.trim();
 
@@ -287,18 +291,7 @@ export function UserHomePage({ company, subdomain }: UserHomePageProps) {
               {filteredAuctions.map((auction) => (
                 <AuctionCard
                   key={auction.id}
-                  auction={{
-                    id: auction.id,
-                    title: auction.title || auction.name || 'Sin título',
-                    description: auction.description,
-                    startTime: auction.startTime || auction.start,
-                    endTime: auction.endTime || auction.end,
-                    status: auction.status || auction.state,
-                    type: auction.type,
-                    items: auction.items,
-                    tenantId: auction.tenantId,
-                  }}
-                  subdomain={subdomain}
+                  auction={auction}
                   onUpdate={refetchRegistrations}
                 />
               ))}

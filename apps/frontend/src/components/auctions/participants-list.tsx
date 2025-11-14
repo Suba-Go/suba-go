@@ -28,21 +28,11 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@suba-go/shared-components/components/ui/dialog';
-
-interface Participant {
-  id: string;
-  name: string | null;
-  email: string;
-  public_name: string | null;
-  phone: string | null;
-  rut: string | null;
-  role: string;
-  createdAt: string;
-}
+import { UserSafeDto } from '@suba-go/shared-validation';
 
 interface ParticipantsListProps {
   auctionId: string;
-  participants: Participant[];
+  participants: UserSafeDto[];
   isManager: boolean;
   onRefresh: () => void;
 }
@@ -56,7 +46,7 @@ export function ParticipantsList({
   const { toast } = useToast();
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [participantToRemove, setParticipantToRemove] =
-    useState<Participant | null>(null);
+    useState<UserSafeDto | null>(null);
 
   // Ensure participants is always an array
   const participantsList = Array.isArray(participants) ? participants : [];
@@ -132,7 +122,7 @@ export function ParticipantsList({
     }
   };
 
-  const formatDate = (dateString: string) => {
+  const formatDate = (dateString: Date) => {
     return new Date(dateString).toLocaleDateString('es-CL', {
       year: 'numeric',
       month: 'short',
@@ -251,7 +241,8 @@ export function ParticipantsList({
                         )}
                         <div className="flex items-center gap-1">
                           <Calendar className="h-3 w-3" />
-                          Registrado: {formatDate(participant.createdAt)}
+                          Registrado:{' '}
+                          {formatDate(participant.createdAt || new Date(''))}
                         </div>
                       </div>
                     </div>

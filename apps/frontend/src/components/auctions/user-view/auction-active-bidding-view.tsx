@@ -20,10 +20,10 @@ import { AuctionItemCard } from './auction-item-card';
 import { SelfBidWarningDialog, AutoBidConfirmDialog } from './bidding-dialogs';
 import { useAuctionWebSocketBidding } from '@/hooks/use-auction-websocket-bidding';
 import { useAutoBidSettings } from '@/hooks/use-auto-bid-settings';
-import type { AuctionData } from '@/types/auction.types';
+import { AuctionDto, AuctionItemDto } from '@suba-go/shared-validation';
 
 interface AuctionActiveBiddingViewProps {
-  auction: AuctionData;
+  auction: AuctionDto;
   accessToken: string;
   tenantId: string;
   userId: string;
@@ -53,12 +53,11 @@ export function AuctionActiveBiddingView({
   tenantId,
   userId,
 }: AuctionActiveBiddingViewProps) {
-  const [auction, setAuction] = useState<AuctionData>(initialAuction);
+  const [auction, setAuction] = useState<AuctionDto>(initialAuction);
   const [bidStates, setBidStates] = useState<BidState>({});
   const [bidHistory, setBidHistory] = useState<ItemBidHistory>({});
-  const [selectedItemForDetail, setSelectedItemForDetail] = useState<
-    any | null
-  >(null);
+  const [selectedItemForDetail, setSelectedItemForDetail] =
+    useState<AuctionItemDto | null>(null);
   const [selfBidWarning, setSelfBidWarning] = useState<{
     auctionItemId: string;
     amount: number;
@@ -115,12 +114,21 @@ export function AuctionActiveBiddingView({
                 bids: [
                   {
                     id: bidId,
+                    requestId: null,
                     offered_price: amount,
-                    amount: amount,
-                    bid_time: new Date(timestamp).toISOString(),
+                    bid_time: new Date(timestamp),
                     userId: bidderId,
+                    tenantId: prev.tenantId,
+                    auctionId: prev.id,
+                    auctionItemId: item.id,
                     user: userName
-                      ? { id: bidderId, public_name: userName }
+                      ? {
+                          id: bidderId,
+                          email: '',
+                          password: '',
+                          role: null,
+                          public_name: userName,
+                        }
                       : undefined,
                   },
                   ...(item.bids || []),
@@ -158,7 +166,7 @@ export function AuctionActiveBiddingView({
     const { newEndTime, extensionSeconds } = data;
     setAuction((prev) => ({
       ...prev,
-      endTime: new Date(newEndTime).toISOString(),
+      endTime: new Date(newEndTime),
     }));
     console.log(
       `⏰ Tiempo extendido: +${extensionSeconds} segundos (cierre suave)`
@@ -285,7 +293,7 @@ export function AuctionActiveBiddingView({
     <div className="space-y-6">
       <AuctionHeader
         title={auction.title}
-        description={auction.description}
+        description={auction.description || ''}
         status="ACTIVA"
       />
 

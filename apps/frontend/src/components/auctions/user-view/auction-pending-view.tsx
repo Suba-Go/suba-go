@@ -16,23 +16,10 @@ import {
 import { Badge } from '@suba-go/shared-components/components/ui/badge';
 import { format, formatDistanceToNow } from 'date-fns';
 import { es } from 'date-fns/locale';
+import { AuctionDto } from '@suba-go/shared-validation';
 
 interface AuctionPendingViewProps {
-  auction: {
-    title: string;
-    description?: string;
-    startTime: string;
-    endTime: string;
-    items?: Array<{
-      id: string;
-      item?: {
-        brand?: string;
-        model?: string;
-        year?: number;
-        plate?: string;
-      };
-    }>;
-  };
+  auction: AuctionDto;
 }
 
 export function AuctionPendingView({ auction }: AuctionPendingViewProps) {

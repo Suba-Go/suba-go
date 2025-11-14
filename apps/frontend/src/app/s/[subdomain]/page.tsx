@@ -27,7 +27,9 @@ export default async function SubdomainPage({
 
   // Get company data for this subdomain
   const normalizedSubdomain = normalizeCompanyName(subdomain);
-  const companyResult = await getCompanyBySubdomainServerAction(normalizedSubdomain);
+  const companyResult = await getCompanyBySubdomainServerAction(
+    normalizedSubdomain
+  );
 
   if (!companyResult.success || !companyResult.data) {
     notFound();
@@ -35,5 +37,5 @@ export default async function SubdomainPage({
 
   const company = companyResult.data;
 
-  return <CompanyBrandedPage company={company} subdomain={subdomain} />;
+  return <CompanyBrandedPage company={company} />;
 }

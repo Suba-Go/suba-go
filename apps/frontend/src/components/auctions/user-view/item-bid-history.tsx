@@ -6,20 +6,10 @@
 
 import { TrendingUp, User } from 'lucide-react';
 import { ScrollArea } from '@suba-go/shared-components/components/ui/scroll-area';
-
-interface Bid {
-  id?: string;
-  amount?: number;
-  offered_price?: number;
-  userId?: string;
-  userName?: string;
-  user?: {
-    public_name?: string;
-  };
-}
+import { BidDto } from '@suba-go/shared-validation';
 
 interface ItemBidHistoryProps {
-  bids: Bid[];
+  bids: BidDto[];
   currentUserId?: string;
   maxItems?: number;
   title?: string;
@@ -54,10 +44,10 @@ export function ItemBidHistory({
       }
     } else {
       // Fallback: if no id, use combination of userId + amount + timestamp
-      const amount = bid.amount || bid.offered_price || 0;
+      const amount = bid.offered_price || 0;
       if (
         !acc.some((b) => {
-          const existingAmount = b.amount || b.offered_price || 0;
+          const existingAmount = b.offered_price || 0;
           return b.userId === bid.userId && existingAmount === amount;
         })
       ) {
@@ -66,12 +56,12 @@ export function ItemBidHistory({
     }
 
     return acc;
-  }, [] as Bid[]);
+  }, [] as BidDto[]);
 
   // Sort bids by amount (highest first)
   const sortedBids = [...uniqueBids].sort((a, b) => {
-    const amountA = a.amount || a.offered_price || 0;
-    const amountB = b.amount || b.offered_price || 0;
+    const amountA = a.offered_price || 0;
+    const amountB = b.offered_price || 0;
     return amountB - amountA;
   });
 
@@ -86,8 +76,8 @@ export function ItemBidHistory({
       <ScrollArea className={`${maxHeight} overflow-y-auto`}>
         <div className="space-y-2">
           {displayBids.map((bid, index) => {
-            const amount = bid.amount || bid.offered_price || 0;
-            const userName = bid.userName || bid.user?.public_name || 'Usuario';
+            const amount = bid.offered_price || 0;
+            const userName = bid.user?.public_name || 'Usuario';
             const isCurrentUser = bid.userId === currentUserId;
             const isWinning = index === 0;
 

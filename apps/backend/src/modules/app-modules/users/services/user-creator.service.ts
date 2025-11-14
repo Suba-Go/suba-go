@@ -7,8 +7,8 @@ import * as bcrypt from 'bcrypt';
 import type { User } from '@prisma/client';
 import { UserRoleEnum } from '@prisma/client';
 import {
-  UserCreateDto,
-  UserSafeWithCompanyAndTenantDto,
+  UserCreateTrcpDto,
+  UserWithTenantAndCompanyDto,
 } from '@suba-go/shared-validation';
 import { UserPrismaRepository } from './user-prisma-repository.service';
 import { TenantPrismaRepository } from '../../tenants/services/tenant-prisma-repository.service';
@@ -23,7 +23,7 @@ export class UserCreatorService {
   ) {}
 
   async createUser(
-    userData: UserCreateDto,
+    userData: UserCreateTrcpDto,
     tenantId?: string,
     companyId?: string
   ): Promise<User> {
@@ -83,7 +83,8 @@ export class UserCreatorService {
     // Generate automatic public_name if user is being created within a company
     let publicName = userData.public_name;
     if (!publicName && company) {
-      const nextUserNumber = await this.userRepository.getNextUserNumberForCompany(company.id);
+      const nextUserNumber =
+        await this.userRepository.getNextUserNumberForCompany(company.id);
       publicName = `Usuario ${nextUserNumber}`;
     }
 
@@ -101,9 +102,7 @@ export class UserCreatorService {
     });
   }
 
-  async connectUserToCompanyAndTenant(
-    userData: UserSafeWithCompanyAndTenantDto
-  ) {
+  async connectUserToCompanyAndTenant(userData: UserWithTenantAndCompanyDto) {
     return await this.userRepository.connectUserToCompanyAndTenant(
       userData.id,
       userData.tenant.id,

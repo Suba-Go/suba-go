@@ -33,39 +33,19 @@ import {
   getAuctionStatusLabel,
 } from '@/lib/auction-badge-colors';
 import { useAuctionStatus } from '@/hooks/use-auction-status';
+import {
+  AuctionDto,
+  AuctionTypeEnum,
+  BidDto,
+} from '@suba-go/shared-validation';
 
 interface AuctionCardProps {
-  auction: {
-    id: string;
-    title: string;
-    description?: string;
-    startTime: string;
-    endTime: string;
-    status: string;
-    type?: string;
-    tenantId?: string;
-    items?: Array<{
-      id: string;
-      item: {
-        id: string;
-        plate?: string;
-        brand?: string;
-        model?: string;
-      };
-      bids: Array<{ offered_price: number }>;
-    }>;
-  };
-  subdomain: string;
+  auction: AuctionDto;
   onUpdate: () => void;
   onEdit?: (auction: AuctionCardProps['auction']) => void;
 }
 
-export function AuctionCard({
-  auction,
-  subdomain,
-  onUpdate,
-  onEdit,
-}: AuctionCardProps) {
+export function AuctionCard({ auction, onUpdate, onEdit }: AuctionCardProps) {
   const startTime = new Date(auction.startTime);
   const endTime = new Date(auction.endTime);
   const [showCompletedDialog, setShowCompletedDialog] = useState(false);
@@ -112,7 +92,8 @@ export function AuctionCard({
     auction.items?.reduce((max, item) => {
       const itemMax =
         item.bids?.reduce(
-          (itemMax, bid) => Math.max(itemMax, Number(bid.offered_price) || 0),
+          (itemMax, bid: BidDto) =>
+            Math.max(itemMax, Number(bid.offered_price) || 0),
           0
         ) || 0;
       return Math.max(max, itemMax);
@@ -150,7 +131,7 @@ export function AuctionCard({
           </div>
           <div className="flex items-center gap-2">
             {getStatusBadge()}
-            {auction.type === 'TEST' && (
+            {auction.type === AuctionTypeEnum.TEST && (
               <Badge className="text-xs bg-orange-100 text-orange-600">
                 Prueba
               </Badge>

@@ -31,7 +31,7 @@ import Image from 'next/image';
 interface ItemDetailModalProps {
   isOpen: boolean;
   onClose: () => void;
-  item: ItemDto | null;
+  item: ItemDto;
 }
 
 export function ItemDetailModal({

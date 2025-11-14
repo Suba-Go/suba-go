@@ -32,42 +32,26 @@ import {
 import { Input } from '@suba-go/shared-components/components/ui/input';
 import { useAutoFormat } from '@/hooks/use-auto-format';
 import { ItemBidHistory } from './user-view/item-bid-history';
+import { AuctionItemDto, BidDto } from '@suba-go/shared-validation';
+
+interface SimpleBidHistory {
+  id: string;
+  amount: number;
+  userId: string;
+  userName?: string;
+  timestamp: number;
+}
 
 interface AuctionItemDetailModalProps {
   isOpen: boolean;
   onClose: () => void;
-  auctionItem: {
-    id: string;
-    startingBid: number;
-    item?: {
-      id: string;
-      brand?: string;
-      model?: string;
-      year?: number;
-      plate?: string;
-      mileage?: number;
-      description?: string;
-      basePrice?: number;
-      photos?: string;
-      docs?: string;
-      legal_status?: string;
-    };
-    bids?: Array<{
-      offered_price: number;
-      userId?: string;
-    }>;
-  };
+  auctionItem: AuctionItemDto;
   currentHighestBid: number;
   bidIncrement: number;
   onPlaceBid?: (amount: number) => void;
   isUserView?: boolean;
   userId?: string;
-  bidHistory?: Array<{
-    id: string;
-    amount: number;
-    userId: string;
-    userName?: string;
-  }>;
+  bidHistory?: SimpleBidHistory[] | BidDto[];
   showBidHistory?: boolean;
 }
 
@@ -237,13 +221,13 @@ export function AuctionItemDetailModal({
               </div>
             )}
 
-            {item.mileage && (
+            {item.kilometraje && (
               <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
                 <Gauge className="h-5 w-5 text-gray-600" />
                 <div>
                   <p className="text-sm text-gray-600">Kilometraje</p>
                   <p className="font-semibold">
-                    {item.mileage.toLocaleString()} km
+                    {item.kilometraje.toLocaleString()} km
                   </p>
                 </div>
               </div>
@@ -365,7 +349,9 @@ export function AuctionItemDetailModal({
               (auctionItem.bids && auctionItem.bids.length > 0)) && (
               <ItemBidHistory
                 bids={
-                  bidHistory.length > 0 ? bidHistory : auctionItem.bids || []
+                  (bidHistory.length > 0
+                    ? bidHistory
+                    : auctionItem.bids || []) as BidDto[]
                 }
                 currentUserId={userId}
                 title={

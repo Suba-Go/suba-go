@@ -1,12 +1,9 @@
-import {
-  UserSafeWithCompanyAndTenantDto,
-  Tokens,
-} from '@suba-go/shared-validation';
+import { UserSafeDto, Tokens } from '@suba-go/shared-validation';
 import { DefaultSessions, Session } from 'next-auth/next';
 
 declare module 'next-auth' {
   interface Session extends DefaultSessions {
-    user: UserSafeWithCompanyAndTenantDto & {
+    user: UserSafeDto & {
       emailVerified: Date | null;
     };
     tokens: Tokens;
@@ -15,7 +12,7 @@ declare module 'next-auth' {
 
 declare module 'next-auth/jwt' {
   interface JWT {
-    user: UserSafeWithCompanyAndTenantDto & {
+    user: UserSafeDto & {
       emailVerified: Date | null;
     };
     tokens: Tokens;
