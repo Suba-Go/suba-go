@@ -6,10 +6,10 @@
 
 import { TrendingUp, User } from 'lucide-react';
 import { ScrollArea } from '@suba-go/shared-components/components/ui/scroll-area';
-import { BidDto } from '@suba-go/shared-validation';
+import { BidWithUserDto } from '@suba-go/shared-validation';
 
 interface ItemBidHistoryProps {
-  bids: BidDto[];
+  bids: BidWithUserDto[];
   currentUserId?: string;
   maxItems?: number;
   title?: string;
@@ -56,7 +56,7 @@ export function ItemBidHistory({
     }
 
     return acc;
-  }, [] as BidDto[]);
+  }, [] as BidWithUserDto[]);
 
   // Sort bids by amount (highest first)
   const sortedBids = [...uniqueBids].sort((a, b) => {

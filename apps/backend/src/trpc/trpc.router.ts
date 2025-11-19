@@ -10,7 +10,7 @@ import {
   companyCreateSchema,
   multiStepFormInputSchema,
   tenantCreateSchema,
-  userCreateTrcpSchema,
+  userCreateSchema,
   userWithTenantAndCompanySchema,
 } from '@suba-go/shared-validation';
 
@@ -29,7 +29,7 @@ export class TrpcRouter {
     // User procedures
     user: this.trpc.router({
       create: this.trpc.procedure
-        .input(userCreateTrcpSchema)
+        .input(userCreateSchema)
         .mutation(async ({ input }) => {
           try {
             const result = await this.userCreatorService.createUser(input);

@@ -35,9 +35,11 @@ import {
 import { useAuctionStatus } from '@/hooks/use-auction-status';
 import {
   AuctionDto,
+  AuctionItemWithItmeAndBidsDto,
   AuctionTypeEnum,
   BidDto,
 } from '@suba-go/shared-validation';
+import { useFetchData } from '@/hooks/use-fetch-data';
 
 interface AuctionCardProps {
   auction: AuctionDto;
@@ -56,6 +58,12 @@ export function AuctionCard({ auction, onUpdate, onEdit }: AuctionCardProps) {
     auction.startTime,
     auction.endTime
   );
+
+  const { data: auctionItems } = useFetchData<AuctionItemWithItmeAndBidsDto[]>({
+    url: `/api/auction-items/${auction.id}`,
+    key: ['auctionItems', auction.id],
+    revalidateOnMount: true,
+  });
 
   const getStatusBadge = () => {
     return (
@@ -84,12 +92,11 @@ export function AuctionCard({ auction, onUpdate, onEdit }: AuctionCardProps) {
     return '';
   };
 
-  const totalItems = auction.items?.length || 0;
+  const totalItems = auctionItems?.length || 0;
   const totalBids =
-    auction.items?.reduce((sum, item) => sum + (item.bids?.length || 0), 0) ||
-    0;
+    auctionItems?.reduce((sum, item) => sum + (item.bids?.length || 0), 0) || 0;
   const highestBid =
-    auction.items?.reduce((max, item) => {
+    auctionItems?.reduce((max, item) => {
       const itemMax =
         item.bids?.reduce(
           (itemMax, bid: BidDto) =>

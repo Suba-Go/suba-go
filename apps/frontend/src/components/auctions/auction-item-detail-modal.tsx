@@ -32,7 +32,11 @@ import {
 import { Input } from '@suba-go/shared-components/components/ui/input';
 import { useAutoFormat } from '@/hooks/use-auto-format';
 import { ItemBidHistory } from './user-view/item-bid-history';
-import { AuctionItemDto, BidDto } from '@suba-go/shared-validation';
+import {
+  AuctionItemWithItmeAndBidsDto,
+  BidDto,
+  BidWithUserDto,
+} from '@suba-go/shared-validation';
 
 interface SimpleBidHistory {
   id: string;
@@ -45,7 +49,7 @@ interface SimpleBidHistory {
 interface AuctionItemDetailModalProps {
   isOpen: boolean;
   onClose: () => void;
-  auctionItem: AuctionItemDto;
+  auctionItem: AuctionItemWithItmeAndBidsDto;
   currentHighestBid: number;
   bidIncrement: number;
   onPlaceBid?: (amount: number) => void;
@@ -351,7 +355,7 @@ export function AuctionItemDetailModal({
                 bids={
                   (bidHistory.length > 0
                     ? bidHistory
-                    : auctionItem.bids || []) as BidDto[]
+                    : auctionItem.bids || []) as BidWithUserDto[]
                 }
                 currentUserId={userId}
                 title={

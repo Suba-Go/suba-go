@@ -28,17 +28,17 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@suba-go/shared-components/components/ui/dialog';
-import { UserSafeDto } from '@suba-go/shared-validation';
+import { AuctionDto, UserSafeDto } from '@suba-go/shared-validation';
 
 interface ParticipantsListProps {
-  auctionId: string;
+  auction: AuctionDto;
   participants: UserSafeDto[];
   isManager: boolean;
   onRefresh: () => void;
 }
 
 export function ParticipantsList({
-  auctionId,
+  auction,
   participants,
   isManager,
   onRefresh,
@@ -62,7 +62,7 @@ export function ParticipantsList({
     const fetchConnectedUsers = async () => {
       try {
         const response = await fetch(
-          `/api/auctions/${auctionId}/connected-users`
+          `/api/auctions/${auction.id}/connected-users`
         );
         if (response.ok) {
           const data = await response.json();
@@ -83,7 +83,7 @@ export function ParticipantsList({
     const interval = setInterval(fetchConnectedUsers, 5000);
 
     return () => clearInterval(interval);
-  }, [auctionId, isManager]);
+  }, [auction.id, isManager]);
 
   const handleRemoveParticipant = async () => {
     if (!participantToRemove) return;
@@ -91,7 +91,7 @@ export function ParticipantsList({
     setIsRemoving(true);
     try {
       const response = await fetch(
-        `/api/auctions/${auctionId}/register/${participantToRemove.id}`,
+        `/api/auctions/${auction.id}/register/${participantToRemove.id}`,
         {
           method: 'DELETE',
         }
@@ -264,7 +264,7 @@ export function ParticipantsList({
 
       {/* Add Participant Modal */}
       <AddParticipantModal
-        auctionId={auctionId}
+        auction={auction}
         isOpen={isAddModalOpen}
         onClose={() => setIsAddModalOpen(false)}
         onSuccess={async () => {

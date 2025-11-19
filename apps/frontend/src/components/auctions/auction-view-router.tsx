@@ -16,7 +16,12 @@ import {
   AlertDescription,
 } from '@suba-go/shared-components/components/ui/alert';
 import { AlertCircle } from 'lucide-react';
-import { AuctionDto, AuctionStatusEnum } from '@suba-go/shared-validation';
+import {
+  AuctionDto,
+  AuctionItemWithItmeAndBidsDto,
+  AuctionStatusEnum,
+  UserRolesEnum,
+} from '@suba-go/shared-validation';
 
 interface AuctionViewRouterProps {
   auctionId: string;
@@ -36,33 +41,43 @@ export function AuctionViewRouter({
   // Fetch auction data
   const {
     data: auction,
-    isLoading,
-    error,
+    isLoading: isLoadingAuction,
+    error: errorAuction,
   } = useFetchData<AuctionDto>({
     url: `/api/auctions/${auctionId}`,
     key: ['auction', auctionId],
+    revalidateOnMount: true,
   });
 
-  if (isLoading) {
+  const {
+    data: auctionItems,
+    isLoading: isLoadingAuctionItems,
+    error: errorAuctionItems,
+  } = useFetchData<AuctionItemWithItmeAndBidsDto[]>({
+    url: `/api/auction-items/${auctionId}`,
+    key: ['auctionItems', auctionId],
+    revalidateOnMount: true,
+  });
+
+  if (isLoadingAuction || isLoadingAuctionItems) {
     return <AuctionDetailSkeleton />;
   }
 
-  if (error || !auction) {
+  if (errorAuction || errorAuctionItems || !auction || !auctionItems) {
     return (
       <Alert variant="destructive">
         <AlertCircle className="h-4 w-4" />
-        <AlertDescription>
-          {error || 'No se pudo cargar la subasta'}
-        </AlertDescription>
+        <AlertDescription>{'No se pudo cargar la subasta'}</AlertDescription>
       </Alert>
     );
   }
 
   // AUCTION_MANAGER always sees the management view
-  if (userRole === 'AUCTION_MANAGER') {
+  if (userRole === UserRolesEnum.AUCTION_MANAGER) {
     return (
       <AuctionDetail
-        auctionId={auctionId}
+        auction={auction}
+        auctionItems={auctionItems}
         userRole={userRole}
         userId={userId}
         accessToken={accessToken}
@@ -72,7 +87,7 @@ export function AuctionViewRouter({
   }
 
   // USER sees different views based on auction status
-  if (userRole === 'USER') {
+  if (userRole === UserRolesEnum.USER) {
     // Determine actual status based on time
     const now = new Date();
     const startTime = new Date(auction.startTime);
@@ -83,7 +98,7 @@ export function AuctionViewRouter({
     // Override status based on time if not cancelled/deleted
     if (
       auction.status !== AuctionStatusEnum.CANCELADA &&
-      auction.status !== 'ELIMINADA'
+      auction.status !== AuctionStatusEnum.ELIMINADA
     ) {
       if (now < startTime) {
         actualStatus = AuctionStatusEnum.PENDIENTE;
@@ -100,6 +115,7 @@ export function AuctionViewRouter({
         return (
           <AuctionActiveBiddingView
             auction={auction}
+            auctionItems={auctionItems}
             accessToken={accessToken}
             tenantId={tenantId}
             userId={userId}
@@ -107,10 +123,18 @@ export function AuctionViewRouter({
         );
 
       case AuctionStatusEnum.PENDIENTE:
-        return <AuctionPendingView auction={auction} />;
+        return (
+          <AuctionPendingView auction={auction} auctionItems={auctionItems} />
+        );
 
       case AuctionStatusEnum.COMPLETADA:
-        return <AuctionCompletedView auction={auction} userId={userId} />;
+        return (
+          <AuctionCompletedView
+            auction={auction}
+            auctionItems={auctionItems}
+            userId={userId}
+          />
+        );
 
       case AuctionStatusEnum.CANCELADA:
         return (
@@ -123,7 +147,8 @@ export function AuctionViewRouter({
       default:
         return (
           <AuctionDetail
-            auctionId={auctionId}
+            auction={auction}
+            auctionItems={auctionItems}
             userRole={userRole}
             userId={userId}
             accessToken={accessToken}
@@ -136,7 +161,8 @@ export function AuctionViewRouter({
   // Fallback to default view
   return (
     <AuctionDetail
-      auctionId={auctionId}
+      auction={auction}
+      auctionItems={auctionItems}
       userRole={userRole}
       userId={userId}
       accessToken={accessToken}

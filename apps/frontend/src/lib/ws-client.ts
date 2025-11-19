@@ -83,7 +83,6 @@ class WebSocketClient {
         });
 
         this.socket.addEventListener('close', (event) => {
-          console.log('WebSocket closed:', event.code, event.reason);
           this.setState(WsConnectionState.DISCONNECTED);
           this.stopHeartbeat();
 
@@ -211,10 +210,6 @@ class WebSocketClient {
     const delay = Math.min(
       this.reconnectDelay * Math.pow(2, this.reconnectAttempts - 1),
       30000
-    );
-
-    console.log(
-      `Reconnecting in ${delay}ms (attempt ${this.reconnectAttempts}/${this.maxReconnectAttempts})`
     );
 
     this.reconnectTimer = setTimeout(() => {

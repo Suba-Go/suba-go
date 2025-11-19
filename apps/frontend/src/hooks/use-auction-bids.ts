@@ -46,7 +46,6 @@ export function useAuctionBids(
     try {
       const backendUrl = process.env.BACKEND_URL || 'http://localhost:3001';
       const url = `${backendUrl}/bids/auction/${auctionId}`;
-      console.log('[useAuctionBids] Fetching bids from:', url);
 
       const response = await fetch(url, {
         headers: {
@@ -54,10 +53,6 @@ export function useAuctionBids(
           'Content-Type': 'application/json',
         },
       });
-
-      console.log('[useAuctionBids] Response status:', response.status);
-      console.log('[useAuctionBids] Response headers:', response.headers);
-
       if (!response.ok) {
         const text = await response.text();
         console.error('[useAuctionBids] Error response:', text);
@@ -74,7 +69,6 @@ export function useAuctionBids(
       }
 
       const data = await response.json();
-      console.log('[useAuctionBids] Response data:', data);
 
       // Ensure data is an array
       if (!Array.isArray(data)) {
@@ -82,8 +76,6 @@ export function useAuctionBids(
         setBids([]);
         return;
       }
-
-      console.log('[useAuctionBids] Bids loaded:', data.length);
 
       // Check for duplicates in the response
       const uniqueIds = new Set(data.map((bid: Bid) => bid.id));

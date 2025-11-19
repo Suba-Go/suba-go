@@ -2,6 +2,13 @@ import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../../providers-modules/prisma/prisma.service';
 import type { User, Prisma } from '@prisma/client';
 
+type UserWithCompanyAndTenant = Prisma.UserGetPayload<{
+  include: {
+    tenant: true;
+    company: true;
+  };
+}>;
+
 @Injectable()
 export class UserPrismaRepository {
   constructor(private readonly prisma: PrismaService) {}
@@ -46,11 +53,14 @@ export class UserPrismaRepository {
     });
   }
 
-  async findByEmailWithRelations(email: string): Promise<User | null> {
+  async findByEmailWithRelations(
+    email: string
+  ): Promise<UserWithCompanyAndTenant | null> {
     return this.prisma.user.findUnique({
       where: { email },
       include: {
         company: true,
+        tenant: true,
       },
     });
   }

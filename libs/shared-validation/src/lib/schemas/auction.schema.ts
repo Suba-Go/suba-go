@@ -13,27 +13,38 @@ export const auctionSchema = baseSchema
     description: z.string().nullable(),
     startTime: z.date(),
     endTime: z.date(),
-    status: z.enum(AuctionStatusEnum).default(AuctionStatusEnum.PENDIENTE),
-    type: z.enum(AuctionTypeEnum).default(AuctionTypeEnum.REAL),
+    status: z.nativeEnum(AuctionStatusEnum).default(AuctionStatusEnum.PENDIENTE),
+    type: z.nativeEnum(AuctionTypeEnum).default(AuctionTypeEnum.REAL),
     bidIncrement: z.number().positive(),
     tenantId: z.uuid(),
-    // Relations
-    // get tenant() {
-    //   return tenantSchema.nullable();
-    // },
+  })
+  .strict();
+
+export const auctionWithItemsAndBidsSchema = baseSchema
+  .extend({
+    title: name,
+    description: z.string().nullable(),
+    startTime: z.date(),
+    endTime: z.date(),
+    status: z.nativeEnum(AuctionStatusEnum).default(AuctionStatusEnum.PENDIENTE),
+    type: z.nativeEnum(AuctionTypeEnum).default(AuctionTypeEnum.REAL),
+    bidIncrement: z.number().positive(),
+    tenantId: z.uuid(),
     get items() {
       return z.array(auctionItemSchema).nullable();
     },
     get bids() {
       return z.array(bidSchema).nullable();
     },
+    // Relations
+    // get tenant() {
+    //   return tenantSchema.nullable();
+    // },
     // get registeredUsers() {
     //   return z.array(auctionRegistrationSchema).nullable();
     // },
   })
   .strict();
-
-export type AuctionDto = z.infer<typeof auctionSchema>;
 
 export const auctionCreateSchema = z
   .object({
@@ -42,7 +53,7 @@ export const auctionCreateSchema = z
     startTime: z.date(),
     endTime: z.date(),
     bidIncrement: z.number().positive(),
-    type: z.enum(AuctionTypeEnum),
+    type: z.nativeEnum(AuctionTypeEnum),
     tenantId: z.uuid(),
     itemIds: z.array(z.uuid()).min(1, 'Debe seleccionar al menos un item'),
   })
@@ -51,4 +62,8 @@ export const auctionCreateSchema = z
     path: ['endTime'],
   });
 
+export type AuctionDto = z.infer<typeof auctionSchema>;
+export type AuctionWithItemsAndBidsDto = z.infer<
+  typeof auctionWithItemsAndBidsSchema
+>;
 export type AuctionCreateDto = z.infer<typeof auctionCreateSchema>;

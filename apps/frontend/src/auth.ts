@@ -198,7 +198,8 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
 
       session.user = {
         ...token.user,
-        emailVerified: token.user.emailVerified ?? null,
+        email: token.user.email ?? null,
+        emailVerified: null,
       };
       session.tokens = token.tokens as Tokens;
       return session;

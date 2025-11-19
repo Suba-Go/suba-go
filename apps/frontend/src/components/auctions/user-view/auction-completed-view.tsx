@@ -16,26 +16,31 @@ import {
 import { Badge } from '@suba-go/shared-components/components/ui/badge';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { AuctionDto } from '@suba-go/shared-validation';
+import {
+  AuctionDto,
+  AuctionItemWithItmeAndBidsDto,
+} from '@suba-go/shared-validation';
 
 interface AuctionCompletedViewProps {
   auction: AuctionDto;
+  auctionItems: AuctionItemWithItmeAndBidsDto[];
   userId?: string;
 }
 
 export function AuctionCompletedView({
   auction,
   userId,
+  auctionItems,
 }: AuctionCompletedViewProps) {
   const startTime = new Date(auction.startTime);
   const endTime = new Date(auction.endTime);
 
   // Calculate auction statistics
-  const totalItems = auction.items?.length || 0;
+  const totalItems = auctionItems?.length || 0;
 
   // Count bids made by THIS user (not unique users)
   const totalUserBids =
-    auction.items?.reduce((count, item) => {
+    auctionItems?.reduce((count, item) => {
       const userBidsForItem =
         item.bids?.filter((bid) => bid.userId === userId).length || 0;
       return count + userBidsForItem;
@@ -43,13 +48,12 @@ export function AuctionCompletedView({
 
   // Count items won by this user
   const itemsWonByUser =
-    auction.items?.filter((item) => item.item?.soldToUserId === userId)
-      .length || 0;
-  const totalBids =
-    auction.items?.reduce((sum, item) => sum + (item.bids?.length || 0), 0) ||
+    auctionItems?.filter((item) => item.item?.soldToUserId === userId).length ||
     0;
+  const totalBids =
+    auctionItems?.reduce((sum, item) => sum + (item.bids?.length || 0), 0) || 0;
   const highestBid =
-    auction.items?.reduce((max, item) => {
+    auctionItems?.reduce((max, item) => {
       const itemMax =
         item.bids?.reduce(
           (itemMax, bid) => Math.max(itemMax, Number(bid.offered_price) || 0),
@@ -144,7 +148,7 @@ export function AuctionCompletedView({
       </Card>
 
       {/* Results */}
-      {auction.items && auction.items.length > 0 && (
+      {auctionItems && auctionItems.length > 0 && (
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
@@ -154,7 +158,7 @@ export function AuctionCompletedView({
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              {auction.items.map((auctionItem) => {
+              {auctionItems.map((auctionItem) => {
                 const highBid = auctionItem.bids?.[0];
                 const hasWinner = highBid && highBid.offered_price > 0;
                 const userWonItem = auctionItem.item?.soldToUserId === userId;

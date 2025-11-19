@@ -11,17 +11,16 @@ import { User, LogOut, ChevronDown, Gavel, Package, Users } from 'lucide-react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { Spinner } from '@suba-go/shared-components/components/ui/spinner';
-import { isUserProfileComplete, isUserAdminOrManager } from '@/utils/subdomain-profile-validation';
+import {
+  isUserProfileComplete,
+  isUserAdminOrManager,
+} from '@/utils/subdomain-profile-validation';
 
 interface CompanyNavbarProps {
   company: CompanyDto;
-  subdomain: string;
 }
 
-export default function CompanyNavbar({
-  company,
-  subdomain,
-}: CompanyNavbarProps) {
+export default function CompanyNavbar({ company }: CompanyNavbarProps) {
   const primaryColor = company.principal_color || '#3B82F6';
   const { data: session, status } = useSession();
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
@@ -92,41 +91,41 @@ export default function CompanyNavbar({
           {/* Navigation Menu */}
           {/* check if the profile is complete */}
           {isUserProfileComplete(session) && (
-          <nav className="hidden md:flex items-center space-x-6">
-            <Link href="/subastas">
-              <Button
-                variant="ghost"
-                className="text-gray-600 hover:text-gray-900 flex items-center gap-2"
-              >
-                <Gavel className="h-4 w-4" />
-                Subastas
-              </Button>
-            </Link>
-            {/* Products - Only for AUCTION_MANAGER and ADMIN */}
-            {isUserAdminOrManager(session) && (
-              <Link href="/items">
+            <nav className="hidden md:flex items-center space-x-6">
+              <Link href="/subastas">
                 <Button
                   variant="ghost"
                   className="text-gray-600 hover:text-gray-900 flex items-center gap-2"
                 >
-                  <Package className="h-4 w-4" />
-                  Productos
+                  <Gavel className="h-4 w-4" />
+                  Subastas
                 </Button>
               </Link>
-            )}
-            {/* Users - Only for AUCTION_MANAGER and ADMIN */}
-            {isUserAdminOrManager(session) && (
-              <Link href="/usuarios">
-                <Button
-                  variant="ghost"
-                  className="text-gray-600 hover:text-gray-900 flex items-center gap-2"
-                >
-                  <Users className="h-4 w-4" />
-                  Usuarios
-                </Button>
-              </Link>
-            )}
-          </nav>
+              {/* Products - Only for AUCTION_MANAGER and ADMIN */}
+              {isUserAdminOrManager(session) && (
+                <Link href="/items">
+                  <Button
+                    variant="ghost"
+                    className="text-gray-600 hover:text-gray-900 flex items-center gap-2"
+                  >
+                    <Package className="h-4 w-4" />
+                    Productos
+                  </Button>
+                </Link>
+              )}
+              {/* Users - Only for AUCTION_MANAGER and ADMIN */}
+              {isUserAdminOrManager(session) && (
+                <Link href="/usuarios">
+                  <Button
+                    variant="ghost"
+                    className="text-gray-600 hover:text-gray-900 flex items-center gap-2"
+                  >
+                    <Users className="h-4 w-4" />
+                    Usuarios
+                  </Button>
+                </Link>
+              )}
+            </nav>
           )}
 
           {/* Right side actions */}

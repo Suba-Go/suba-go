@@ -1,12 +1,13 @@
 import {
-  Controller,
-  Post,
   Body,
-  Param,
+  Controller,
+  ForbiddenException,
   Get,
+  Param,
   Patch,
-  UseGuards,
+  Post,
   Request,
+  UseGuards,
 } from '@nestjs/common';
 import { UserCreatorService } from './services/user-creator.service';
 import { UserGettersService } from './services/user-getter.service';
@@ -103,7 +104,9 @@ export class UsersController {
   ) {
     // Los usuarios solo pueden actualizar su propio perfil
     if (req.user.role === UserRolesEnum.USER && req.user.userId !== id) {
-      throw new Error('No puedes actualizar el perfil de otro usuario');
+      throw new ForbiddenException(
+        'No puedes actualizar el perfil de otro usuario'
+      );
     }
     return await this.userUpdaterService.updateUserProfile(id, updateData);
   }

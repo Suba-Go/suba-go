@@ -256,7 +256,6 @@ export class AuctionPrismaService {
               },
             },
             bids: {
-              take: 1,
               orderBy: {
                 offered_price: 'desc',
               },

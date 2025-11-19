@@ -1,7 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { UserPrismaRepository } from './user-prisma-repository.service';
 import { normalizeCompanyName } from '../../../../utils/company-normalization';
-import { UserDto } from '@suba-go/shared-validation';
 
 // Define User with relations type for this service
 // Note: Tenant no longer has a name field - company name is used as subdomain
@@ -21,15 +20,13 @@ export class UserLookupService {
   ): Promise<CompanyLookupResult | null> {
     try {
       // Find user by email with company and tenant relations
-      const user = (await this.userRepository.findByEmailWithRelations(
-        email
-      )) as UserDto;
+      const user = await this.userRepository.findByEmailWithRelations(email);
 
       if (!user) {
         return null;
       }
 
-      if (!user.companyId) {
+      if (!user.companyId || !user.company) {
         throw new NotFoundException(
           'User exists but has no associated company'
         );
@@ -59,9 +56,7 @@ export class UserLookupService {
   ): Promise<{ isValid: boolean; message?: string }> {
     try {
       // Find user by email with relations
-      const user = (await this.userRepository.findByEmailWithRelations(
-        email
-      )) as UserDto;
+      const user = await this.userRepository.findByEmailWithRelations(email);
       if (!user) {
         return {
           isValid: false,
@@ -78,6 +73,13 @@ export class UserLookupService {
       }
 
       // the tenant name is the subdomain, it is normalized to match the subdomain format for comparison
+      if (!user.company) {
+        return {
+          isValid: false,
+          message: 'Usuario no tiene empresa asociada',
+        };
+      }
+
       const userTenantSubdomain = normalizeCompanyName(user.company.name);
 
       // compare the normalized tenant name with the requested subdomain

@@ -45,7 +45,7 @@ export class WsAuthAdapter extends WsAdapter {
         httpServer =
           nestApp.getHttpServer?.() || nestApp.httpAdapter?.getHttpServer?.();
       } catch (error) {
-        this.logger.debug('Could not get HTTP server from app');
+        this.logger.debug('Could not get HTTP server from app', error);
       }
     }
 

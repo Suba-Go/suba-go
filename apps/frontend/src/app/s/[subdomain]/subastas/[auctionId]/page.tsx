@@ -4,6 +4,7 @@ import { redirect } from 'next/navigation';
 import { AuctionViewRouter } from '@/components/auctions/auction-view-router';
 import { AuctionDetailSkeleton } from '@/components/auctions/auction-detail-skeleton';
 import { isUserRole } from '@/lib/auction-utils';
+import { UserRolesEnum } from '@suba-go/shared-validation';
 
 export default async function AuctionDetailPage({
   params,
@@ -16,7 +17,8 @@ export default async function AuctionDetailPage({
   // Verify user has access to auctions (AUCTION_MANAGER or regular user)
   const hasAccess =
     session &&
-    (session.user.role === 'AUCTION_MANAGER' || isUserRole(session.user.role));
+    (session.user.role === UserRolesEnum.AUCTION_MANAGER ||
+      isUserRole(session.user.role));
 
   if (!hasAccess) {
     redirect('/');

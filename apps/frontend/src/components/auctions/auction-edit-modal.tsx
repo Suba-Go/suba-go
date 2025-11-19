@@ -24,9 +24,12 @@ import { TimeInput } from '@/components/ui/time-input';
 import {
   auctionCreateSchema,
   AuctionDto,
+  AuctionItemWithItmeAndBidsDto,
   AuctionTypeEnum,
   type AuctionCreateDto,
 } from '@suba-go/shared-validation';
+import { Spinner } from '@suba-go/shared-components/components/ui/spinner';
+import { useFetchData } from '@/hooks/use-fetch-data';
 
 interface AuctionEditModalProps {
   isOpen: boolean;
@@ -60,6 +63,16 @@ export function AuctionEditModal({
     resolver: zodResolver(auctionCreateSchema),
   });
 
+  const {
+    data: auctionItems,
+    isLoading: isLoadingAuctionItems,
+    error: errorAuctionItems,
+  } = useFetchData<AuctionItemWithItmeAndBidsDto[]>({
+    url: `/api/auction-items/${auction.id}`,
+    key: ['auctionItems', auction.id],
+    revalidateOnMount: true,
+  });
+
   const durationOptions = useMemo(
     () => [
       { value: 15, label: '15 minutos' },
@@ -88,7 +101,7 @@ export function AuctionEditModal({
       );
 
       const items =
-        auction.items
+        auctionItems
           ?.map((item) => item?.id)
           .filter((id): id is string => Boolean(id)) || [];
 
@@ -109,7 +122,7 @@ export function AuctionEditModal({
         type: (auction.type as AuctionTypeEnum) ?? AuctionTypeEnum.REAL,
       });
     }
-  }, [auction, company?.tenantId, isOpen, reset]);
+  }, [auction, company?.tenantId, isOpen, reset, auctionItems]);
 
   useEffect(() => {
     const [hoursStr, minutesStr] = startTimeInput.split(':');
@@ -229,10 +242,18 @@ export function AuctionEditModal({
     return t;
   }, []);
 
-  if (!auction) {
+  if (!auction || errorAuctionItems) {
     return null;
   }
-
+  if (isLoadingAuctionItems) {
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-gray-50">
+        <div className="text-center">
+          <Spinner className="size-8" />
+        </div>
+      </div>
+    );
+  }
   return (
     <Dialog open={isOpen} onOpenChange={handleClose}>
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">

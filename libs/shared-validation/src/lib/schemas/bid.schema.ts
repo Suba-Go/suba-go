@@ -1,9 +1,6 @@
 import { z } from 'zod';
 import { baseSchema } from './base.schema';
-// import { tenantSchema } from './tenant.schema';
-// import { userSafeSchema } from './user.schema';
-// import { auctionSchema } from './auction.schema';
-// import { auctionItemSchema } from './auction-item.schema';
+import { userSafeSchema } from './user.schema';
 
 export const bidSchema = baseSchema
   .extend({
@@ -14,23 +11,14 @@ export const bidSchema = baseSchema
     userId: z.uuid(),
     auctionId: z.uuid(),
     auctionItemId: z.uuid(),
-    // Relations
-    // get tenant() {
-    //   return tenantSchema.nullable();
-    // },
-    // get user() {
-    //   return userSafeSchema.nullable();
-    // },
-    // get auction() {
-    //   return auctionSchema;
-    // },
-    // get auctionItem() {
-    //   return auctionItemSchema;
-    // },
   })
   .strict();
 
-export type BidDto = z.infer<typeof bidSchema>;
+export const bidWithUserSchema = bidSchema
+  .extend({
+    user: userSafeSchema,
+  })
+  .strict();
 
 export const bidCreateSchema = z
   .object({
@@ -39,6 +27,6 @@ export const bidCreateSchema = z
   })
   .strict();
 
-export const auctionBidSchema = bidSchema.extend({});
-
+export type BidDto = z.infer<typeof bidSchema>;
+export type BidWithUserDto = z.infer<typeof bidWithUserSchema>;
 export type BidCreateDto = z.infer<typeof bidCreateSchema>;

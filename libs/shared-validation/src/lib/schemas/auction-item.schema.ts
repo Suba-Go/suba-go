@@ -1,25 +1,32 @@
 import { z } from 'zod';
 import { baseSchema } from './base.schema';
 // import { auctionSchema } from './auction.schema';
-import { itemSchema } from './item.schema';
-import { bidSchema } from './bid.schema';
+import { itemWithSoldToUserSchema } from './item.schema';
+import { bidWithUserSchema } from './bid.schema';
 
 export const auctionItemSchema = baseSchema
   .extend({
     startingBid: z.number().positive(),
     auctionId: z.uuid(),
     itemId: z.uuid(),
-    // Relations
-    // get auction() {
-    //   return auctionSchema;
-    // },
+  })
+  .strict();
+
+export const auctionItemWithItmeAndBidsSchema = baseSchema
+  .extend({
+    startingBid: z.number().positive(),
+    auctionId: z.uuid(),
+    itemId: z.uuid(),
     get item() {
-      return itemSchema.nullable();
+      return itemWithSoldToUserSchema.nullable();
     },
     get bids() {
-      return z.array(bidSchema).nullable();
+      return z.array(bidWithUserSchema).nullable();
     },
   })
   .strict();
 
 export type AuctionItemDto = z.infer<typeof auctionItemSchema>;
+export type AuctionItemWithItmeAndBidsDto = z.infer<
+  typeof auctionItemWithItmeAndBidsSchema
+>;
