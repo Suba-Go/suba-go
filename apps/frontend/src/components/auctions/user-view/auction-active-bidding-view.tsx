@@ -20,13 +20,17 @@ import { AuctionItemCard } from './auction-item-card';
 import { SelfBidWarningDialog, AutoBidConfirmDialog } from './bidding-dialogs';
 import { useAuctionWebSocketBidding } from '@/hooks/use-auction-websocket-bidding';
 import { useAutoBidSettings } from '@/hooks/use-auto-bid-settings';
-import type { AuctionData } from '@/types/auction.types';
+import {
+  AuctionDto,
+  AuctionItemWithItmeAndBidsDto,
+} from '@suba-go/shared-validation';
 
 interface AuctionActiveBiddingViewProps {
-  auction: AuctionData;
+  auction: AuctionDto;
   accessToken: string;
   tenantId: string;
   userId: string;
+  auctionItems: AuctionItemWithItmeAndBidsDto[];
 }
 
 interface BidState {
@@ -48,17 +52,16 @@ interface ItemBidHistory {
 }
 
 export function AuctionActiveBiddingView({
-  auction: initialAuction,
+  auction,
+  auctionItems,
   accessToken,
   tenantId,
   userId,
 }: AuctionActiveBiddingViewProps) {
-  const [auction, setAuction] = useState<AuctionData>(initialAuction);
   const [bidStates, setBidStates] = useState<BidState>({});
   const [bidHistory, setBidHistory] = useState<ItemBidHistory>({});
-  const [selectedItemForDetail, setSelectedItemForDetail] = useState<
-    any | null
-  >(null);
+  const [selectedItemForDetail, setSelectedItemForDetail] =
+    useState<AuctionItemWithItmeAndBidsDto | null>(null);
   const [selfBidWarning, setSelfBidWarning] = useState<{
     auctionItemId: string;
     amount: number;
@@ -106,30 +109,6 @@ export function AuctionActiveBiddingView({
         },
       }));
 
-      setAuction((prev) => ({
-        ...prev,
-        items: prev.items?.map((item) =>
-          item.id === auctionItemId
-            ? {
-                ...item,
-                bids: [
-                  {
-                    id: bidId,
-                    offered_price: amount,
-                    amount: amount,
-                    bid_time: new Date(timestamp).toISOString(),
-                    userId: bidderId,
-                    user: userName
-                      ? { id: bidderId, public_name: userName }
-                      : undefined,
-                  },
-                  ...(item.bids || []),
-                ],
-              }
-            : item
-        ),
-      }));
-
       // Toast de éxito solo para la puja del usuario actual
       if (bidderId === userId) {
         toast({
@@ -155,14 +134,7 @@ export function AuctionActiveBiddingView({
   }, []);
 
   const handleTimeExtension = useCallback((data: any) => {
-    const { newEndTime, extensionSeconds } = data;
-    setAuction((prev) => ({
-      ...prev,
-      endTime: new Date(newEndTime).toISOString(),
-    }));
-    console.log(
-      `⏰ Tiempo extendido: +${extensionSeconds} segundos (cierre suave)`
-    );
+    // todo extend auction time
   }, []);
 
   const { isConnected, isJoined, participantCount, connectionError, sendBid } =
@@ -177,16 +149,16 @@ export function AuctionActiveBiddingView({
 
   // Initialize bid states
   useEffect(() => {
-    if (auction.items) {
+    if (auctionItems) {
       const initialStates: BidState = {};
-      auction.items.forEach((item) => {
+      auctionItems.forEach((auctionItem) => {
         const currentHighest = Number(
-          item.bids?.[0]?.offered_price || item.startingBid || 0
+          auctionItem.bids?.[0]?.offered_price || auctionItem.startingBid || 0
         );
         const bidIncrement = Number(auction.bidIncrement || 50000);
         const minNextBid = currentHighest + bidIncrement;
 
-        initialStates[item.id] = {
+        initialStates[auctionItem.id] = {
           amount: minNextBid.toString(),
           isPending: false,
           error: null,
@@ -194,7 +166,7 @@ export function AuctionActiveBiddingView({
       });
       setBidStates(initialStates);
     }
-  }, [auction.items, auction.bidIncrement]);
+  }, [auctionItems, auction.bidIncrement]);
 
   // Place bid function
   const placeBid = (auctionItemId: string, skipSelfBidCheck = false) => {
@@ -205,7 +177,7 @@ export function AuctionActiveBiddingView({
     const itemHistory = bidHistory[auctionItemId] || [];
     const currentHighestBidderId =
       itemHistory[0]?.userId ||
-      auction.items?.find((i) => i.id === auctionItemId)?.bids?.[0]?.userId;
+      auctionItems?.find((i) => i.id === auctionItemId)?.bids?.[0]?.userId;
 
     if (!skipSelfBidCheck && currentHighestBidderId === userId) {
       setSelfBidWarning({ auctionItemId, amount });
@@ -246,9 +218,9 @@ export function AuctionActiveBiddingView({
       const itemHistory = bidHistory[auctionItemId] || [];
       const currentHighest = Number(
         itemHistory[0]?.amount ||
-          auction.items?.find((i) => i.id === auctionItemId)?.bids?.[0]
+          auctionItems?.find((i) => i.id === auctionItemId)?.bids?.[0]
             ?.offered_price ||
-          auction.items?.find((i) => i.id === auctionItemId)?.startingBid ||
+          auctionItems?.find((i) => i.id === auctionItemId)?.startingBid ||
           0
       );
       const bidIncrement = Number(auction.bidIncrement || 50000);
@@ -285,7 +257,7 @@ export function AuctionActiveBiddingView({
     <div className="space-y-6">
       <AuctionHeader
         title={auction.title}
-        description={auction.description}
+        description={auction.description || ''}
         status="ACTIVA"
       />
 
@@ -310,9 +282,9 @@ export function AuctionActiveBiddingView({
       />
 
       {/* Items Grid */}
-      {auction.items && auction.items.length > 0 ? (
+      {auctionItems && auctionItems.length > 0 ? (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {auction.items.map((auctionItem) => {
+          {auctionItems.map((auctionItem) => {
             const itemHistory = bidHistory[auctionItem.id] || [];
             const currentHighest = Number(
               itemHistory[0]?.amount ||

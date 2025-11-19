@@ -83,7 +83,7 @@ export default auth(async function middleware(request: NextRequest) {
         new URL(`/s/${subdomain}/subastas`, request.url)
       );
     }
-    
+
     // Onboarding page
     if (pathname === '/onboarding') {
       return NextResponse.rewrite(
@@ -113,27 +113,19 @@ export default auth(async function middleware(request: NextRequest) {
 
     // Validate user belongs to the company (subdomain is company name)
     if (session && !isPublic) {
-    const userCompanyName = session.user?.company?.name ?? '';
+      const userCompanyName = session.user?.company?.name ?? '';
 
-    if (userCompanyName !== subdomain) {
-      // Redirect to login if user doesn't belong to this company
-      const login = new URL('/login', request.url);
-      return NextResponse.redirect(login);
-    }
+      if (userCompanyName !== subdomain) {
+        // Redirect to login if user doesn't belong to this company
+        const login = new URL('/login', request.url);
+        return NextResponse.redirect(login);
+      }
 
-    // Check if user profile is complete - redirect to /onboarding if not
-    if (!isUserProfileComplete(session)) {
-      console.log('Profile incomplete, redirecting to /onboarding', {
-        user: session.user?.email,
-        name: session.user?.name,
-        phone: session.user?.phone,
-        rut: session.user?.rut,
-        pathname: pathname,
-      });
-      
-      // redirect to public onboarding route
-      return NextResponse.redirect(new URL(`/onboarding`, request.url));
-    }
+      // Check if user profile is complete - redirect to /onboarding if not
+      if (!isUserProfileComplete(session)) {
+        // redirect to public onboarding route
+        return NextResponse.redirect(new URL(`/onboarding`, request.url));
+      }
     }
 
     // bloquea zonas globales desde subdominios

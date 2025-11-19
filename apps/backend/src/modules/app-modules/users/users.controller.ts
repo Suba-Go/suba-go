@@ -1,11 +1,21 @@
-import { Controller, Post, Body, Param, Get, Patch, UseGuards, Request } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  ForbiddenException,
+  Get,
+  Param,
+  Patch,
+  Post,
+  Request,
+  UseGuards,
+} from '@nestjs/common';
 import { UserCreatorService } from './services/user-creator.service';
 import { UserGettersService } from './services/user-getter.service';
 import { UserUpdaterService } from './services/user-updater.service';
 import {
-  UserCreateDto,
-  UserSafeWithCompanyAndTenantDto,
+  UserCreateTrcpDto,
   UserUpdateProfileDto,
+  UserWithTenantAndCompanyDto,
 } from '@suba-go/shared-validation';
 import { JwtAuthGuard } from '../../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../../common/guards/roles.guard';
@@ -36,13 +46,13 @@ export class UsersController {
   ) {}
 
   @Post()
-  async createUser(@Body() userData: UserCreateDto) {
+  async createUser(@Body() userData: UserCreateTrcpDto) {
     return await this.userCreatorService.createUser(userData);
   }
 
   @Post('tenant/:tenantId')
   async createUserWithTenant(
-    @Body() userData: UserCreateDto,
+    @Body() userData: UserCreateTrcpDto,
     @Param('tenantId') tenantId: string
   ) {
     return await this.userCreatorService.createUser(userData, tenantId);
@@ -50,7 +60,7 @@ export class UsersController {
 
   @Post('tenant/:tenantId/company/:companyId')
   async createUserWithTenantAndCompany(
-    @Body() userData: UserCreateDto,
+    @Body() userData: UserCreateTrcpDto,
     @Param('tenantId') tenantId: string,
     @Param('companyId') companyId: string
   ) {
@@ -77,7 +87,7 @@ export class UsersController {
 
   @Post('connect-user-to-company-and-tenant')
   async connectUserToCompanyAndTenant(
-    @Body() userData: UserSafeWithCompanyAndTenantDto
+    @Body() userData: UserWithTenantAndCompanyDto
   ) {
     return await this.userCreatorService.connectUserToCompanyAndTenant(
       userData
@@ -94,7 +104,9 @@ export class UsersController {
   ) {
     // Los usuarios solo pueden actualizar su propio perfil
     if (req.user.role === UserRolesEnum.USER && req.user.userId !== id) {
-      throw new Error('No puedes actualizar el perfil de otro usuario');
+      throw new ForbiddenException(
+        'No puedes actualizar el perfil de otro usuario'
+      );
     }
     return await this.userUpdaterService.updateUserProfile(id, updateData);
   }

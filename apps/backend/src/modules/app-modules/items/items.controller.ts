@@ -135,6 +135,22 @@ export class ItemsController {
     return this.itemsService.getItemStats(tenantId);
   }
 
+  @Get('sold-to/:userId')
+  @ApiOperation({ summary: 'Obtener items vendidos a un usuario específico' })
+  @ApiParam({ name: 'userId', description: 'ID del usuario' })
+  @ApiResponse({
+    status: 200,
+    description: 'Lista de items vendidos al usuario',
+    type: [ItemResponseDto],
+  })
+  async getItemsSoldToUser(
+    @Param('userId') userId: string,
+    @Request() req: AuthenticatedRequest
+  ) {
+    const tenantId = req.user.tenantId;
+    return this.itemsService.getItemsSoldToUser(userId, tenantId);
+  }
+
   @Get('by-state/:state/tenant/:tenantId')
   @ApiOperation({ summary: 'Obtener items por estado y tenant' })
   @ApiParam({ name: 'state', description: 'Estado del item' })

@@ -1,7 +1,7 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { useForm, Controller } from 'react-hook-form';
+import { useEffect, useMemo, useState } from 'react';
+import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Calendar, Clock, Package } from 'lucide-react';
 import {
@@ -23,16 +23,19 @@ import { DateInput } from '@/components/ui/date-input';
 import { TimeInput } from '@/components/ui/time-input';
 import {
   auctionCreateSchema,
+  AuctionDto,
+  AuctionItemWithItmeAndBidsDto,
   AuctionTypeEnum,
   type AuctionCreateDto,
 } from '@suba-go/shared-validation';
-import type { AuctionData } from '@/types/auction.types';
+import { Spinner } from '@suba-go/shared-components/components/ui/spinner';
+import { useFetchData } from '@/hooks/use-fetch-data';
 
 interface AuctionEditModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSuccess: () => void;
-  auction: AuctionData | null;
+  auction: AuctionDto;
 }
 
 export function AuctionEditModal({
@@ -44,7 +47,11 @@ export function AuctionEditModal({
   const [isLoading, setIsLoading] = useState(false);
   const [selectedItems, setSelectedItems] = useState<string[]>([]);
   const [isTestAuction, setIsTestAuction] = useState(false);
+  const [startDate, setStartDate] = useState<Date>(new Date());
+  const [startTimeInput, setStartTimeInput] = useState('10:00');
+  const [durationMinutes, setDurationMinutes] = useState(30);
   const { toast } = useToast();
+  const { company } = useCompany();
 
   const {
     register,
@@ -52,62 +59,105 @@ export function AuctionEditModal({
     formState: { errors },
     reset,
     setValue,
-    control,
-  } = useForm({
+  } = useForm<AuctionCreateDto>({
     resolver: zodResolver(auctionCreateSchema),
   });
 
-  // Duration options
-  const durationOptions = [
-    { value: 15, label: '15 minutos' },
-    { value: 30, label: '30 minutos' },
-    { value: 45, label: '45 minutos' },
-    { value: 60, label: '1 hora' },
-    { value: 120, label: '2 horas' },
-    { value: 300, label: '5 horas' },
-  ];
+  const {
+    data: auctionItems,
+    isLoading: isLoadingAuctionItems,
+    error: errorAuctionItems,
+  } = useFetchData<AuctionItemWithItmeAndBidsDto[]>({
+    url: `/api/auction-items/${auction.id}`,
+    key: ['auctionItems', auction.id],
+    revalidateOnMount: true,
+  });
 
-  // Load auction data when modal opens
+  const durationOptions = useMemo(
+    () => [
+      { value: 15, label: '15 minutos' },
+      { value: 30, label: '30 minutos' },
+      { value: 45, label: '45 minutos' },
+      { value: 60, label: '1 hora' },
+      { value: 120, label: '2 horas' },
+      { value: 300, label: '5 horas' },
+    ],
+    []
+  );
+
+  useEffect(() => {
+    if (company?.tenantId) {
+      setValue('tenantId', company.tenantId);
+    }
+  }, [company?.tenantId, setValue]);
+
   useEffect(() => {
     if (auction && isOpen) {
-      const startTime = new Date(auction.startTime);
-      const endTime = new Date(auction.endTime);
-      const durationMinutes = Math.round(
-        (endTime.getTime() - startTime.getTime()) / (1000 * 60)
+      const start = new Date(auction.startTime);
+      const end = new Date(auction.endTime);
+      const minutes = Math.max(
+        15,
+        Math.round((end.getTime() - start.getTime()) / 60000)
       );
 
-      // Extract selected item IDs
-      const itemIds =
-        auction.items
-          ?.map((item) => item.item?.id)
+      const items =
+        auctionItems
+          ?.map((item) => item?.id)
           .filter((id): id is string => Boolean(id)) || [];
-      setSelectedItems(itemIds);
 
-      // Set test auction state
+      setSelectedItems(items);
       setIsTestAuction(auction.type === AuctionTypeEnum.TEST);
+      setStartDate(start);
+      setStartTimeInput(start.toTimeString().slice(0, 5));
+      setDurationMinutes(minutes);
 
       reset({
         title: auction.title,
-        description: auction.description || '',
-        startDate: startTime,
-        startTime: startTime.toTimeString().slice(0, 5), // HH:MM format
-        durationMinutes: durationMinutes,
-        selectedItems: itemIds,
-        type: (auction.type as AuctionTypeEnum) || AuctionTypeEnum.REAL,
+        description: auction.description ?? '',
+        startTime: start,
+        endTime: end,
+        bidIncrement: auction.bidIncrement ?? 50000,
+        tenantId: company?.tenantId ?? '',
+        itemIds: items,
+        type: (auction.type as AuctionTypeEnum) ?? AuctionTypeEnum.REAL,
       });
     }
-  }, [auction, isOpen, reset]);
+  }, [auction, company?.tenantId, isOpen, reset, auctionItems]);
 
-  const onSubmit = async (
-    data: AuctionCreateDto & { selectedItems: string[] }
-  ) => {
-    if (!auction) return;
+  useEffect(() => {
+    const [hoursStr, minutesStr] = startTimeInput.split(':');
+    const hours = Number(hoursStr);
+    const minutes = Number(minutesStr);
 
-    // Check if auction has already started
+    if (
+      Number.isNaN(hours) ||
+      Number.isNaN(minutes) ||
+      hours < 0 ||
+      hours > 23 ||
+      minutes < 0 ||
+      minutes > 59
+    ) {
+      return;
+    }
+
+    const startDateTime = new Date(startDate);
+    startDateTime.setHours(hours, minutes, 0, 0);
+
+    const endDateTime = new Date(startDateTime);
+    endDateTime.setMinutes(endDateTime.getMinutes() + durationMinutes);
+
+    setValue('startTime', startDateTime);
+    setValue('endTime', endDateTime);
+  }, [startDate, startTimeInput, durationMinutes, setValue]);
+
+  const onSubmit = async (data: AuctionCreateDto) => {
+    if (!auction) {
+      return;
+    }
+
     const now = new Date();
-    const auctionStart = new Date(auction.startTime);
-
-    if (auctionStart <= now) {
+    const originalStart = new Date(auction.startTime);
+    if (originalStart <= now) {
       toast({
         title: 'Error',
         description: 'No se puede editar una subasta que ya ha comenzado',
@@ -116,8 +166,7 @@ export function AuctionEditModal({
       return;
     }
 
-    // Validar que hay items seleccionados
-    if (!data.selectedItems || data.selectedItems.length === 0) {
+    if (!data.itemIds.length) {
       toast({
         title: 'Error',
         description: 'Debe seleccionar al menos un item para la subasta',
@@ -126,49 +175,31 @@ export function AuctionEditModal({
       return;
     }
 
+    if (data.startTime <= now) {
+      toast({
+        title: 'Error',
+        description: 'La fecha y hora de inicio debe ser futura',
+        variant: 'destructive',
+      });
+      return;
+    }
+
     setIsLoading(true);
     try {
-      // Combinar fecha y hora para crear startTime
-      const [hours, minutes] = data.startTime.split(':');
-      const startDateTime = new Date(data.startDate);
-      startDateTime.setHours(parseInt(hours), parseInt(minutes), 0, 0);
-
-      // Validar que la fecha y hora de inicio sea futura
-      const now = new Date();
-      if (startDateTime <= now) {
-        const isToday = startDateTime.toDateString() === now.toDateString();
-        const errorMessage = isToday
-          ? 'La hora de inicio debe ser posterior a la hora actual'
-          : 'La fecha y hora de inicio debe ser futura';
-
-        toast({
-          title: 'Error',
-          description: errorMessage,
-          variant: 'destructive',
-        });
-        setIsLoading(false);
-        return;
-      }
-
-      // Calcular endTime basado en la duración
-      const endDateTime = new Date(startDateTime);
-      endDateTime.setMinutes(endDateTime.getMinutes() + data.durationMinutes);
-
-      const requestBody = {
-        title: data.title,
-        description: data.description,
-        startTime: startDateTime.toISOString(),
-        endTime: endDateTime.toISOString(),
-        selectedItems: data.selectedItems,
-        type: isTestAuction ? AuctionTypeEnum.TEST : AuctionTypeEnum.REAL,
-      };
-
       const response = await fetch(`/api/auctions/${auction.id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(requestBody),
+        body: JSON.stringify({
+          title: data.title,
+          description: data.description,
+          startTime: data.startTime.toISOString(),
+          endTime: data.endTime.toISOString(),
+          bidIncrement: data.bidIncrement,
+          type: isTestAuction ? AuctionTypeEnum.TEST : data.type,
+          itemIds: data.itemIds,
+        }),
       });
 
       if (!response.ok) {
@@ -177,15 +208,13 @@ export function AuctionEditModal({
       }
 
       toast({
-        title: 'Éxito',
+        title: 'Exito',
         description: 'Subasta actualizada correctamente',
-        variant: 'default',
       });
 
-      handleCloseClick();
       onSuccess();
+      handleClose();
     } catch (error) {
-      console.error('Error updating auction:', error);
       toast({
         title: 'Error',
         description:
@@ -199,29 +228,32 @@ export function AuctionEditModal({
     }
   };
 
-  const handleClose = (open?: boolean) => {
-    if (open === false || open === undefined) {
-      reset();
-      setSelectedItems([]);
-      setIsTestAuction(false);
-      onClose();
-    }
+  const handleClose = () => {
+    setIsTestAuction(false);
+    setSelectedItems([]);
+    setStartTimeInput('10:00');
+    setDurationMinutes(30);
+    onClose();
   };
 
-  const handleCloseClick = () => {
-    handleClose(false);
-  };
+  const today = useMemo(() => {
+    const t = new Date();
+    t.setHours(0, 0, 0, 0);
+    return t;
+  }, []);
 
-  const { company } = useCompany();
-  const primaryColor = company?.principal_color || '#3B82F6';
-
-  if (!auction) return null;
-
-  // Check if auction can be edited
-  const now = new Date();
-  const auctionStart = new Date(auction.startTime);
-  const canEdit = auctionStart > now;
-
+  if (!auction || errorAuctionItems) {
+    return null;
+  }
+  if (isLoadingAuctionItems) {
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-gray-50">
+        <div className="text-center">
+          <Spinner className="size-8" />
+        </div>
+      </div>
+    );
+  }
   return (
     <Dialog open={isOpen} onOpenChange={handleClose}>
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
@@ -231,84 +263,50 @@ export function AuctionEditModal({
             Editar Subasta
           </DialogTitle>
           <DialogDescription>
-            {canEdit
-              ? 'Modifica los detalles de la subasta antes de que comience'
-              : 'Esta subasta ya ha comenzado y no puede ser editada'}
+            Actualiza la informacion de la subasta seleccionada
           </DialogDescription>
         </DialogHeader>
 
-        {!canEdit ? (
-          <div className="text-center py-8">
-            <p className="text-gray-600 mb-4">
-              Esta subasta ya ha comenzado y no puede ser modificada.
-            </p>
-            <Button onClick={handleCloseClick}>Cerrar</Button>
-          </div>
-        ) : (
-          <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
-            {/* Basic Info */}
-            <div className="space-y-4">
-              <div>
-                <Label htmlFor="title" className="flex items-center gap-2">
-                  <Calendar className="h-4 w-4" />
-                  Título de la Subasta *
-                </Label>
-                <Input
-                  id="title"
-                  placeholder="Ej: Subasta de Vehículos Enero 2024"
-                  {...register('title')}
-                  className={errors.title ? 'border-red-500' : ''}
-                />
-                {errors.title && (
-                  <p className="text-sm text-red-600 mt-1">
-                    {errors.title.message}
-                  </p>
-                )}
-              </div>
-
-              <div>
-                <Label htmlFor="description">Descripción</Label>
-                <Textarea
-                  id="description"
-                  placeholder="Descripción opcional de la subasta..."
-                  {...register('description')}
-                  className={errors.description ? 'border-red-500' : ''}
-                />
-                {errors.description && (
-                  <p className="text-sm text-red-600 mt-1">
-                    {errors.description.message}
-                  </p>
-                )}
-              </div>
+        <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+          <div className="space-y-4">
+            <div>
+              <Label htmlFor="title">Titulo de la Subasta *</Label>
+              <Input
+                id="title"
+                {...register('title')}
+                placeholder="Ej: Subasta de Vehiculos Enero 2024"
+                className={errors.title ? 'border-red-500' : ''}
+              />
+              {errors.title && (
+                <p className="text-sm text-red-600 mt-1">
+                  {errors.title.message as string}
+                </p>
+              )}
             </div>
 
-            {/* Date and Time */}
+            <div>
+              <Label htmlFor="description">Descripcion</Label>
+              <Textarea
+                id="description"
+                {...register('description')}
+                placeholder="Describe los detalles de la subasta..."
+                rows={3}
+              />
+            </div>
+          </div>
+
+          <div className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <Label htmlFor="startDate" className="flex items-center gap-2">
                   <Calendar className="h-4 w-4" />
                   Fecha de Inicio * (dd/mm/yyyy)
                 </Label>
-                <Controller
-                  name="startDate"
-                  control={control}
-                  render={({ field }) => (
-                    <DateInput
-                      value={field.value}
-                      onChange={field.onChange}
-                      minDate={new Date()}
-                      error={!!errors.startDate}
-                    />
-                  )}
+                <DateInput
+                  value={startDate}
+                  onChange={(date) => date && setStartDate(date)}
+                  minDate={today}
                 />
-                {errors.startDate && (
-                  <p className="text-sm text-red-600 mt-1">
-                    {errors.startDate.message}
-                  </p>
-                )}
-                <p className="text-xs text-gray-500 mt-1">
-                  Formato: día/mes/año
-                </p>
               </div>
 
               <div>
@@ -316,41 +314,24 @@ export function AuctionEditModal({
                   <Clock className="h-4 w-4" />
                   Hora de Inicio * (HH:MM)
                 </Label>
-                <Controller
-                  name="startTime"
-                  control={control}
-                  render={({ field }) => (
-                    <TimeInput
-                      value={field.value}
-                      onChange={field.onChange}
-                      error={!!errors.startTime}
-                    />
-                  )}
+                <TimeInput
+                  value={startTimeInput}
+                  onChange={setStartTimeInput}
                 />
-                {errors.startTime && (
-                  <p className="text-sm text-red-600 mt-1">
-                    {errors.startTime.message}
-                  </p>
-                )}
-                <p className="text-xs text-gray-500 mt-1">
-                  Formato: 24 horas (ej: 14:30)
-                </p>
               </div>
             </div>
 
-            {/* Duration */}
             <div>
-              <Label
-                htmlFor="durationMinutes"
-                className="flex items-center gap-2"
-              >
+              <Label className="flex items-center gap-2">
                 <Clock className="h-4 w-4" />
-                Duración *
+                Duracion de la Subasta *
               </Label>
               <select
-                id="durationMinutes"
-                {...register('durationMinutes', { valueAsNumber: true })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                value={durationMinutes}
+                onChange={(event) =>
+                  setDurationMinutes(Number(event.target.value))
+                }
+                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {durationOptions.map((option) => (
                   <option key={option.value} value={option.value}>
@@ -358,91 +339,76 @@ export function AuctionEditModal({
                   </option>
                 ))}
               </select>
-              {errors.durationMinutes && (
-                <p className="text-sm text-red-600 mt-1">
-                  {errors.durationMinutes.message}
-                </p>
-              )}
             </div>
+          </div>
 
-            {/* Auction Type */}
-            <div className="flex items-center justify-between p-4 border rounded-lg bg-gray-50">
-              <div className="space-y-1">
-                <Label className="text-sm font-medium">Tipo de Subasta</Label>
-                <p className="text-sm text-gray-600">
-                  Las subastas de prueba no aparecen en estadísticas
-                </p>
-              </div>
-              <div className="flex items-center gap-3">
-                <span
-                  className={`text-sm ${
-                    !isTestAuction
-                      ? 'font-medium text-green-600'
-                      : 'text-gray-500'
-                  }`}
-                >
-                  Real
-                </span>
-                <Switch
-                  checked={isTestAuction}
-                  onCheckedChange={setIsTestAuction}
-                />
-                <span
-                  className={`text-sm ${
-                    isTestAuction
-                      ? 'font-medium text-orange-600'
-                      : 'text-gray-500'
-                  }`}
-                >
-                  Prueba
-                </span>
-              </div>
+          <div className="flex items-center justify-between p-4 border rounded-lg bg-gray-50">
+            <div className="space-y-1">
+              <Label className="text-sm font-medium">Tipo de Subasta</Label>
+              <p className="text-sm text-gray-600">
+                Las subastas de prueba no aparecen en estadisticas
+              </p>
             </div>
-
-            {/* Item Selection */}
-            <div>
-              <Label className="flex items-center gap-2 mb-3">
-                <Package className="h-4 w-4" />
-                Seleccionar Items *
-              </Label>
-              <ItemSelector
-                selectedItems={selectedItems}
-                onItemsChange={(items) => {
-                  setSelectedItems(items);
-                  setValue('selectedItems', items);
+            <div className="flex items-center gap-3">
+              <span
+                className={`text-sm ${
+                  !isTestAuction
+                    ? 'font-medium text-green-600'
+                    : 'text-gray-500'
+                }`}
+              >
+                Real
+              </span>
+              <Switch
+                checked={isTestAuction}
+                onCheckedChange={(checked) => {
+                  setIsTestAuction(checked);
+                  setValue(
+                    'type',
+                    checked ? AuctionTypeEnum.TEST : AuctionTypeEnum.REAL
+                  );
                 }}
               />
-              {selectedItems.length === 0 && (
-                <p className="text-sm text-red-600 mt-1">
-                  Debe seleccionar al menos un item
-                </p>
-              )}
+              <span
+                className={`text-sm ${
+                  isTestAuction
+                    ? 'font-medium text-orange-600'
+                    : 'text-gray-500'
+                }`}
+              >
+                Prueba
+              </span>
             </div>
+          </div>
 
-            {/* Actions */}
-            <div className="flex justify-end gap-3 pt-4 border-t">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={handleCloseClick}
-              >
-                Cancelar
-              </Button>
-              <Button
-                type="submit"
-                disabled={isLoading}
-                style={{
-                  backgroundColor: primaryColor,
-                  borderColor: primaryColor,
-                  color: 'white',
-                }}
-                className="hover:opacity-90 transition-opacity"
-              >
-                {isLoading ? 'Actualizando...' : 'Actualizar Subasta'}
-              </Button>
-            </div>
-          </form>
-        )}
+          <div>
+            <Label className="flex items-center gap-2 mb-3">
+              <Package className="h-4 w-4" />
+              Seleccionar Items *
+            </Label>
+            <ItemSelector
+              selectedItems={selectedItems}
+              onItemsChange={(items) => {
+                setSelectedItems(items);
+                setValue('itemIds', items, { shouldValidate: true });
+              }}
+            />
+            {selectedItems.length === 0 && (
+              <p className="text-sm text-red-600 mt-1">
+                Debe seleccionar al menos un item
+              </p>
+            )}
+          </div>
+
+          <div className="flex justify-end gap-3 pt-4 border-t">
+            <Button type="button" variant="outline" onClick={handleClose}>
+              Cancelar
+            </Button>
+            <Button type="submit" disabled={isLoading}>
+              {isLoading ? 'Guardando...' : 'Actualizar Subasta'}
+            </Button>
+          </div>
+        </form>
       </DialogContent>
     </Dialog>
   );

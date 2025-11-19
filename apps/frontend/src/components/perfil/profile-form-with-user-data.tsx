@@ -23,7 +23,8 @@ const validateEmail = (email: string): string | null => {
 
 const validateName = (name: string): string | null => {
   if (!name.trim()) return 'El nombre es obligatorio';
-  if (name.trim().length < 3) return 'El nombre debe tener al menos 3 caracteres';
+  if (name.trim().length < 3)
+    return 'El nombre debe tener al menos 3 caracteres';
   return null;
 };
 
@@ -39,7 +40,7 @@ const validatePhone = (phone: string): string | null => {
 
 const validateRUT = (rut: string): string | null => {
   if (!rut.trim()) return 'El RUT es obligatorio';
-  
+
   // Validation rut format and validate the rut
   const rutRegex = /^[0-9]{1,2}\.?[0-9]{3}\.?[0-9]{3}-[0-9kK]$/;
   if (!rutRegex.test(rut)) {
@@ -130,17 +131,17 @@ export default function ProfileFormWithUserData({
 
     // Validate all fields before sending
     const errors: { [key: string]: string } = {};
-    
+
     // Validate required fields
     const nameError = validateName(userData.name);
     if (nameError) errors.name = nameError;
-    
+
     const emailError = validateEmail(userData.email);
     if (emailError) errors.email = emailError;
-    
+
     const phoneError = validatePhone(userData.phone);
     if (phoneError) errors.phone = phoneError;
-    
+
     const rutError = validateRUT(userData.rut);
     if (rutError) errors.rut = rutError;
 
@@ -168,10 +169,6 @@ export default function ProfileFormWithUserData({
         //  Rut saved formatted
         rut: formatRut(userData.rut.trim()),
       };
-
-      console.log('Preparing to send update data:', updateData);
-      console.log('Original userData:', userData);
-
       // Call the API to update the profile
       const result = await updateUserProfileAction(session.user.id, updateData);
 
@@ -210,18 +207,19 @@ export default function ProfileFormWithUserData({
         phone: userData.phone,
         rut: userData.rut,
       });
-      
+
       let errorMessage = 'Error al actualizar el perfil';
-      
+
       if (error instanceof Error) {
         errorMessage = error.message;
-        
+
         // If it is an internal server error, show a more specific message
         if (error.message.includes('Internal server error')) {
-          errorMessage = 'Error interno del servidor. Por favor verifica que todos los datos estén correctos e intenta nuevamente.';
+          errorMessage =
+            'Error interno del servidor. Por favor verifica que todos los datos estén correctos e intenta nuevamente.';
         }
       }
-      
+
       toast({
         title: 'Error',
         description: errorMessage,
@@ -240,11 +238,11 @@ export default function ProfileFormWithUserData({
         ...prev,
         [field]: value,
       }));
-      
+
       // Validate in real time only if the field has content
       if (value.trim()) {
         let error: string | null = null;
-        
+
         switch (field) {
           case 'name':
             error = validateName(value);
@@ -259,7 +257,7 @@ export default function ProfileFormWithUserData({
             error = validateRUT(value);
             break;
         }
-        
+
         setValidationErrors((prev) => ({
           ...prev,
           [field]: error || undefined,
@@ -306,19 +304,22 @@ export default function ProfileFormWithUserData({
   return (
     <div className="space-y-6">
       {/* warning missing fields */}
-      {session?.user && (() => {
-        const missing: string[] = [];
-        const u = session.user;
-        if (!u?.name || u.name.trim().length < 3) missing.push('name');
-        if (!u?.phone || u.phone.trim().length === 0) missing.push('phone');
-        if (!u?.rut || u.rut.trim().length === 0) missing.push('rut');
-        return missing.length > 0 ? (
-          <div className="rounded-md border border-yellow-300 bg-yellow-50 px-4 py-3 text-yellow-900">
-            <p className="font-medium">Completa tu perfil para continuar</p>
-            <p className="text-sm mt-1">Campos faltantes: {missing.join(', ')}</p>
-          </div>
-        ) : null;
-      })()}
+      {session?.user &&
+        (() => {
+          const missing: string[] = [];
+          const u = session.user;
+          if (!u?.name || u.name.trim().length < 3) missing.push('name');
+          if (!u?.phone || u.phone.trim().length === 0) missing.push('phone');
+          if (!u?.rut || u.rut.trim().length === 0) missing.push('rut');
+          return missing.length > 0 ? (
+            <div className="rounded-md border border-yellow-300 bg-yellow-50 px-4 py-3 text-yellow-900">
+              <p className="font-medium">Completa tu perfil para continuar</p>
+              <p className="text-sm mt-1">
+                Campos faltantes: {missing.join(', ')}
+              </p>
+            </div>
+          ) : null;
+        })()}
       <h2 className="text-xl font-semibold text-gray-900 mb-6 border-b border-gray-200 pb-4">
         Información Personal
       </h2>
@@ -342,7 +343,9 @@ export default function ProfileFormWithUserData({
                 placeholder="Tu nombre"
               />
               {validationErrors.name && (
-                <p className="mt-1 text-sm text-red-600">{validationErrors.name}</p>
+                <p className="mt-1 text-sm text-red-600">
+                  {validationErrors.name}
+                </p>
               )}
             </div>
           ) : (
@@ -367,9 +370,15 @@ export default function ProfileFormWithUserData({
                   setUserData((prev) => ({ ...prev, email: value }));
                   if (value.trim()) {
                     const err = validateEmail(value);
-                    setValidationErrors((prev) => ({ ...prev, email: err || undefined }));
+                    setValidationErrors((prev) => ({
+                      ...prev,
+                      email: err || undefined,
+                    }));
                   } else {
-                    setValidationErrors((prev) => ({ ...prev, email: undefined }));
+                    setValidationErrors((prev) => ({
+                      ...prev,
+                      email: undefined,
+                    }));
                   }
                 }}
                 className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 bg-blue-50 ${
@@ -380,7 +389,9 @@ export default function ProfileFormWithUserData({
                 placeholder="tu@email.com"
               />
               {validationErrors.email && (
-                <p className="mt-1 text-sm text-red-600">{validationErrors.email}</p>
+                <p className="mt-1 text-sm text-red-600">
+                  {validationErrors.email}
+                </p>
               )}
             </div>
           ) : (
@@ -402,9 +413,15 @@ export default function ProfileFormWithUserData({
                   setUserData((prev) => ({ ...prev, phone: val }));
                   if (val.trim()) {
                     const error = validatePhone(val);
-                    setValidationErrors((prev) => ({ ...prev, phone: error || undefined }));
+                    setValidationErrors((prev) => ({
+                      ...prev,
+                      phone: error || undefined,
+                    }));
                   } else {
-                    setValidationErrors((prev) => ({ ...prev, phone: undefined }));
+                    setValidationErrors((prev) => ({
+                      ...prev,
+                      phone: undefined,
+                    }));
                   }
                 }}
                 className={`w-full ${
@@ -415,7 +432,9 @@ export default function ProfileFormWithUserData({
                 placeholder="9 1234 5678"
               />
               {validationErrors.phone && (
-                <p className="mt-1 text-sm text-red-600">{validationErrors.phone}</p>
+                <p className="mt-1 text-sm text-red-600">
+                  {validationErrors.phone}
+                </p>
               )}
             </div>
           ) : (
@@ -439,9 +458,15 @@ export default function ProfileFormWithUserData({
                   setUserData((prev) => ({ ...prev, rut: value }));
                   if (value.trim()) {
                     const error = validateRUT(value);
-                    setValidationErrors((prev) => ({ ...prev, rut: error || undefined }));
+                    setValidationErrors((prev) => ({
+                      ...prev,
+                      rut: error || undefined,
+                    }));
                   } else {
-                    setValidationErrors((prev) => ({ ...prev, rut: undefined }));
+                    setValidationErrors((prev) => ({
+                      ...prev,
+                      rut: undefined,
+                    }));
                   }
                 }}
                 className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 bg-blue-50 ${
@@ -452,7 +477,9 @@ export default function ProfileFormWithUserData({
                 placeholder="12.345.678-9"
               />
               {validationErrors.rut && (
-                <p className="mt-1 text-sm text-red-600">{validationErrors.rut}</p>
+                <p className="mt-1 text-sm text-red-600">
+                  {validationErrors.rut}
+                </p>
               )}
             </div>
           ) : (

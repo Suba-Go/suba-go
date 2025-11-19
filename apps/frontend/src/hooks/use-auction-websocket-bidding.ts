@@ -72,23 +72,12 @@ export function useAuctionWebSocketBidding({
 
   // WebSocket connection - single useEffect
   useEffect(() => {
-    console.log('[WS] useEffect triggered for:', connectionKey);
-    console.log('[WS] Active connections:', activeConnections.size);
-
     // Check if there's already an active connection for this auction
     const existingConnection = activeConnections.get(connectionKey);
     if (existingConnection) {
       const state = existingConnection.readyState;
-      console.log('[WS] Existing connection state:', state, {
-        CONNECTING: WebSocket.CONNECTING,
-        OPEN: WebSocket.OPEN,
-        CLOSING: WebSocket.CLOSING,
-        CLOSED: WebSocket.CLOSED,
-      });
-
       // Reuse if OPEN or CONNECTING (don't interrupt connection in progress)
       if (state === WebSocket.OPEN || state === WebSocket.CONNECTING) {
-        console.log('[WS] Reusing existing connection for:', connectionKey);
         wsRef.current = existingConnection;
 
         // Set states based on current connection state
@@ -99,37 +88,26 @@ export function useAuctionWebSocketBidding({
 
         return () => {
           // Don't close the connection on cleanup if we're reusing it
-          console.log(
-            '[WS] Cleanup: Keeping shared connection open for:',
-            connectionKey
-          );
         };
       }
 
       // If CLOSING or CLOSED, remove it
-      console.log('[WS] Removing stale connection (state:', state, ')');
       activeConnections.delete(connectionKey);
     }
 
     // Prevent multiple connections from same component
     if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
-      console.log('[WS] Connection already exists in ref');
       return;
     }
 
     const wsEndpoint = getWebSocketUrl();
     const wsUrl = `${wsEndpoint}?token=${encodeURIComponent(accessToken)}`;
-    console.log(
-      '[WS] Creating new connection to:',
-      wsUrl.replace(/token=.*/, 'token=***')
-    );
 
     const ws = new WebSocket(wsUrl);
     wsRef.current = ws;
     activeConnections.set(connectionKey, ws);
 
     ws.onopen = () => {
-      console.log('[WS] Connected - joining auction room immediately');
       setIsConnected(true);
       setConnectionError(null);
 
@@ -145,7 +123,6 @@ export function useAuctionWebSocketBidding({
     ws.onmessage = (event) => {
       try {
         const message = JSON.parse(event.data) as WebSocketMessage;
-        console.log('[WS] Received:', message.event, message.data);
 
         switch (message.event) {
           case 'CONNECTED':
@@ -153,7 +130,6 @@ export function useAuctionWebSocketBidding({
             break;
 
           case 'JOINED':
-            console.log('[WS] Successfully joined auction room');
             setIsJoined(true);
             if (message.data.participantCount) {
               setParticipantCount(message.data.participantCount);
@@ -187,7 +163,6 @@ export function useAuctionWebSocketBidding({
             break;
 
           case 'AUCTION_STATUS_CHANGED':
-            console.log('[WS] Auction status changed:', message.data.status);
             onStatusChanged?.(message.data.status);
             if (message.data.status === 'COMPLETADA') {
               window.location.reload();
@@ -216,25 +191,20 @@ export function useAuctionWebSocketBidding({
     };
 
     ws.onclose = () => {
-      console.log('[WS] Disconnected');
       setIsConnected(false);
       setIsJoined(false);
       activeConnections.delete(connectionKey);
     };
 
     return () => {
-      console.log('[WS] Cleanup called for:', connectionKey);
-
       // In React Strict Mode, cleanup is called immediately after mount
       // We should NOT close the connection here, as it will be reused
       // Only close if the connection is not in the global map (component truly unmounting)
       const globalConnection = activeConnections.get(connectionKey);
 
       if (wsRef.current && wsRef.current === globalConnection) {
-        console.log('[WS] Cleanup: Keeping connection in global map');
         // Don't close - let it be reused
       } else if (wsRef.current) {
-        console.log('[WS] Cleanup: Closing orphaned connection');
         if (wsRef.current.readyState === WebSocket.OPEN) {
           wsRef.current.close();
         }
@@ -243,7 +213,6 @@ export function useAuctionWebSocketBidding({
       // Clear the ref but keep the connection in the global map
       wsRef.current = null;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // Empty deps - only connect once on mount
 
   // Send bid function
@@ -260,13 +229,6 @@ export function useAuctionWebSocketBidding({
 
       if (ws?.readyState === WebSocket.OPEN) {
         const requestId = crypto.randomUUID();
-        console.log('[WS] Sending bid:', {
-          auctionItemId,
-          amount,
-          tenantId,
-          auctionId,
-          requestId,
-        });
         ws.send(
           JSON.stringify({
             event: 'PLACE_BID',

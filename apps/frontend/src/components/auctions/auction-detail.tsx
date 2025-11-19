@@ -6,7 +6,6 @@ import {
   ArrowLeft,
   Calendar,
   Clock,
-  AlertCircle,
   Trophy,
   Edit,
   Wifi,
@@ -37,13 +36,7 @@ import {
   TabsList,
   TabsTrigger,
 } from '@suba-go/shared-components/components/ui/tabs';
-import { Spinner } from '@suba-go/shared-components/components/ui/spinner';
 import { useFetchData } from '@/hooks/use-fetch-data';
-import type {
-  AuctionData,
-  AuctionItem,
-  AuctionBid,
-} from '@/types/auction.types';
 import {
   getAuctionBadgeColor,
   getAuctionStatusLabel,
@@ -52,13 +45,24 @@ import { AuctionEditModal } from './auction-edit-modal';
 import Image from 'next/image';
 import { useRouter } from 'next-nprogress-bar';
 import { useAuctionStatus } from '@/hooks/use-auction-status';
-import { AuctionStatusEnum } from '@suba-go/shared-validation';
+import {
+  AuctionDto,
+  AuctionItemWithItmeAndBidsDto,
+  AuctionStatusEnum,
+  AuctionTypeEnum,
+  // BidDto,
+  BidWithUserDto,
+  ItemStateEnum,
+  UserRolesEnum,
+  UserSafeDto,
+} from '@suba-go/shared-validation';
 import { ParticipantsList } from './participants-list';
 import { ItemBidHistory } from './user-view/item-bid-history';
 import { AuctionItemDetailModal } from './auction-item-detail-modal';
 
 interface AuctionDetailProps {
-  auctionId: string;
+  auction: AuctionDto;
+  auctionItems: AuctionItemWithItmeAndBidsDto[];
   userRole: string;
   userId?: string;
   accessToken?: string;
@@ -66,7 +70,8 @@ interface AuctionDetailProps {
 }
 
 export function AuctionDetail({
-  auctionId,
+  auction,
+  auctionItems,
   userRole,
   accessToken,
   tenantId,
@@ -77,42 +82,32 @@ export function AuctionDetail({
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isCanceled, setIsCanceled] = useState(false);
   const [showCompletedDialog, setShowCompletedDialog] = useState(false);
-  const [selectedItemForDetail, setSelectedItemForDetail] = useState<
-    any | null
-  >(null);
+  const [selectedItemForDetail, setSelectedItemForDetail] =
+    useState<AuctionItemWithItmeAndBidsDto | null>(null);
 
   // WebSocket state for real-time updates (AUCTION_MANAGER only)
   const wsRef = useRef<WebSocket | null>(null);
   const connectionAttemptedRef = useRef(false); // Prevent duplicate connections
   const [isWsConnected, setIsWsConnected] = useState(false);
-  const [isWsJoined, setIsWsJoined] = useState(false);
+  // const [isWsJoined, setIsWsJoined] = useState(false);
   const [liveParticipantCount, setLiveParticipantCount] = useState(0);
-  const [liveBidUpdates, setLiveBidUpdates] = useState<
-    Array<{
-      auctionItemId: string;
-      amount: number;
-      userName: string;
-      timestamp: string;
-    }>
-  >([]);
 
-  // Fetch auction data
-  const {
-    data: auction,
-    isLoading,
-    error,
-    refetch,
-  } = useFetchData<AuctionData>({
-    url: `/api/auctions/${auctionId}`,
-    key: ['auction', auctionId],
-  });
+  // Local type for realtime lightweight bid updates received over WebSocket
+  // interface LiveBidUpdate {
+  //   auctionItemId: string;
+  //   amount: number;
+  //   userName: string;
+  //   timestamp: string;
+  // }
+
+  // const [liveBidUpdates, setLiveBidUpdates] = useState<LiveBidUpdate[]>([]);
 
   // Fetch participants data (only for AUCTION_MANAGER)
   const { data: participants, refetch: refetchParticipants } = useFetchData<
-    any[]
+    UserSafeDto[]
   >({
-    url: `/api/auctions/${auctionId}/participants`,
-    key: ['auction-participants', auctionId],
+    url: `/api/auctions/${auction.id}/participants`,
+    key: ['auction-participants', auction.id],
     condition: userRole === 'AUCTION_MANAGER',
     fallbackData: [],
   });
@@ -124,18 +119,12 @@ export function AuctionDetail({
     auction?.endTime || new Date()
   );
 
-  // Store refetch in a ref to avoid recreating WebSocket on every refetch
-  const refetchRef = useRef(refetch);
-  useEffect(() => {
-    refetchRef.current = refetch;
-  }, [refetch]);
-
   // WebSocket connection for AUCTION_MANAGER real-time updates
   useEffect(() => {
     // Only connect if user is AUCTION_MANAGER and we have required data
     // Don't connect if auction is already completed
     if (
-      userRole !== 'AUCTION_MANAGER' ||
+      userRole !== UserRolesEnum.AUCTION_MANAGER ||
       !accessToken ||
       !tenantId ||
       !auction ||
@@ -146,13 +135,11 @@ export function AuctionDetail({
 
     // Prevent duplicate connections
     if (connectionAttemptedRef.current) {
-      console.log('[Manager WS] Connection already attempted, skipping');
       return;
     }
 
     // Check if already connected
     if (wsRef.current?.readyState === WebSocket.OPEN) {
-      console.log('[Manager WS] Already connected, skipping');
       return;
     }
 
@@ -169,23 +156,17 @@ export function AuctionDetail({
 
     const wsEndpoint = getWebSocketUrl();
     const wsUrl = `${wsEndpoint}?token=${encodeURIComponent(accessToken)}`;
-    console.log(
-      '[Manager WS] Connecting to:',
-      wsUrl.replace(/token=.*/, 'token=***')
-    );
 
     const ws = new WebSocket(wsUrl);
     wsRef.current = ws;
 
     ws.onopen = () => {
-      console.log('[Manager WS] Connected');
       ws.send(JSON.stringify({ event: 'HELLO', data: {} }));
     };
 
     ws.onmessage = (event) => {
       try {
         const message = JSON.parse(event.data);
-        console.log('[Manager WS] Received:', message.event);
 
         switch (message.event) {
           case 'HELLO_OK':
@@ -200,7 +181,7 @@ export function AuctionDetail({
             break;
 
           case 'JOINED':
-            setIsWsJoined(true);
+            // setIsWsJoined(true);
             if (message.data.participantCount) {
               setLiveParticipantCount(message.data.participantCount);
             }
@@ -212,22 +193,19 @@ export function AuctionDetail({
 
           case 'BID_PLACED':
             // Add to live bid updates
-            setLiveBidUpdates((prev) => [
-              {
-                auctionItemId: message.data.auctionItemId,
-                amount: message.data.amount,
-                userName: message.data.userName || 'Usuario',
-                timestamp: message.data.timestamp || new Date().toISOString(),
-              },
-              ...prev.slice(0, 19), // Keep last 20 bids
-            ]);
+            // setLiveBidUpdates((prev) => [
+            //   {
+            //     auctionItemId: message.data.auctionItemId,
+            //     amount: message.data.amount,
+            //     userName: message.data.userName || 'Usuario',
+            //     timestamp: message.data.timestamp || new Date().toISOString(),
+            //   },
+            //   ...prev.slice(0, 19), // Keep last 20 bids
+            // ]);
             // Refetch auction data to update highest bids
-            refetchRef.current();
             break;
 
           case 'AUCTION_STATUS_CHANGED':
-            console.log('[Manager WS] Status changed:', message.data.status);
-            refetchRef.current();
             break;
         }
       } catch (error) {
@@ -240,9 +218,8 @@ export function AuctionDetail({
     };
 
     ws.onclose = () => {
-      console.log('[Manager WS] Disconnected');
       setIsWsConnected(false);
-      setIsWsJoined(false);
+      // setIsWsJoined(false);
       connectionAttemptedRef.current = false; // Allow reconnection
     };
 
@@ -254,13 +231,13 @@ export function AuctionDetail({
       wsRef.current = null;
       connectionAttemptedRef.current = false;
     };
-  }, [userRole, accessToken, tenantId, auction, auctionId]);
+  }, [userRole, accessToken, tenantId, auction, auction.id]);
 
   const handleCancelToggle = async (checked: boolean) => {
     try {
       const endpoint = checked
-        ? `/api/auctions/${auctionId}/cancel`
-        : `/api/auctions/${auctionId}/uncancel`;
+        ? `/api/auctions/${auction.id}/cancel`
+        : `/api/auctions/${auction.id}/uncancel`;
 
       const response = await fetch(endpoint, {
         method: 'POST',
@@ -282,7 +259,6 @@ export function AuctionDetail({
       });
 
       setIsCanceled(checked);
-      refetch();
     } catch (error) {
       toast({
         title: 'Error',
@@ -294,35 +270,6 @@ export function AuctionDetail({
       });
     }
   };
-
-  if (error) {
-    return (
-      <div className="text-center py-8">
-        <AlertCircle className="h-12 w-12 text-red-500 mx-auto mb-4" />
-        <h2 className="text-xl font-semibold text-gray-900 mb-2">
-          Error al cargar la subasta
-        </h2>
-        <p className="text-gray-600 mb-4">
-          No se pudo cargar la información de la subasta
-        </p>
-        <p className="text-gray-600 mb-4">
-          {error instanceof Error ? error.message : String(error)}
-        </p>
-
-        <Button onClick={() => refetch()}>Reintentar</Button>
-      </div>
-    );
-  }
-
-  if (isLoading || !auction) {
-    return (
-      <div className="fixed inset-0 z-50 flex items-center justify-center bg-gray-50">
-        <div className="text-center">
-          <Spinner className="size-8" />
-        </div>
-      </div>
-    );
-  }
 
   const getStatusBadge = () => {
     return (
@@ -336,16 +283,14 @@ export function AuctionDetail({
     );
   };
 
-  const totalItems = auction.items?.length || 0;
+  const totalItems = auctionItems?.length || 0;
   const totalBids =
-    auction.items?.reduce(
-      (sum: number, item: AuctionItem) => sum + item.bids.length,
+    auctionItems?.reduce(
+      (sum: number, item) => sum + (item.bids?.length || 0),
       0
     ) || 0;
   const totalParticipants = new Set(
-    auction.items?.flatMap((item: AuctionItem) =>
-      item.bids.map((bid: AuctionBid) => bid.userId)
-    )
+    auctionItems?.flatMap((item) => item.bids?.map((bid) => bid.userId) || [])
   ).size;
 
   return (
@@ -404,8 +349,8 @@ export function AuctionDetail({
             ) : (
               <>
                 {/* Edit button - only show if auction is PENDIENTE or CANCELADA */}
-                {(auction.status === 'PENDIENTE' ||
-                  auction.status === 'CANCELADA') && (
+                {(auction.status === AuctionStatusEnum.PENDIENTE ||
+                  auction.status === AuctionStatusEnum.CANCELADA) && (
                   <Button
                     variant="outline"
                     onClick={() => setIsEditModalOpen(true)}
@@ -417,9 +362,9 @@ export function AuctionDetail({
                 )}
 
                 {/* Cancel switch - only show if auction is PENDIENTE, CANCELADA, or TEST */}
-                {(auction.status === 'PENDIENTE' ||
-                  auction.status === 'CANCELADA' ||
-                  auction.type === 'TEST') && (
+                {(auction.status === AuctionStatusEnum.PENDIENTE ||
+                  auction.status === AuctionStatusEnum.CANCELADA ||
+                  auction.type === AuctionTypeEnum.TEST) && (
                   <div className="flex items-center gap-2">
                     <Switch
                       id="cancel-auction"
@@ -575,7 +520,9 @@ export function AuctionDetail({
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-blue-600">{totalBids}</div>
+            <div className="text-2xl font-bold text-blue-600">
+              {typeof totalBids === 'number' ? totalBids : 0}
+            </div>
           </CardContent>
         </Card>
 
@@ -616,150 +563,159 @@ export function AuctionDetail({
         </TabsList>
 
         <TabsContent value="items" className="space-y-6">
-          {auction.items && auction.items.length > 0 ? (
+          {auctionItems && auctionItems.length > 0 ? (
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {auction.items.map((auctionItem: AuctionItem) => {
-                const topBid =
-                  auctionItem.bids && auctionItem.bids.length > 0
-                    ? auctionItem.bids.reduce(
-                        (prev: AuctionBid | null, b: AuctionBid) => {
-                          if (!prev) return b;
-                          return Number(b.offered_price) >
-                            Number(prev.offered_price)
-                            ? b
-                            : prev;
-                        },
-                        null as unknown as AuctionBid
-                      )
-                    : null;
-                return (
-                  <Card
-                    key={auctionItem.id}
-                    className="hover:shadow-lg transition-shadow cursor-pointer"
-                    onClick={() => setSelectedItemForDetail(auctionItem)}
-                  >
-                    {/* Item Image */}
-                    {auctionItem.item?.photos && (
-                      <div className="relative h-48 overflow-hidden rounded-t-lg bg-gray-100">
-                        <Image
-                          src={auctionItem.item.photos.split(',')[0]?.trim()}
-                          alt={`${auctionItem.item.brand} ${auctionItem.item.model}`}
-                          fill
-                          className="object-cover"
-                          sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
-                          onError={(e) => {
-                            const target = e.currentTarget as HTMLImageElement;
-                            target.src =
-                              'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgdmlld0JveD0iMCAwIDIwMCAyMDAiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxyZWN0IHdpZHRoPSIyMDAiIGhlaWdodD0iMjAwIiBmaWxsPSIjRjNGNEY2Ii8+CjxwYXRoIGQ9Ik04MCA2MEgxMjBWODBIODBWNjBaIiBmaWxsPSIjOUI5QkEwIi8+CjxwYXRoIGQ9Ik02MCA4MEgxNDBWMTQwSDYwVjgwWiIgZmlsbD0iIzlCOUJBMCIvPgo8L3N2Zz4K';
-                          }}
-                        />
-                      </div>
-                    )}
+              {auctionItems.map(
+                (auctionItem: AuctionItemWithItmeAndBidsDto) => {
+                  const topBid =
+                    auctionItem.bids && auctionItem.bids.length > 0
+                      ? auctionItem.bids.reduce(
+                          (prev: BidWithUserDto | null, b: BidWithUserDto) => {
+                            if (!prev) return b;
+                            return Number(b.offered_price) >
+                              Number(prev.offered_price)
+                              ? b
+                              : prev;
+                          },
+                          null as unknown as BidWithUserDto
+                        )
+                      : null;
+                  return (
+                    <Card
+                      key={auctionItem.id}
+                      className="hover:shadow-lg transition-shadow cursor-pointer"
+                      onClick={() => setSelectedItemForDetail(auctionItem)}
+                    >
+                      {/* Item Image */}
+                      {auctionItem.item?.photos && (
+                        <div className="relative h-48 overflow-hidden rounded-t-lg bg-gray-100">
+                          <Image
+                            src={auctionItem.item.photos.split(',')[0]?.trim()}
+                            alt={`${auctionItem.item.brand} ${auctionItem.item.model}`}
+                            fill
+                            className="object-cover"
+                            sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+                            onError={(e) => {
+                              const target =
+                                e.currentTarget as HTMLImageElement;
+                              target.src =
+                                'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgdmlld0JveD0iMCAwIDIwMCAyMDAiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxyZWN0IHdpZHRoPSIyMDAiIGhlaWdodD0iMjAwIiBmaWxsPSIjRjNGNEY2Ii8+CjxwYXRoIGQ9Ik04MCA2MEgxMjBWODBIODBWNjBaIiBmaWxsPSIjOUI5QkEwIi8+CjxwYXRoIGQ9Ik02MCA4MEgxNDBWMTQwSDYwVjgwWiIgZmlsbD0iIzlCOUJBMCIvPgo8L3N2Zz4K';
+                            }}
+                          />
+                        </div>
+                      )}
 
-                    <CardContent className="p-4">
-                      <div className="space-y-2">
-                        <h3 className="font-semibold text-lg">
-                          {auctionItem.item?.plate || 'Sin Patente'}
-                        </h3>
-                        <p className="text-sm text-gray-600">
-                          {auctionItem.item?.brand} {auctionItem.item?.model}{' '}
-                          {auctionItem.item?.year}
-                        </p>
+                      <CardContent className="p-4">
+                        <div className="space-y-2">
+                          <h3 className="font-semibold text-lg">
+                            {auctionItem.item?.plate || 'Sin Patente'}
+                          </h3>
+                          <p className="text-sm text-gray-600">
+                            {auctionItem.item?.brand} {auctionItem.item?.model}{' '}
+                            {auctionItem.item?.year}
+                          </p>
 
-                        <div className="flex justify-between items-center pt-2">
-                          <div>
-                            <p className="text-xs text-gray-500">
-                              Puja inicial
-                            </p>
-                            <p className="font-semibold text-green-600">
-                              $
-                              {Number(auctionItem.startingBid).toLocaleString()}
-                            </p>
-                          </div>
-
-                          {auctionItem.bids && auctionItem.bids.length > 0 && (
-                            <div className="text-right">
+                          <div className="flex justify-between items-center pt-2">
+                            <div>
                               <p className="text-xs text-gray-500">
-                                Puja más alta
+                                Puja inicial
                               </p>
-                              <p className="font-semibold text-blue-600">
+                              <p className="font-semibold text-green-600">
                                 $
-                                {Math.max(
-                                  ...auctionItem.bids.map((bid: AuctionBid) =>
-                                    Number(bid.offered_price)
-                                  )
+                                {Number(
+                                  auctionItem.startingBid
                                 ).toLocaleString()}
                               </p>
-                              {topBid && (
-                                <p className="text-xs text-gray-600 mt-1">
-                                  Ganando:{' '}
-                                  <span className="font-medium text-gray-900">
-                                    {topBid.user?.public_name || 'Usuario'}
-                                  </span>
-                                </p>
-                              )}
                             </div>
-                          )}
-                        </div>
 
-                        {auctionItem.bids && auctionItem.bids.length > 0 && (
-                          <>
-                            <p className="text-xs text-gray-500 pt-1">
-                              {auctionItem.bids.length} puja(s) realizadas
-                            </p>
-                            <ItemBidHistory
-                              bids={auctionItem.bids || []}
-                              maxItems={5}
-                            />
-                          </>
-                        )}
-
-                        {/* Sale Status Badge - Only show for completed auctions */}
-                        {auction?.status === AuctionStatusEnum.COMPLETADA && (
-                          <div className="pt-3 border-t mt-3">
-                            {auctionItem.item?.state === 'VENDIDO' &&
-                            auctionItem.item?.soldPrice ? (
-                              <div className="space-y-2">
-                                <Badge className="bg-green-600 hover:bg-green-700">
-                                  ✓ Vendido
-                                </Badge>
-                                <div className="text-sm">
-                                  <p className="text-gray-600">
-                                    Precio de venta:{' '}
-                                    <span className="font-semibold text-green-700">
-                                      $
-                                      {Number(
-                                        auctionItem.item.soldPrice
-                                      ).toLocaleString()}
-                                    </span>
+                            {auctionItem.bids &&
+                              auctionItem.bids.length > 0 && (
+                                <div className="text-right">
+                                  <p className="text-xs text-gray-500">
+                                    Puja más alta
                                   </p>
-                                  {auctionItem.item.soldToUser && (
-                                    <p className="text-gray-600">
-                                      Comprador:{' '}
-                                      <span className="font-semibold text-gray-900">
-                                        {userRole === 'AUCTION_MANAGER' ||
-                                        userRole === 'ADMIN'
-                                          ? auctionItem.item.soldToUser.name ||
-                                            auctionItem.item.soldToUser
-                                              .public_name ||
-                                            'Usuario'
-                                          : auctionItem.item.soldToUser
-                                              .public_name || 'Usuario'}
+                                  <p className="font-semibold text-blue-600">
+                                    $
+                                    {Math.max(
+                                      ...auctionItem.bids.map(
+                                        (bid: BidWithUserDto) =>
+                                          Number(bid.offered_price)
+                                      )
+                                    ).toLocaleString()}
+                                  </p>
+                                  {topBid && (
+                                    <p className="text-xs text-gray-600 mt-1">
+                                      Ganando:{' '}
+                                      <span className="font-medium text-gray-900">
+                                        {topBid.user?.public_name || 'Usuario'}
                                       </span>
                                     </p>
                                   )}
                                 </div>
-                              </div>
-                            ) : (
-                              <Badge variant="secondary">Sin ofertas</Badge>
-                            )}
+                              )}
                           </div>
-                        )}
-                      </div>
-                    </CardContent>
-                  </Card>
-                );
-              })}
+
+                          {auctionItem.bids && auctionItem.bids.length > 0 && (
+                            <>
+                              <p className="text-xs text-gray-500 pt-1">
+                                {auctionItem.bids.length} puja(s) realizadas
+                              </p>
+                              <ItemBidHistory
+                                bids={auctionItem.bids || []}
+                                maxItems={5}
+                              />
+                            </>
+                          )}
+
+                          {/* Sale Status Badge - Only show for completed auctions */}
+                          {auction?.status === AuctionStatusEnum.COMPLETADA && (
+                            <div className="pt-3 border-t mt-3">
+                              {auctionItem.item?.state ===
+                                ItemStateEnum.VENDIDO &&
+                              auctionItem.item?.soldPrice ? (
+                                <div className="space-y-2">
+                                  <Badge className="bg-green-600 hover:bg-green-700">
+                                    ✓ Vendido
+                                  </Badge>
+                                  <div className="text-sm">
+                                    <p className="text-gray-600">
+                                      Precio de venta:{' '}
+                                      <span className="font-semibold text-green-700">
+                                        $
+                                        {Number(
+                                          auctionItem.item.soldPrice
+                                        ).toLocaleString()}
+                                      </span>
+                                    </p>
+                                    {auctionItem.item.soldToUser && (
+                                      <p className="text-gray-600">
+                                        Comprador:{' '}
+                                        <span className="font-semibold text-gray-900">
+                                          {userRole === 'AUCTION_MANAGER' ||
+                                          userRole === 'ADMIN'
+                                            ? auctionItem.item.soldToUser
+                                                .name ||
+                                              auctionItem.item.soldToUser
+                                                .public_name ||
+                                              'Usuario'
+                                            : auctionItem.item.soldToUser
+                                                .public_name || 'Usuario'}
+                                        </span>
+                                      </p>
+                                    )}
+                                  </div>
+                                </div>
+                              ) : (
+                                <Badge variant="secondary">Sin ofertas</Badge>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      </CardContent>
+                    </Card>
+                  );
+                }
+              )}
             </div>
           ) : (
             <Card className="text-center py-12">
@@ -778,11 +734,10 @@ export function AuctionDetail({
 
         <TabsContent value="participants">
           <ParticipantsList
-            auctionId={auctionId}
+            auction={auction}
             participants={participants || []}
             isManager={userRole === 'AUCTION_MANAGER'}
             onRefresh={() => {
-              refetch();
               refetchParticipants();
             }}
           />
@@ -796,7 +751,6 @@ export function AuctionDetail({
         onClose={() => setIsEditModalOpen(false)}
         onSuccess={() => {
           setIsEditModalOpen(false);
-          refetch();
         }}
       />
 

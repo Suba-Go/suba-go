@@ -7,6 +7,7 @@ import { UsersModule } from './modules/app-modules/users/users.module';
 import { CompaniesModule } from './modules/app-modules/companies/companies.module';
 import { TenantsModule } from './modules/app-modules/tenants/tenants.module';
 import { AuctionsModule } from './modules/app-modules/auctions/auctions.module';
+import { AuctionItemsModule } from './modules/app-modules/auction-items/auction-items.module';
 import { ItemsModule } from './modules/app-modules/items/items.module';
 import { ParticipantsModule } from './modules/app-modules/participants/participants.module';
 import { BidsModule } from './modules/app-modules/bids/bids.module';
@@ -26,6 +27,7 @@ import { RealtimeModule } from './modules/providers-modules/realtime/realtime.mo
     CompaniesModule,
     TenantsModule,
     AuctionsModule,
+    AuctionItemsModule,
     ItemsModule,
     ParticipantsModule,
     BidsModule,

@@ -17,6 +17,7 @@ import {
   TenantDto,
   UserCreateDto,
   UserDto,
+  UserRolesEnum,
 } from '@suba-go/shared-validation';
 import { createCompleteTrpcAction } from '@/domain/trpc-actions/multi-step-form/create-complete-trpc-action';
 import { getUserCompanyDomainTrpcAction } from '@/domain/trpc-actions/user/get-user-company-domain-trpc-action';
@@ -43,6 +44,7 @@ export default function MultiStepForm() {
     email: '',
     password: '',
     confirmPassword: '',
+    role: UserRolesEnum.AUCTION_MANAGER,
   });
 
   const [companyData, setCompanyData] = useState<CompanyCreateDto>({
@@ -53,6 +55,7 @@ export default function MultiStepForm() {
     secondary_color: null,
     secondary_color2: null,
     secondary_color3: null,
+    tenantId: null,
   });
   const [isLoading, setIsLoading] = useState(false);
   const [completedData, setCompletedData] = useState<{

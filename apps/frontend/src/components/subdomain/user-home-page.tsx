@@ -1,7 +1,13 @@
 'use client';
 
-import { useState, useMemo } from 'react';
-import { CompanyDto, AuctionStatusEnum } from '@suba-go/shared-validation';
+import { useMemo } from 'react';
+import {
+  CompanyDto,
+  AuctionStatusEnum,
+  ItemDto,
+  AuctionDto,
+  AuctionRegistrationWithAuctionDto,
+} from '@suba-go/shared-validation';
 import { useFetchData } from '@/hooks/use-fetch-data';
 import { useSession } from 'next-auth/react';
 import {
@@ -12,8 +18,6 @@ import {
   CardTitle,
 } from '@suba-go/shared-components/components/ui/card';
 import { Badge } from '@suba-go/shared-components/components/ui/badge';
-import { Switch } from '@suba-go/shared-components/components/ui/switch';
-import { Label } from '@suba-go/shared-components/components/ui/label';
 import { Spinner } from '@suba-go/shared-components/components/ui/spinner';
 import { Trophy, Gavel } from 'lucide-react';
 import { useAutoFormat } from '@/hooks/use-auto-format';
@@ -23,131 +27,59 @@ import { AuctionCard } from '@/components/auctions/auction-card';
 
 interface UserHomePageProps {
   company: CompanyDto;
-  subdomain: string;
 }
 
-export function UserHomePage({ company, subdomain }: UserHomePageProps) {
+export function UserHomePage({ company }: UserHomePageProps) {
   const { data: session } = useSession();
   const router = useRouter();
   const { formatPrice } = useAutoFormat();
-  const [showAllAuctions, setShowAllAuctions] = useState(false);
 
   const userId = session?.user?.id;
 
-  // TODO: Implement /bids/my-bids endpoint in backend
-  // Fetch user's bids to find adjudicated items
-  // const { data: userBids, isLoading: bidsLoading } = useFetchData<any[]>({
-  //   url: '/api/bids/my-bids',
-  //   key: ['my-bids', userId || ''],
-  //   condition: !!userId,
-  // });
-  const userBids: any[] = [];
-  const bidsLoading = false;
-
-  // Fetch user's registered auctions
-  const {
-    data: userRegistrations,
-    isLoading: registrationsLoading,
-    refetch: refetchRegistrations,
-  } = useFetchData<any[]>({
-    url: `/api/auctions/my-registrations`,
-    key: ['my-registrations', userId || ''],
+  // Fetch items sold to this user
+  const { data: soldItems, isLoading: itemsLoading } = useFetchData<ItemDto[]>({
+    url: `/api/items/sold-to/${userId}`,
+    key: ['sold-items', userId || ''],
     condition: !!userId,
   });
 
+  // Fetch user's registered auctions
+  const { data: userRegistrations, isLoading: registrationsLoading } =
+    useFetchData<AuctionRegistrationWithAuctionDto[]>({
+      url: `/api/auctions/my-registrations`,
+      key: ['my-registrations', userId || ''],
+      condition: !!userId,
+    });
+
   const primaryColor = company.principal_color || '#3B82F6';
 
-  // Build list of auctions from registrations and bids
-  const filteredAuctions = useMemo(() => {
-    if (showAllAuctions) {
-      // Toggle ON: Show auctions where user has placed bids (regardless of state)
-      // Extract unique auctions from bids using Map to prevent duplicates
-      const auctionMap = new Map();
-      userBids?.forEach((bid: any) => {
-        const auction = bid.auctionItem?.auction;
-        if (auction && !auctionMap.has(auction.id)) {
-          // Map Prisma field names to frontend expected names
-          auctionMap.set(auction.id, {
-            ...auction,
-            start: auction.startTime || auction.start,
-            end: auction.endTime || auction.end,
-            state: auction.status || auction.state,
-            tenantId: auction.tenantId, // Include tenantId for navigation
-          });
-        }
-      });
-      return Array.from(auctionMap.values());
-    }
+  // Get auctions where user is registered
+  const availableAuctions = useMemo(() => {
+    if (!userRegistrations) return [];
 
-    // Default: Show ACTIVA and PENDIENTE auctions where user is registered
-    // Use Map to prevent duplicates in case of multiple registrations
-    const auctionMap = new Map();
-    userRegistrations?.forEach((reg: any) => {
+    // Use Map to prevent duplicates
+    const auctionMap = new Map<string, AuctionDto>();
+
+    userRegistrations.forEach((reg) => {
       const auction = reg.auction;
       if (!auction) return;
 
       // Only include ACTIVA and PENDIENTE auctions
-      const auctionState = auction.status || auction.state;
+      const auctionState = auction.status;
       if (
         auctionState === AuctionStatusEnum.ACTIVA ||
         auctionState === AuctionStatusEnum.PENDIENTE
       ) {
         if (!auctionMap.has(auction.id)) {
-          // Map Prisma field names to frontend expected names
-          auctionMap.set(auction.id, {
-            ...auction,
-            start: auction.startTime || auction.start,
-            end: auction.endTime || auction.end,
-            state: auctionState,
-            tenantId: auction.tenantId, // Include tenantId for navigation
-          });
+          auctionMap.set(auction.id, auction);
         }
       }
     });
 
     return Array.from(auctionMap.values());
-  }, [showAllAuctions, userBids, userRegistrations]);
+  }, [userRegistrations]);
 
-  // Find adjudicated items (items where user won in completed auctions)
-  // Use a Map to deduplicate by item ID
-  const adjudicatedItemsMap = new Map();
-
-  userBids?.forEach((bid: any) => {
-    const auction = bid.auctionItem?.auction;
-    const item = bid.auctionItem?.item;
-
-    // Debug logging
-    if (auction?.status === AuctionStatusEnum.COMPLETADA) {
-      console.log('[UserHomePage] Completed auction bid:', {
-        itemId: item?.id,
-        itemState: item?.state,
-        soldToUserId: item?.soldToUserId,
-        currentUserId: userId,
-        matches: item?.soldToUserId === userId,
-      });
-    }
-
-    // Only include if auction is completed and item was sold to this user
-    if (
-      auction?.status === AuctionStatusEnum.COMPLETADA &&
-      item?.soldToUserId === userId &&
-      item?.state === 'VENDIDO'
-    ) {
-      // Use item ID as key to prevent duplicates
-      if (!adjudicatedItemsMap.has(item.id)) {
-        adjudicatedItemsMap.set(item.id, bid);
-      }
-    }
-  });
-
-  const adjudicatedItems = Array.from(adjudicatedItemsMap.values());
-
-  console.log(
-    '[UserHomePage] Adjudicated items count:',
-    adjudicatedItems.length
-  );
-
-  const isLoading = bidsLoading || registrationsLoading;
+  const isLoading = itemsLoading || registrationsLoading;
 
   if (isLoading) {
     return (
@@ -189,26 +121,26 @@ export function UserHomePage({ company, subdomain }: UserHomePageProps) {
             </h2>
           </div>
 
-          {adjudicatedItems && adjudicatedItems.length > 0 ? (
+          {soldItems && soldItems.length > 0 ? (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {adjudicatedItems.map((bid: any) => {
-                const item = bid.auctionItem?.item;
-                const photoUrl = item?.photos?.split(',')[0]?.trim();
+              {soldItems.map((item: ItemDto) => {
+                const photoUrl = item.photos?.split(',')[0]?.trim();
+                // const latestAuction = item.auctionItems?.[0]?.auction;
 
                 return (
                   <Card
-                    key={bid.id}
+                    key={item.id}
                     className="hover:shadow-lg transition-shadow cursor-pointer"
-                    onClick={() => router.push(`/items/${item?.id}`)}
+                    onClick={() => router.push(`/items/${item.id}`)}
                   >
                     <CardHeader className="pb-3">
                       <div className="flex justify-between items-start">
                         <div>
                           <CardTitle className="text-lg">
-                            {item?.brand} {item?.model}
+                            {item.brand} {item.model}
                           </CardTitle>
                           <CardDescription>
-                            {item?.plate || 'Sin patente'}
+                            {item.plate || 'Sin patente'}
                           </CardDescription>
                         </div>
                         <Badge className="bg-yellow-100 text-yellow-800">
@@ -222,24 +154,41 @@ export function UserHomePage({ company, subdomain }: UserHomePageProps) {
                           <Image
                             src={photoUrl}
                             fill
-                            alt={`${item?.brand} ${item?.model}`}
+                            alt={`${item.brand} ${item.model}`}
                             className="w-full h-full object-cover"
                           />
                         </div>
                       )}
                       <div className="space-y-2 text-sm">
                         <div className="flex justify-between">
-                          <span className="text-gray-600">Puja Ganadora:</span>
+                          <span className="text-gray-600">Precio Final:</span>
                           <span className="font-semibold">
-                            {formatPrice(bid.offered_price)}
+                            {formatPrice(item.soldPrice || 0)}
                           </span>
                         </div>
-                        <div className="flex justify-between">
-                          <span className="text-gray-600">Subasta:</span>
-                          <span className="font-medium truncate ml-2">
-                            {bid.auctionItem?.auction?.title}
-                          </span>
-                        </div>
+                        {/* {latestAuction && (
+                          <div className="flex justify-between">
+                            <span className="text-gray-600">Subasta:</span>
+                            <span className="font-medium truncate ml-2">
+                              {latestAuction.title}
+                            </span>
+                          </div>
+                        )} */}
+                        {item.soldAt && (
+                          <div className="flex justify-between">
+                            <span className="text-gray-600">Comprado:</span>
+                            <span className="text-xs text-gray-500">
+                              {new Date(item.soldAt).toLocaleDateString(
+                                'es-ES',
+                                {
+                                  year: 'numeric',
+                                  month: 'short',
+                                  day: 'numeric',
+                                }
+                              )}
+                            </span>
+                          </div>
+                        )}
                       </div>
                     </CardContent>
                   </Card>
@@ -263,57 +212,33 @@ export function UserHomePage({ company, subdomain }: UserHomePageProps) {
 
         {/* Auctions Section */}
         <div>
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-2">
-              <Gavel className="h-6 w-6" style={{ color: primaryColor }} />
-              <h2 className="text-2xl font-bold text-gray-900">
-                Subastas Disponibles
-              </h2>
-            </div>
-            <div className="flex items-center gap-2">
-              <Switch
-                id="show-all"
-                checked={showAllAuctions}
-                onCheckedChange={setShowAllAuctions}
-              />
-              <Label htmlFor="show-all" className="cursor-pointer">
-                Mostrar subastas donde he pujado
-              </Label>
-            </div>
+          <div className="flex items-center gap-2 mb-4">
+            <Gavel className="h-6 w-6" style={{ color: primaryColor }} />
+            <h2 className="text-2xl font-bold text-gray-900">
+              Mis Subastas Registradas
+            </h2>
           </div>
 
-          {filteredAuctions && filteredAuctions.length > 0 ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {filteredAuctions.map((auction) => (
+          {availableAuctions && availableAuctions.length > 0 ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {availableAuctions.map((auction) => (
                 <AuctionCard
                   key={auction.id}
-                  auction={{
-                    id: auction.id,
-                    title: auction.title || auction.name || 'Sin título',
-                    description: auction.description,
-                    startTime: auction.startTime || auction.start,
-                    endTime: auction.endTime || auction.end,
-                    status: auction.status || auction.state,
-                    type: auction.type,
-                    items: auction.items,
-                    tenantId: auction.tenantId,
-                  }}
-                  subdomain={subdomain}
-                  onUpdate={refetchRegistrations}
+                  auction={auction}
+                  onUpdate={() => null}
                 />
               ))}
             </div>
           ) : (
             <Card>
-              <CardContent className="pt-6">
-                <div className="text-center py-8">
-                  <Gavel className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                  <p className="text-gray-600">
-                    {showAllAuctions
-                      ? 'No has pujado en ninguna subasta todavía'
-                      : 'No tienes subastas activas o pendientes disponibles'}
-                  </p>
-                </div>
+              <CardContent className="py-12 text-center">
+                <Gavel className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                <h3 className="text-lg font-medium text-gray-900 mb-2">
+                  No estás registrado en ninguna subasta
+                </h3>
+                <p className="text-gray-600">
+                  Regístrate en subastas activas para participar
+                </p>
               </CardContent>
             </Card>
           )}

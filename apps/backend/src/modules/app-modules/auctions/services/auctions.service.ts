@@ -12,8 +12,15 @@ import {
   AuctionStatsDto,
 } from '../dto/auction.dto';
 import type { Auction } from '@prisma/client';
-import { AuctionTypeEnum } from '@prisma/client';
+import {
+  AuctionStatusEnum,
+  AuctionTypeEnum as PrismaAuctionTypeEnum,
+} from '@prisma/client';
 import { PrismaService } from '../../../providers-modules/prisma/prisma.service';
+import {
+  AuctionWithItemsAndBidsDto,
+  AuctionTypeEnum as SharedAuctionTypeEnum,
+} from '@suba-go/shared-validation';
 
 @Injectable()
 export class AuctionsService {
@@ -44,11 +51,11 @@ export class AuctionsService {
     }
 
     // Convert string type to enum
-    let auctionType: AuctionTypeEnum = AuctionTypeEnum.REAL;
-    if (createAuctionDto.type === 'test') {
-      auctionType = AuctionTypeEnum.TEST;
-    } else if (createAuctionDto.type === 'real') {
-      auctionType = AuctionTypeEnum.REAL;
+    let auctionType: PrismaAuctionTypeEnum = PrismaAuctionTypeEnum.REAL;
+    if (createAuctionDto.type === SharedAuctionTypeEnum.TEST) {
+      auctionType = PrismaAuctionTypeEnum.TEST;
+    } else if (createAuctionDto.type === SharedAuctionTypeEnum.REAL) {
+      auctionType = PrismaAuctionTypeEnum.REAL;
     }
 
     const auction = await this.auctionRepository.createAuction({
@@ -76,7 +83,9 @@ export class AuctionsService {
     return this.auctionRepository.getAuctionById(auction.id);
   }
 
-  async getAuctionsByTenant(tenantId: string): Promise<Auction[]> {
+  async getAuctionsByTenant(
+    tenantId: string
+  ): Promise<AuctionWithItemsAndBidsDto[]> {
     return this.auctionRepository.getAuctionsByTenant(tenantId);
   }
 
@@ -107,8 +116,8 @@ export class AuctionsService {
 
     // Validate that auction can be updated (PENDIENTE or CANCELADA)
     if (
-      existingAuction.status !== 'PENDIENTE' &&
-      existingAuction.status !== 'CANCELADA'
+      existingAuction.status !== AuctionStatusEnum.PENDIENTE &&
+      existingAuction.status !== AuctionStatusEnum.CANCELADA
     ) {
       throw new BadRequestException(
         'No se puede modificar una subasta activa o completada'
@@ -125,12 +134,12 @@ export class AuctionsService {
     }
 
     // Convert string type to enum if provided
-    let auctionType: AuctionTypeEnum | undefined;
+    let auctionType: PrismaAuctionTypeEnum | undefined;
     if (updateAuctionDto.type) {
-      if (updateAuctionDto.type === 'test') {
-        auctionType = AuctionTypeEnum.TEST;
-      } else if (updateAuctionDto.type === 'real') {
-        auctionType = AuctionTypeEnum.REAL;
+      if (updateAuctionDto.type === SharedAuctionTypeEnum.TEST) {
+        auctionType = PrismaAuctionTypeEnum.TEST;
+      } else if (updateAuctionDto.type === SharedAuctionTypeEnum.REAL) {
+        auctionType = PrismaAuctionTypeEnum.REAL;
       }
     }
 
@@ -145,8 +154,11 @@ export class AuctionsService {
     });
 
     // If auction was CANCELADA and is being edited, change status to PENDIENTE
-    if (existingAuction.status === 'CANCELADA') {
-      await this.auctionRepository.updateAuctionStatus(id, 'PENDIENTE');
+    if (existingAuction.status === AuctionStatusEnum.CANCELADA) {
+      await this.auctionRepository.updateAuctionStatus(
+        id,
+        AuctionStatusEnum.PENDIENTE
+      );
     }
 
     // Update selected items if provided
@@ -196,7 +208,7 @@ export class AuctionsService {
   async startAuction(id: string, tenantId: string): Promise<Auction> {
     const auction = await this.getAuctionById(id, tenantId);
 
-    if (auction.status !== 'PENDIENTE') {
+    if (auction.status !== AuctionStatusEnum.PENDIENTE) {
       throw new BadRequestException(
         'Solo se pueden iniciar subastas pendientes'
       );

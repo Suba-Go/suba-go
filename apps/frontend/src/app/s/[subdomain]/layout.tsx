@@ -59,7 +59,9 @@ export default async function SubdomainLayout({
     const resolvedParams = await params;
     subdomain = resolvedParams.subdomain;
     const normalizedSubdomain = normalizeCompanyName(subdomain);
-    const companyResponse = await getCompanyBySubdomainServerAction(normalizedSubdomain);
+    const companyResponse = await getCompanyBySubdomainServerAction(
+      normalizedSubdomain
+    );
 
     if (!companyResponse.success || !companyResponse.data) {
       console.error('Company not found:', companyResponse.error);
@@ -75,7 +77,7 @@ export default async function SubdomainLayout({
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Company Navbar - Conditionally included (not in login) */}
-      <ConditionalNavbar company={company} subdomain={subdomain} />
+      <ConditionalNavbar company={company} />
 
       {/* Page content */}
       {children}

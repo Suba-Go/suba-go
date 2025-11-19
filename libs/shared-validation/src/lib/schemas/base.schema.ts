@@ -1,11 +1,11 @@
 import { z } from 'zod';
 
 export const baseSchema = z.object({
-  id: z.string().uuid(),
-  is_deleted: z.boolean().optional().nullable(),
-  createdAt: z.date().optional().nullable(),
-  updatedAt: z.date().optional().nullable(),
-  deletedAt: z.date().optional().nullable(),
+  id: z.uuid(),
+  isDeleted: z.boolean().optional(),
+  createdAt: z.date().optional(),
+  updatedAt: z.date().optional(),
+  deletedAt: z.date().nullable().optional(),
 });
 
 export type BaseDto = z.infer<typeof baseSchema>;

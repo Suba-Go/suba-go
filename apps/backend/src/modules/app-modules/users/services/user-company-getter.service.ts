@@ -29,13 +29,6 @@ export class UserCompanyGetterService {
       );
     }
 
-    // Check if company has a tenant
-    if (!user.company.tenant) {
-      throw new NotFoundException(
-        `La empresa del usuario ${userEmail} no tiene un tenant asignado`
-      );
-    }
-
     // Return the normalized company name (which is the subdomain)
     return normalizeCompanyName(user.company.name);
   }
