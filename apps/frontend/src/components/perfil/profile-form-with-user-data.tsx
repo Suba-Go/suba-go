@@ -14,6 +14,7 @@ import { PhoneInput } from '@/components/ui/phone-input';
 import { useAutoFormat } from '@/hooks/use-auto-format';
 
 // functions to validate the form fields
+// TODO: validaciones rtaspasar a helper reutilizable
 const validateEmail = (email: string): string | null => {
   if (!email.trim()) return 'El email es obligatorio';
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -38,6 +39,7 @@ const validatePhone = (phone: string): string | null => {
   return null;
 };
 
+// TODO: opcion de rut con 1.234.567-8 usuarios mas antiguos
 const validateRUT = (rut: string): string | null => {
   if (!rut.trim()) return 'El RUT es obligatorio';
 

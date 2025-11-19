@@ -1,12 +1,10 @@
 import {
   Body,
   Controller,
-  ForbiddenException,
   Get,
   Param,
   Patch,
   Post,
-  Request,
   UseGuards,
 } from '@nestjs/common';
 import { UserCreatorService } from './services/user-creator.service';
@@ -26,14 +24,6 @@ enum UserRolesEnum {
   ADMIN = 'ADMIN',
   USER = 'USER',
   AUCTION_MANAGER = 'AUCTION_MANAGER',
-}
-
-interface AuthenticatedRequest extends Request {
-  user: {
-    userId: string;
-    tenantId: string;
-    role: string;
-  };
 }
 
 @UseGuards(JwtAuthGuard)
@@ -99,15 +89,8 @@ export class UsersController {
   @Roles(UserRolesEnum.ADMIN, UserRolesEnum.AUCTION_MANAGER, UserRolesEnum.USER)
   async updateUserProfile(
     @Param('id') id: string,
-    @Body() updateData: UserUpdateProfileDto,
-    @Request() req: AuthenticatedRequest
+    @Body() updateData: UserUpdateProfileDto
   ) {
-    // Los usuarios solo pueden actualizar su propio perfil
-    if (req.user.role === UserRolesEnum.USER && req.user.userId !== id) {
-      throw new ForbiddenException(
-        'No puedes actualizar el perfil de otro usuario'
-      );
-    }
     return await this.userUpdaterService.updateUserProfile(id, updateData);
   }
 
