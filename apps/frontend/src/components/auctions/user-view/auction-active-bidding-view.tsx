@@ -31,6 +31,7 @@ interface AuctionActiveBiddingViewProps {
   tenantId: string;
   userId: string;
   auctionItems: AuctionItemWithItmeAndBidsDto[];
+  onRealtimeSnapshot?: () => void;
 }
 
 interface BidState {
@@ -57,6 +58,7 @@ export function AuctionActiveBiddingView({
   accessToken,
   tenantId,
   userId,
+  onRealtimeSnapshot,
 }: AuctionActiveBiddingViewProps) {
   const [bidStates, setBidStates] = useState<BidState>({});
   const [bidHistory, setBidHistory] = useState<ItemBidHistory>({});
@@ -134,18 +136,18 @@ export function AuctionActiveBiddingView({
   }, []);
 
   const handleTimeExtension = useCallback((data: any) => {
-    // todo extend auction time
+    // TODO: extend auction time
   }, []);
 
-  const { isConnected, isJoined, participantCount, connectionError, sendBid } =
-    useAuctionWebSocketBidding({
-      auctionId: auction.id,
-      tenantId,
-      accessToken,
-      onBidPlaced: handleBidPlaced,
-      onBidRejected: handleBidRejected,
-      onTimeExtension: handleTimeExtension,
-    });
+  const { isJoined, connectionError, sendBid } = useAuctionWebSocketBidding({
+    auctionId: auction.id,
+    tenantId,
+    accessToken,
+    onBidPlaced: handleBidPlaced,
+    onBidRejected: handleBidRejected,
+    onTimeExtension: handleTimeExtension,
+    onJoined: onRealtimeSnapshot,
+  });
 
   // Initialize bid states
   useEffect(() => {
