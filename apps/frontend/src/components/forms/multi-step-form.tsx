@@ -11,10 +11,8 @@ import { Progress } from '@suba-go/shared-components/components/ui/progress';
 import UserForm from './user-form';
 import CompanyForm from './company-form';
 import {
-  CompanyCreateDto,
+  CompanyCreateCompactDto,
   CompanyDto,
-  TenantCreateDto,
-  TenantDto,
   UserCreateDto,
   UserDto,
   UserRolesEnum,
@@ -22,6 +20,10 @@ import {
 import { createCompleteTrpcAction } from '@/domain/trpc-actions/multi-step-form/create-complete-trpc-action';
 import { getUserCompanyDomainTrpcAction } from '@/domain/trpc-actions/user/get-user-company-domain-trpc-action';
 import { signIn } from 'next-auth/react';
+import FormResult from './form-result';
+import { useToast } from '@suba-go/shared-components/components/ui/toaster';
+import { useRouter } from 'next-nprogress-bar';
+import getCompanyUrl from './helper/company-url';
 
 // Cache management for multi-step form
 const clearAllFormCache = () => {
@@ -32,9 +34,6 @@ const clearAllFormCache = () => {
     console.warn('Failed to clear form cache:', error);
   }
 };
-
-import FormResult from './form-result';
-import { useToast } from '@suba-go/shared-components/components/ui/toaster';
 
 export default function MultiStepForm() {
   const { toast } = useToast();
@@ -47,31 +46,23 @@ export default function MultiStepForm() {
     role: UserRolesEnum.AUCTION_MANAGER,
   });
 
-  const [companyData, setCompanyData] = useState<CompanyCreateDto>({
+  const [companyData, setCompanyData] = useState<CompanyCreateCompactDto>({
     name: '',
-    logo: null,
     principal_color: null,
-    principal_color2: null,
-    secondary_color: null,
-    secondary_color2: null,
-    secondary_color3: null,
-    tenantId: null,
   });
   const [isLoading, setIsLoading] = useState(false);
   const [completedData, setCompletedData] = useState<{
     user: UserDto;
     company: CompanyDto;
-    tenant: TenantDto;
   } | null>(null);
-
+  const router = useRouter();
   const handleUserSubmit = async (data: UserCreateDto) => {
     setUserData(data);
     setCurrentStep(2);
   };
 
   const handleCompanySubmit = async (data: {
-    companyData: CompanyCreateDto;
-    tenantData: TenantCreateDto;
+    companyData: CompanyCreateCompactDto;
   }) => {
     setIsLoading(true);
     try {
@@ -81,7 +72,6 @@ export default function MultiStepForm() {
       const result = await createCompleteTrpcAction({
         userData,
         companyData: data.companyData,
-        tenantData: data.tenantData,
       });
 
       if (result.success && result.data) {
@@ -118,11 +108,9 @@ export default function MultiStepForm() {
               });
 
               // Redirect to the user's company domain
-              setTimeout(() => {
-                if (domainResult.data?.domain) {
-                  window.location.href = domainResult.data.domain;
-                }
-              }, 1500);
+              if (domainResult.data?.domain) {
+                router.push(getCompanyUrl(domainResult.data?.domain));
+              }
             } else {
               // Show success step if domain not found
               setCurrentStep(3);

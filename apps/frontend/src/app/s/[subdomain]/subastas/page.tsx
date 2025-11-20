@@ -12,6 +12,7 @@ export default function SubastasPage({
   params: Promise<{ subdomain: string }>;
 }) {
   const { subdomain } = use(params);
+  // TODO: un refresh que se gatille despues de crear una subasta
   const {
     data: auctions,
     isLoading,

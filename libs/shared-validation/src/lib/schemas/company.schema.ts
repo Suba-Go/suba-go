@@ -30,7 +30,6 @@ export const companyCompactCreateSchema = companySchema.omit({
   updatedAt: true,
   deletedAt: true,
   nameLowercase: true,
-  tenant: true,
   logo: true,
   principal_color2: true,
   secondary_color: true,
@@ -46,12 +45,17 @@ export const companyCreateSchema = companySchema
     createdAt: true,
     updatedAt: true,
     deletedAt: true,
-    nameLowercase: true,
+    logo: true,
+    principal_color2: true,
+    secondary_color: true,
+    secondary_color2: true,
+    secondary_color3: true,
+    tenantId: true,
   })
   .strict();
 
 export type CompanyDto = z.infer<typeof companySchema>;
-export type CompanyWithTEnantDto = z.infer<typeof companyWithTenantSchema>;
+export type CompanyWithTenantDto = z.infer<typeof companyWithTenantSchema>;
 export type CompanyCreateCompactDto = z.infer<
   typeof companyCompactCreateSchema
 >;

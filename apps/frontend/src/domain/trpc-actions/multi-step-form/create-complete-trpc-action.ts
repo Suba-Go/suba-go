@@ -2,17 +2,15 @@
 import { trpcServer } from '@/lib/trpc-server';
 import {
   UserCreateDto,
-  CompanyCreateDto,
-  TenantCreateDto,
   UserDto,
   CompanyDto,
   TenantDto,
+  CompanyCreateCompactDto,
 } from '@suba-go/shared-validation';
 
 export interface MultiStepFormData {
   userData: UserCreateDto;
-  companyData: CompanyCreateDto;
-  tenantData: TenantCreateDto;
+  companyData: CompanyCreateCompactDto;
 }
 
 export interface MultiStepFormResult {

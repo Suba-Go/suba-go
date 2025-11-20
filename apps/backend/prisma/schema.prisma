@@ -187,6 +187,7 @@ model Auction {
 
   // Global per-auction bid increment (applies to all items in this auction)
   bidIncrement Int @default(50000)
+  itemIds      String[] @default([])
 
   // Relations
   tenantId             String

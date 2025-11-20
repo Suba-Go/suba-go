@@ -13,8 +13,9 @@ export const auctionSchema = baseSchema
     description: z.string().nullable(),
     startTime: z.date(),
     endTime: z.date(),
-    status: z.nativeEnum(AuctionStatusEnum).default(AuctionStatusEnum.PENDIENTE),
-    type: z.nativeEnum(AuctionTypeEnum).default(AuctionTypeEnum.REAL),
+    status: z.enum(AuctionStatusEnum).default(AuctionStatusEnum.PENDIENTE),
+    type: z.enum(AuctionTypeEnum).default(AuctionTypeEnum.REAL),
+    itemIds: z.array(z.uuid()).nullable(),
     bidIncrement: z.number().positive(),
     tenantId: z.uuid(),
   })
@@ -26,10 +27,11 @@ export const auctionWithItemsAndBidsSchema = baseSchema
     description: z.string().nullable(),
     startTime: z.date(),
     endTime: z.date(),
-    status: z.nativeEnum(AuctionStatusEnum).default(AuctionStatusEnum.PENDIENTE),
-    type: z.nativeEnum(AuctionTypeEnum).default(AuctionTypeEnum.REAL),
+    status: z.enum(AuctionStatusEnum).default(AuctionStatusEnum.PENDIENTE),
+    type: z.enum(AuctionTypeEnum).default(AuctionTypeEnum.REAL),
     bidIncrement: z.number().positive(),
     tenantId: z.uuid(),
+    itemIds: z.array(z.uuid()).nullable(),
     get items() {
       return z.array(auctionItemSchema).nullable();
     },
@@ -53,7 +55,7 @@ export const auctionCreateSchema = z
     startTime: z.date(),
     endTime: z.date(),
     bidIncrement: z.number().positive(),
-    type: z.nativeEnum(AuctionTypeEnum),
+    type: z.enum(AuctionTypeEnum),
     tenantId: z.uuid(),
     itemIds: z.array(z.uuid()).min(1, 'Debe seleccionar al menos un item'),
   })

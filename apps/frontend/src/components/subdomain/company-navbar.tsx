@@ -92,15 +92,17 @@ export default function CompanyNavbar({ company }: CompanyNavbarProps) {
           {/* check if the profile is complete */}
           {isUserProfileComplete(session) && (
             <nav className="hidden md:flex items-center space-x-6">
-              <Link href="/subastas">
-                <Button
-                  variant="ghost"
-                  className="text-gray-600 hover:text-gray-900 flex items-center gap-2"
-                >
-                  <Gavel className="h-4 w-4" />
-                  Subastas
-                </Button>
-              </Link>
+              {isUserAdminOrManager(session) && (
+                <Link href="/subastas">
+                  <Button
+                    variant="ghost"
+                    className="text-gray-600 hover:text-gray-900 flex items-center gap-2"
+                  >
+                    <Gavel className="h-4 w-4" />
+                    Subastas
+                  </Button>
+                </Link>
+              )}
               {/* Products - Only for AUCTION_MANAGER and ADMIN */}
               {isUserAdminOrManager(session) && (
                 <Link href="/items">

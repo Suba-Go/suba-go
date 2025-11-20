@@ -24,12 +24,12 @@ import { RolesGuard } from '../../../common/guards/roles.guard';
 import { Roles } from '../../../common/decorators/roles.decorator';
 import { AuctionsService } from './services/auctions.service';
 import {
-  CreateAuctionDto,
   UpdateAuctionDto,
   AuctionStatsDto,
   AuctionResponseDto,
 } from './dto/auction.dto';
 import { AuctionsGateway } from '../../providers-modules/realtime/auctions.gateway';
+import { AuctionCreateDto } from '@suba-go/shared-validation';
 
 interface AuthenticatedRequest extends Request {
   user: {
@@ -69,10 +69,11 @@ export class AuctionsController {
   @ApiResponse({ status: 403, description: 'Sin permisos para crear subastas' })
   @HttpCode(HttpStatus.CREATED)
   async createAuction(
-    @Body() createAuctionDto: CreateAuctionDto,
+    @Body() createAuctionDto: AuctionCreateDto,
     @Request() req: AuthenticatedRequest
   ) {
     const tenantId = req.user.tenantId;
+    console.log(tenantId, 'controller to create auction');
     return this.auctionsService.createAuction(createAuctionDto, tenantId);
   }
 
