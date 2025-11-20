@@ -33,7 +33,8 @@ export function BidInput({
   onChange,
   onSubmit,
 }: BidInputProps) {
-  const isValidBid = Number(value) >= minBid;
+  const numericValue = Number(value) || 0;
+  const isValidBid = numericValue >= minBid;
 
   return (
     <div className="space-y-2">
@@ -70,4 +71,3 @@ export function BidInput({
     </div>
   );
 }
-

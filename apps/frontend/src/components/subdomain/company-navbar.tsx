@@ -205,15 +205,17 @@ export default function CompanyNavbar({ company }: CompanyNavbarProps) {
       {/* Mobile menu (hidden by default, can be toggled) */}
       <div className="md:hidden border-t border-gray-200">
         <div className="px-4 py-2 space-y-1">
-          <Link href="/subastas">
-            <Button
-              variant="ghost"
-              className="w-full text-left justify-start text-gray-600 hover:text-gray-900 flex items-center gap-2"
-            >
-              <Gavel className="h-4 w-4" />
-              Subastas
-            </Button>
-          </Link>
+          {isUserAdminOrManager(session) && (
+            <Link href="/subastas">
+              <Button
+                variant="ghost"
+                className="w-full text-left justify-start text-gray-600 hover:text-gray-900 flex items-center gap-2"
+              >
+                <Gavel className="h-4 w-4" />
+                Subastas
+              </Button>
+            </Link>
+          )}
           {/* Products - Only for AUCTION_MANAGER and ADMIN */}
           {isUserAdminOrManager(session) && (
             <Link href="/items">

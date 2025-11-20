@@ -1,3 +1,4 @@
+import { UserRolesEnum } from '@suba-go/shared-validation';
 import { Session } from 'next-auth';
 
 /**
@@ -72,6 +73,7 @@ export function isUserAdminOrManager(session: Session | null): boolean {
   }
 
   return (
-    session.user.role === 'AUCTION_MANAGER' || session.user.role === 'ADMIN'
+    session.user.role === UserRolesEnum.AUCTION_MANAGER ||
+    session.user.role === UserRolesEnum.ADMIN
   );
 }
