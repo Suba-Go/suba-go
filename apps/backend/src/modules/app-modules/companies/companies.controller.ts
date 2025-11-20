@@ -1,7 +1,7 @@
 import { Controller, Post, Body, Param, Get } from '@nestjs/common';
 import { CompanyCreatorService } from './services/company-creator.service';
 import { CompanyGetterService } from './services/company-getter.service';
-import { CompanyCreateDto } from '@suba-go/shared-validation';
+import { CompanyCreateCompactDto } from '@suba-go/shared-validation';
 
 @Controller('companies')
 export class CompaniesController {
@@ -11,13 +11,13 @@ export class CompaniesController {
   ) {}
 
   @Post()
-  async createCompanyStandalone(@Body() companyData: CompanyCreateDto) {
+  async createCompanyStandalone(@Body() companyData: CompanyCreateCompactDto) {
     return await this.companyCreatorService.createCompany(companyData);
   }
 
   @Post('tenant/:tenantId')
   async createCompany(
-    @Body() companyData: CompanyCreateDto,
+    @Body() companyData: CompanyCreateCompactDto,
     @Param('tenantId') tenantId: string
   ) {
     return await this.companyCreatorService.createCompany(

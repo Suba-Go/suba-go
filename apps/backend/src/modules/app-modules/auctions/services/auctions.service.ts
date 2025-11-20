@@ -6,11 +6,7 @@ import {
 } from '@nestjs/common';
 import { AuctionPrismaService } from './auction-prisma.service';
 import { AuctionsGateway } from '../../../providers-modules/realtime/auctions.gateway';
-import {
-  CreateAuctionDto,
-  UpdateAuctionDto,
-  AuctionStatsDto,
-} from '../dto/auction.dto';
+import { UpdateAuctionDto, AuctionStatsDto } from '../dto/auction.dto';
 import type { Auction } from '@prisma/client';
 import {
   AuctionStatusEnum,
@@ -18,6 +14,7 @@ import {
 } from '@prisma/client';
 import { PrismaService } from '../../../providers-modules/prisma/prisma.service';
 import {
+  AuctionCreateDto,
   AuctionWithItemsAndBidsDto,
   AuctionTypeEnum as SharedAuctionTypeEnum,
 } from '@suba-go/shared-validation';
@@ -31,7 +28,7 @@ export class AuctionsService {
   ) {}
 
   async createAuction(
-    createAuctionDto: CreateAuctionDto,
+    createAuctionDto: AuctionCreateDto,
     tenantId: string
   ): Promise<Auction> {
     // Validate dates
@@ -57,6 +54,7 @@ export class AuctionsService {
     } else if (createAuctionDto.type === SharedAuctionTypeEnum.REAL) {
       auctionType = PrismaAuctionTypeEnum.REAL;
     }
+    console.log('creating auction');
 
     const auction = await this.auctionRepository.createAuction({
       title: createAuctionDto.title,
@@ -66,16 +64,16 @@ export class AuctionsService {
       tenantId,
       type: auctionType,
       bidIncrement: createAuctionDto.bidIncrement,
+      itemIds: createAuctionDto.itemIds,
     });
+    console.log('auction', auction);
 
     // Add selected items to auction
-    if (
-      createAuctionDto.selectedItems &&
-      createAuctionDto.selectedItems.length > 0
-    ) {
+    if (auction.itemIds) {
+      console.log('trying');
       await this.auctionRepository.addItemsToAuction(
         auction.id,
-        createAuctionDto.selectedItems
+        createAuctionDto.itemIds
       );
     }
 

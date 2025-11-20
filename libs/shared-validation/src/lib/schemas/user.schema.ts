@@ -20,7 +20,7 @@ export const userSchema = baseSchema
     password,
     rut: rut.optional().nullable(),
     public_name: name.optional().nullable(),
-    role: z.nativeEnum(UserRolesEnum).default(UserRolesEnum.AUCTION_MANAGER),
+    role: z.enum(UserRolesEnum).default(UserRolesEnum.AUCTION_MANAGER),
     tenantId: z.uuid().optional().nullable(),
     companyId: z.uuid().optional().nullable(),
   })
@@ -33,6 +33,7 @@ export const userCreateSchema = userSchema
     createdAt: true,
     updatedAt: true,
     deletedAt: true,
+    tenantId: true,
   })
   .extend({
     confirmPassword: confirmation_password,

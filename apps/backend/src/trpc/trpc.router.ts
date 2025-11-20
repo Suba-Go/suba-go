@@ -7,7 +7,7 @@ import { CompanyCreatorService } from '../modules/app-modules/companies/services
 import { TenantCreatorService } from '../modules/app-modules/tenants/services/tenant-creator.service';
 import { MultiStepFormCreatorService } from '../modules/app-modules/multi-step-form/services/multi-step-form-creator.service';
 import {
-  companyCreateSchema,
+  companyCompactCreateSchema,
   multiStepFormInputSchema,
   tenantCreateSchema,
   userCreateSchema,
@@ -95,7 +95,7 @@ export class TrpcRouter {
     // Company procedures
     company: this.trpc.router({
       create: this.trpc.procedure
-        .input(companyCreateSchema)
+        .input(companyCompactCreateSchema)
         .mutation(async ({ input }) => {
           try {
             const result = await this.companyCreatorService.createCompany(
@@ -149,7 +149,6 @@ export class TrpcRouter {
               await this.multiStepFormCreatorService.createCompleteAccount({
                 userData: input.userData,
                 companyData: input.companyData,
-                tenantData: input.tenantData,
               });
 
             return {

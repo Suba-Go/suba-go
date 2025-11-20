@@ -51,7 +51,6 @@ export interface AppRouterClient {
         ApiResponse<{
           user: UserDto;
           company: CompanyDto;
-          tenant: TenantDto;
         }>
       >;
     };

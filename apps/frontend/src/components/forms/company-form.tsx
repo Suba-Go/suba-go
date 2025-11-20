@@ -9,8 +9,6 @@ import { Label } from '@suba-go/shared-components/components/ui/label';
 import {
   companyCompactCreateSchema,
   CompanyCreateCompactDto,
-  CompanyCreateDto,
-  TenantCreateDto,
 } from '@suba-go/shared-validation';
 import { useEffect } from 'react';
 
@@ -31,9 +29,22 @@ const saveToCache = (data: CompanyCreateCompactDto) => {
 const loadFromCache = (): CompanyCreateCompactDto | null => {
   try {
     const cached = localStorage.getItem(CACHE_KEYS.COMPANY_FORM);
-    return cached ? JSON.parse(cached) : null;
+    if (!cached) return null;
+
+    const parsed = JSON.parse(cached);
+    const safe = companyCompactCreateSchema.partial().safeParse(parsed);
+    if (!safe.success) {
+      clearCache();
+      return null;
+    }
+
+    return {
+      name: safe.data.name ?? '',
+      principal_color: safe.data.principal_color ?? '#3B82F6',
+    };
   } catch (error) {
     console.warn('Failed to load form data from cache:', error);
+    clearCache();
     return null;
   }
 };
@@ -47,12 +58,9 @@ const clearCache = () => {
 };
 
 interface CompanyFormProps {
-  onSubmit: (data: {
-    companyData: CompanyCreateDto;
-    tenantData: TenantCreateDto;
-  }) => void;
+  onSubmit: (data: { companyData: CompanyCreateCompactDto }) => void;
   isLoading: boolean;
-  initialData: CompanyCreateDto;
+  initialData: CompanyCreateCompactDto;
   onBack: () => void;
 }
 
@@ -106,24 +114,14 @@ export default function CompanyForm({
   };
 
   const onFormSubmit = (data: CompanyCreateCompactDto) => {
-    const companyData: CompanyCreateDto = {
+    const companyData: CompanyCreateCompactDto = {
       name: data.name,
-      logo: null,
       principal_color: data.principal_color || null,
-      principal_color2: null,
-      secondary_color: null,
-      secondary_color2: null,
-      secondary_color3: null,
-      tenantId: null,
     };
-
-    // Tenant no longer has a name field - company name is used as subdomain
-    const tenantData: TenantCreateDto = {};
 
     // Clear cache on successful submit
     clearCache();
-
-    onSubmit({ companyData, tenantData });
+    onSubmit({ companyData });
   };
 
   return (

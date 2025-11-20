@@ -3,16 +3,11 @@
  */
 
 import { z } from 'zod';
-import {
-  companyCreateSchema,
-  tenantCreateSchema,
-  userCreateSchema,
-} from '../schemas';
+import { companyCompactCreateSchema, userCreateSchema } from '../schemas';
 
 export const multiStepFormInputSchema = z.object({
   userData: userCreateSchema,
-  companyData: companyCreateSchema,
-  tenantData: tenantCreateSchema,
+  companyData: companyCompactCreateSchema,
 });
 
 // Type exports
