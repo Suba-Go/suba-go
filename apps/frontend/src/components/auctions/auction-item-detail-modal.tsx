@@ -96,6 +96,28 @@ export function AuctionItemDetailModal({
     });
   }, [photoCarouselApi]);
 
+  useEffect(() => {
+    if (!photoCarouselApi) return;
+
+    const carouselNode = photoCarouselApi.rootNode() as HTMLElement;
+    if (!carouselNode) return;
+
+    const preventHorizontalScroll = (e: WheelEvent) => {
+      if (Math.abs(e.deltaX) > Math.abs(e.deltaY)) {
+        e.preventDefault();
+        e.stopPropagation();
+      }
+    };
+
+    if (window.matchMedia('(pointer: fine)').matches) {
+      carouselNode.addEventListener('wheel', preventHorizontalScroll, { passive: false });
+    }
+
+    return () => {
+      carouselNode.removeEventListener('wheel', preventHorizontalScroll);
+    };
+  }, [photoCarouselApi]);
+
   const handleDownload = (url: string, filename: string) => {
     const link = document.createElement('a');
     link.href = url;
@@ -162,16 +184,33 @@ export function AuctionItemDetailModal({
                 <h3 className="text-lg font-semibold">Fotos</h3>
               </div>
               <div className="relative">
-                <Carousel className="w-full" setApi={setPhotoCarouselApi}>
-                  <CarouselContent>
+                <Carousel
+                  className="w-full"
+                  setApi={setPhotoCarouselApi}
+                  opts={{
+                    align: 'start',
+                    dragFree: false,
+                    containScroll: 'trimSnaps',
+                    watchDrag: false,
+                    skipSnaps: false,
+                  }}
+                >
+                  <CarouselContent 
+                    className="-ml-0"
+                    style={{
+                      touchAction: 'pan-y',
+                      overscrollBehaviorX: 'none',
+                    }}
+                  >
                     {photoUrls.map((url: string, index: number) => (
-                      <CarouselItem key={index}>
+                      <CarouselItem key={index} className="pl-0">
                         <div className="aspect-video relative bg-gray-100 rounded-lg overflow-hidden">
                           <Image
                             src={url}
                             fill
                             alt={`Foto ${index + 1}`}
-                            className="object-contain"
+                            className="object-contain select-none pointer-events-none"
+                            draggable={false}
                           />
                         </div>
                       </CarouselItem>
@@ -179,13 +218,13 @@ export function AuctionItemDetailModal({
                   </CarouselContent>
                   {photoUrls.length > 1 && (
                     <>
-                      <CarouselPrevious />
-                      <CarouselNext />
+                      <CarouselPrevious className="left-2 md:left-4 z-20 opacity-100" />
+                      <CarouselNext className="right-2 md:right-4 z-20 opacity-100" />
                     </>
                   )}
                 </Carousel>
                 {photoCount > 0 && (
-                  <div className="absolute top-2 right-2 bg-black/70 text-white px-3 py-1 rounded-full text-sm font-medium">
+                  <div className="absolute top-2 right-2 bg-black/70 text-white px-3 py-1 rounded-full text-sm font-medium z-10">
                     {currentPhotoIndex + 1} de {photoCount}
                   </div>
                 )}
