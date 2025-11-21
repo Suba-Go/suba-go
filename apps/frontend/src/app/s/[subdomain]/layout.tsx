@@ -1,6 +1,7 @@
 import { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import { getCompanyBySubdomainServerAction } from '@/domain/server-actions/company/get-company-by-subdomain-server-action';
+import { normalizeCompanyName } from '@/utils/company-normalization';
 import ConditionalNavbar from '@/components/subdomain/conditional-navbar';
 
 interface SubdomainLayoutProps {
@@ -15,8 +16,9 @@ export async function generateMetadata({
 }: SubdomainLayoutProps): Promise<Metadata> {
   try {
     const resolvedParams = await params;
+    const normalizedSubdomain = normalizeCompanyName(resolvedParams.subdomain);
     const companyResponse = await getCompanyBySubdomainServerAction(
-      resolvedParams.subdomain
+      normalizedSubdomain
     );
 
     if (companyResponse.success && companyResponse.data) {
@@ -56,7 +58,10 @@ export default async function SubdomainLayout({
   try {
     const resolvedParams = await params;
     subdomain = resolvedParams.subdomain;
-    const companyResponse = await getCompanyBySubdomainServerAction(subdomain);
+    const normalizedSubdomain = normalizeCompanyName(subdomain);
+    const companyResponse = await getCompanyBySubdomainServerAction(
+      normalizedSubdomain
+    );
 
     if (!companyResponse.success || !companyResponse.data) {
       console.error('Company not found:', companyResponse.error);
@@ -71,10 +76,10 @@ export default async function SubdomainLayout({
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Company Navbar - Condicionalmente incluida (no en login) */}
-      <ConditionalNavbar company={company} subdomain={subdomain} />
+      {/* Company Navbar - Conditionally included (not in login) */}
+      <ConditionalNavbar company={company} />
 
-      {/* Contenido de la página */}
+      {/* Page content */}
       {children}
     </div>
   );

@@ -3,6 +3,8 @@ import { auth } from '@/auth';
 import { redirect } from 'next/navigation';
 import { AuctionViewRouter } from '@/components/auctions/auction-view-router';
 import { AuctionDetailSkeleton } from '@/components/auctions/auction-detail-skeleton';
+import { isUserRole } from '@/lib/auction-utils';
+import { UserRolesEnum } from '@suba-go/shared-validation';
 
 export default async function AuctionDetailPage({
   params,
@@ -12,13 +14,11 @@ export default async function AuctionDetailPage({
   const session = await auth();
   const { auctionId } = await params;
 
-  if (!session) {
-    redirect('/login');
-  }
-
   // Verify user has access to auctions (AUCTION_MANAGER or regular user)
   const hasAccess =
-    session.user.role === 'AUCTION_MANAGER' || session.user.role === 'USER';
+    session &&
+    (session.user.role === UserRolesEnum.AUCTION_MANAGER ||
+      isUserRole(session.user.role));
 
   if (!hasAccess) {
     redirect('/');
@@ -26,7 +26,7 @@ export default async function AuctionDetailPage({
 
   // Get access token and tenant ID for WebSocket
   const accessToken = session.tokens.accessToken;
-  const tenantId = session.user.tenant?.id;
+  const tenantId = session.user.tenantId;
   const userId = session.user.id;
 
   if (!tenantId) {

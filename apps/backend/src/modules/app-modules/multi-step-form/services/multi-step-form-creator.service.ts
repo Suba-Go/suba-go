@@ -1,20 +1,27 @@
 import { Injectable, BadRequestException } from '@nestjs/common';
 import {
   UserCreateDto,
-  CompanyCreateDto,
-  TenantCreateDto,
+  CompanyCreateCompactDto,
 } from '@suba-go/shared-validation';
-import type { User, Company, Tenant } from '@prisma/client';
+import {
+  type User,
+  type Company,
+  type Tenant,
+  type Prisma,
+  UserRoleEnum,
+} from '@prisma/client';
 import { UserPrismaRepository } from '../../users/services/user-prisma-repository.service';
-import { CompanyPrismaRepository } from '../../companies/services/company-prisma-repository.service';
-import { TenantPrismaRepository } from '../../tenants/services/tenant-prisma-repository.service';
 import { PrismaService } from '../../../providers-modules/prisma/prisma.service';
+import { normalizeCompanyName } from '../../../../utils/company-normalization';
 import * as bcrypt from 'bcrypt';
+
+type CompanyCreateInputWithNormalized = Prisma.CompanyCreateInput & {
+  nameLowercase: string;
+};
 
 export interface MultiStepFormData {
   userData: UserCreateDto;
-  companyData: CompanyCreateDto;
-  tenantData: TenantCreateDto;
+  companyData: CompanyCreateCompactDto;
 }
 
 export interface MultiStepFormResult {
@@ -27,9 +34,7 @@ export interface MultiStepFormResult {
 export class MultiStepFormCreatorService {
   constructor(
     private readonly prisma: PrismaService,
-    private readonly userRepository: UserPrismaRepository,
-    private readonly companyRepository: CompanyPrismaRepository,
-    private readonly tenantRepository: TenantPrismaRepository
+    private readonly userRepository: UserPrismaRepository
   ) {}
 
   async createCompleteAccount(
@@ -56,7 +61,6 @@ export class MultiStepFormCreatorService {
       }
 
       // Step 3: Create tenant first (within transaction)
-      // Tenant no longer has a name field - company name is used as subdomain
       const savedTenant = await prisma.tenant.create({
         data: {},
       });
@@ -79,15 +83,15 @@ export class MultiStepFormCreatorService {
       const savedCompany = await prisma.company.create({
         data: {
           name: data.companyData.name,
-          nameLowercase: data.companyData.name.toLowerCase(),
-          logo: data.companyData.logo,
+          nameLowercase: normalizeCompanyName(data.companyData.name),
+          logo: null,
           principal_color: data.companyData.principal_color,
-          principal_color2: data.companyData.principal_color2,
-          secondary_color: data.companyData.secondary_color,
-          secondary_color2: data.companyData.secondary_color2,
-          secondary_color3: data.companyData.secondary_color3,
-          tenantId: savedTenant.id,
-        },
+          principal_color2: null,
+          secondary_color: null,
+          secondary_color2: null,
+          secondary_color3: null,
+          tenant: { connect: { id: savedTenant.id } },
+        } as CompanyCreateInputWithNormalized,
       });
 
       // Step 5: Create user with tenant and company references (within transaction)
@@ -115,7 +119,7 @@ export class MultiStepFormCreatorService {
           password: hashedPassword,
           rut: data.userData.rut,
           public_name: publicName,
-          role: 'AUCTION_MANAGER', // Force AUCTION_MANAGER role
+          role: UserRoleEnum.AUCTION_MANAGER, // Force AUCTION_MANAGER role
           tenantId: savedTenant.id,
           companyId: savedCompany.id,
         },

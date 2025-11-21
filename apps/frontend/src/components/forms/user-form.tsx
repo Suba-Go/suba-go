@@ -3,12 +3,17 @@
 import type React from 'react';
 
 import { useEffect, useState } from 'react';
-import { useForm } from 'react-hook-form';
+import { useForm, type SubmitHandler, type Resolver } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Button } from '@suba-go/shared-components/components/ui/button';
 import { Input } from '@suba-go/shared-components/components/ui/input';
+import { FormattedInput } from '@/components/ui/formatted-input';
 import { Label } from '@suba-go/shared-components/components/ui/label';
-import { UserCreateDto, userCreateSchema } from '@suba-go/shared-validation';
+import {
+  UserCreateDto,
+  userCreateSchema,
+  UserRolesEnum,
+} from '@suba-go/shared-validation';
 
 // Cache keys for localStorage
 const CACHE_KEYS = {
@@ -57,7 +62,7 @@ export default function UserForm({
   const getCachedOrInitialData = (): UserCreateDto => {
     const cached = loadUserFromCache();
     if (cached) {
-      return cached;
+      return cached as UserCreateDto;
     }
     return initialData;
   };
@@ -74,8 +79,9 @@ export default function UserForm({
     formState: { errors, isValid },
     watch,
     getValues,
+    setValue,
   } = useForm<UserCreateDto>({
-    resolver: zodResolver(userCreateSchema),
+    resolver: zodResolver(userCreateSchema) as Resolver<UserCreateDto>,
     defaultValues: defaultData,
     mode: 'onChange', // Enable real-time validation
   });
@@ -85,7 +91,7 @@ export default function UserForm({
   const emailValue = watch('email');
 
   useEffect(() => {
-    setShowConfirmPassword(!!passwordValue && passwordValue.length > 0);
+    setShowConfirmPassword(!!passwordValue);
   }, [passwordValue]);
 
   // Save form data to cache whenever form values change
@@ -96,10 +102,15 @@ export default function UserForm({
     }
   }, [nameValue, emailValue, passwordValue, getValues]);
 
-  const onFormSubmit = (data: UserCreateDto) => {
+  const onFormSubmit: SubmitHandler<UserCreateDto> = (data) => {
     // Clear cache on successful submit
     clearUserCache();
-    onSubmit(data);
+    const normalized: UserCreateDto = {
+      ...data,
+      email: (data.email || '').trim().toLowerCase(),
+      role: UserRolesEnum.AUCTION_MANAGER,
+    };
+    onSubmit(normalized);
   };
 
   return (
@@ -121,10 +132,15 @@ export default function UserForm({
 
       <div className="space-y-2">
         <Label htmlFor="email">Email</Label>
-        <Input
+        <FormattedInput
           id="email"
           type="email"
-          {...register('email')}
+          formatType="email"
+          value={emailValue || ''}
+          onChange={(val) => {
+            const v = (val ?? '').toString();
+            setValue('email', v, { shouldValidate: true, shouldDirty: true });
+          }}
           className={`border-gray-300 focus:border-primary ${
             errors.email ? 'border-red-500 focus:border-red-500' : ''
           }`}

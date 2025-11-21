@@ -31,7 +31,7 @@ import Image from 'next/image';
 interface ItemDetailModalProps {
   isOpen: boolean;
   onClose: () => void;
-  item: ItemDto | null;
+  item: ItemDto;
 }
 
 export function ItemDetailModal({
@@ -103,7 +103,7 @@ export function ItemDetailModal({
         </DialogHeader>
 
         <div className="space-y-6">
-          {/* Header con estado */}
+          {/* Header with state */}
           <div className="flex justify-between items-start">
             <div>
               <h2 className="text-2xl font-bold">
@@ -116,7 +116,7 @@ export function ItemDetailModal({
             <Badge className={getStateColor(item.state)}>{item.state}</Badge>
           </div>
 
-          {/* Información básica */}
+          {/* Basic Information */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="space-y-4">
               <h3 className="text-lg font-semibold flex items-center gap-2">
@@ -179,7 +179,7 @@ export function ItemDetailModal({
             </div>
           </div>
 
-          {/* Fotos - Carousel */}
+          {/* Photos - Carousel */}
           <div className="space-y-4">
             <h3 className="text-lg font-semibold flex items-center gap-2">
               <ImageIcon className="h-5 w-5" />
@@ -229,7 +229,7 @@ export function ItemDetailModal({
             )}
           </div>
 
-          {/* Documentos - With Preview */}
+          {/* Documents - With Preview */}
           <div className="space-y-4">
             <h3 className="text-lg font-semibold flex items-center gap-2">
               <FileText className="h-5 w-5" />

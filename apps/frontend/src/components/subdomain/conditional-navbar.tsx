@@ -6,21 +6,17 @@ import { CompanyDto } from '@suba-go/shared-validation';
 
 interface ConditionalNavbarProps {
   company: CompanyDto;
-  subdomain: string;
 }
 
-export default function ConditionalNavbar({
-  company,
-  subdomain,
-}: ConditionalNavbarProps) {
+export default function ConditionalNavbar({ company }: ConditionalNavbarProps) {
   const pathname = usePathname();
 
-  // No mostrar navbar en la página de login
+  // Don't show navbar on login page
   const shouldShowNavbar = !pathname.includes('/login');
 
   if (!shouldShowNavbar) {
     return null;
   }
 
-  return <CompanyNavbar company={company} subdomain={subdomain} />;
+  return <CompanyNavbar company={company} />;
 }

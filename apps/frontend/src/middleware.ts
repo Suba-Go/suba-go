@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from './auth';
 import { getSubdomainFromHost } from '@suba-go/shared-components';
+import { isUserProfileComplete } from './utils/subdomain-profile-validation';
 
 // Determine ROOT_DOMAIN based on APP_ENV
 const APP_ENV =
@@ -69,6 +70,13 @@ export default auth(async function middleware(request: NextRequest) {
       );
     }
 
+    // Users page
+    if (pathname === '/usuarios') {
+      return NextResponse.rewrite(
+        new URL(`/s/${subdomain}/usuarios`, request.url)
+      );
+    }
+
     // Auctions pages
     if (pathname === '/subastas') {
       return NextResponse.rewrite(
@@ -76,9 +84,10 @@ export default auth(async function middleware(request: NextRequest) {
       );
     }
 
-    if (pathname === '/usuarios') {
+    // Onboarding page
+    if (pathname === '/onboarding') {
       return NextResponse.rewrite(
-        new URL(`/s/${subdomain}/usuarios`, request.url)
+        new URL(`/s/${subdomain}/onboarding`, request.url)
       );
     }
 
@@ -110,6 +119,12 @@ export default auth(async function middleware(request: NextRequest) {
         // Redirect to login if user doesn't belong to this company
         const login = new URL('/login', request.url);
         return NextResponse.redirect(login);
+      }
+
+      // Check if user profile is complete - redirect to /onboarding if not
+      if (!isUserProfileComplete(session)) {
+        // redirect to public onboarding route
+        return NextResponse.redirect(new URL(`/onboarding`, request.url));
       }
     }
 

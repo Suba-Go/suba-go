@@ -163,7 +163,6 @@ export function useAuctionWebSocket({
         case 'AUCTION_STATUS_CHANGED':
           if (message.data.auctionId === auctionId) {
             // Handle auction status change (e.g., auction ended)
-            console.log('Auction status changed:', message.data.status);
           }
           break;
 

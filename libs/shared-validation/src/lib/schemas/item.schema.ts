@@ -1,9 +1,9 @@
 import { z } from 'zod';
-import { errorMap } from '../errors/error-map';
 import { ItemStateEnum, LegalStatusEnum } from '../enums/item';
 import { baseSchema } from './base.schema';
-
-z.setErrorMap(errorMap);
+// import { tenantSchema } from './tenant.schema';
+// import { auctionItemSchema } from './auction-item.schema';
+import { userBasicInfoSchema } from './user.schema';
 
 export const itemSchema = baseSchema
   .extend({
@@ -11,97 +11,96 @@ export const itemSchema = baseSchema
       .string()
       .min(6, 'La patente debe tener exactamente 6 caracteres')
       .max(6, 'La patente debe tener exactamente 6 caracteres')
-      .optional(),
-    brand: z.string().nullable().optional(),
-    model: z.string().nullable().optional(),
-    year: z.number().int().positive().nullable().optional(),
-    version: z.string().nullable().optional(),
-    photos: z.string().nullable().optional(),
-    docs: z.string().nullable().optional(),
-    kilometraje: z.number().int().positive().nullable().optional(),
-    legal_status: z.enum(LegalStatusEnum).nullable().optional(),
-    basePrice: z.number().positive().nullable().optional(),
-    state: z.enum(ItemStateEnum).default(ItemStateEnum.DISPONIBLE),
+      .nullable(),
+    brand: z.string().nullable(),
+    model: z.string().nullable(),
+    year: z.number().int().min(1900).max(3000).nullable(),
+    version: z.string().nullable(),
+    photos: z.string().nullable(),
+    docs: z.string().nullable(),
+    kilometraje: z.number().int().nullable(),
+    legal_status: z.nativeEnum(LegalStatusEnum).nullable(),
+    state: z.nativeEnum(ItemStateEnum).default(ItemStateEnum.DISPONIBLE),
+    description: z.string().optional().nullable(),
+    basePrice: z.number().nullable(),
+    soldPrice: z.number().nullable(),
+    soldAt: z.date().nullable(),
+    soldToUserId: z.uuid().nullable(),
+    tenantId: z.uuid(),
   })
   .strict();
 
-export const itemCreateSchema = z.object({
-  plate: z
-    .string()
-    .min(6, 'La patente debe tener exactamente 6 caracteres')
-    .max(6, 'La patente debe tener exactamente 6 caracteres')
-    .optional(),
-  brand: z.string().optional(),
-  model: z.string().optional(),
-  year: z
-    .number()
-    .int()
-    .min(1900)
-    .max(new Date().getFullYear() + 1)
-    .optional(),
-  version: z.string().optional(),
-  kilometraje: z.number().int().min(0).optional(),
-  legal_status: z
-    .enum([
-      'TRANSFERIBLE',
-      'LEASING',
-      'POSIBILIDAD_DE_EMBARGO',
-      'PRENDA',
-      'OTRO',
-    ])
-    .optional(),
-  basePrice: z.number().positive().optional(),
-  photos: z.array(z.string()).optional(),
-  docs: z.array(z.instanceof(File)).optional(),
+export const itemWithSoldToUserSchema = itemSchema.extend({
+  get soldToUser() {
+    return userBasicInfoSchema.nullable();
+  },
 });
 
-export const itemEditSchema = z.object({
-  plate: z
-    .string()
-    .min(6, 'La patente debe tener exactamente 6 caracteres')
-    .max(6, 'La patente debe tener exactamente 6 caracteres')
-    .optional(),
-  brand: z.string().optional(),
-  model: z.string().optional(),
-  year: z
-    .number()
-    .int()
-    .min(1900)
-    .max(new Date().getFullYear() + 1)
-    .optional(),
-  version: z.string().optional(),
-  kilometraje: z
-    .any()
-    .transform((val) => {
-      if (val === '' || val === null || val === undefined) return undefined;
-      const num = typeof val === 'number' ? val : Number(val);
-      if (isNaN(num) || num <= 0) return undefined;
-      return Math.floor(num); // Ensure integer
-    })
-    .optional(),
-  legal_status: z
-    .enum([
-      'TRANSFERIBLE',
-      'LEASING',
-      'POSIBILIDAD_DE_EMBARGO',
-      'PRENDA',
-      'OTRO',
-    ])
-    .optional(),
-  basePrice: z
-    .any()
-    .transform((val) => {
-      if (val === '' || val === null || val === undefined) return undefined;
-      const num = typeof val === 'number' ? val : Number(val);
-      if (isNaN(num) || num <= 0) return undefined;
-      return num;
-    })
-    .optional(),
-  description: z.string().optional(),
-  photos: z.array(z.string()).optional(),
-  docs: z.array(z.string()).optional(),
-});
+export const itemCreateSchema = z
+  .object({
+    plate: z
+      .string()
+      .min(6, 'La patente debe tener exactamente 6 caracteres')
+      .max(6, 'La patente debe tener exactamente 6 caracteres')
+      .optional(),
+    brand: z.string().optional(),
+    model: z.string().optional(),
+    year: z
+      .number()
+      .int()
+      .min(1900)
+      .max(new Date().getFullYear() + 1)
+      .optional(),
+    version: z.string().optional(),
+    kilometraje: z.number().int().min(0).optional(),
+    legal_status: z.nativeEnum(LegalStatusEnum).optional(),
+    basePrice: z.number().positive().optional(),
+    photos: z.array(z.string()).optional(),
+    docs: z.array(z.instanceof(File)).optional(),
+  })
+  .strict();
 
-export type ItemEditDto = z.infer<typeof itemEditSchema>;
+export const itemEditSchema = z
+  .object({
+    plate: z
+      .string()
+      .min(6, 'La patente debe tener exactamente 6 caracteres')
+      .max(6, 'La patente debe tener exactamente 6 caracteres')
+      .optional(),
+    brand: z.string().optional(),
+    model: z.string().optional(),
+    year: z
+      .number()
+      .int()
+      .min(1900)
+      .max(new Date().getFullYear() + 1)
+      .optional(),
+    version: z.string().optional(),
+    kilometraje: z
+      .any()
+      .transform((val) => {
+        if (val === '' || val === null || val === undefined) return undefined;
+        const num = typeof val === 'number' ? val : Number(val);
+        if (Number.isNaN(num) || num < 0) return undefined;
+        return Math.floor(num);
+      })
+      .optional(),
+    legal_status: z.nativeEnum(LegalStatusEnum).optional(),
+    basePrice: z
+      .any()
+      .transform((val) => {
+        if (val === '' || val === null || val === undefined) return undefined;
+        const num = typeof val === 'number' ? val : Number(val);
+        if (Number.isNaN(num) || num <= 0) return undefined;
+        return num;
+      })
+      .optional(),
+    photos: z.array(z.string()).optional(),
+    docs: z.array(z.string()).optional(),
+  })
+  .strict();
+
 export type ItemDto = z.infer<typeof itemSchema>;
+export type ItemWithSoldToUserDto = z.infer<typeof itemWithSoldToUserSchema>;
 export type ItemCreateDto = z.infer<typeof itemCreateSchema>;
+export type ItemEditDto = z.infer<typeof itemEditSchema>;

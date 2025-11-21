@@ -152,10 +152,11 @@ model Item {
   kilometraje  Int?
   legal_status LegalStatusEnum?
   state        ItemStateEnum @default(DISPONIBLE)
-  basePrice    Decimal? @db.Decimal(10, 2)
+  basePrice    Int? 
+  description  String?
 
   // Sale tracking fields
-  soldPrice    Decimal? @db.Decimal(10, 2)
+  soldPrice    Int?
   soldAt       DateTime?
   soldToUserId String?
   soldToUser   User? @relation("ItemSales", fields: [soldToUserId], references: [id], onDelete: SetNull)
@@ -185,7 +186,8 @@ model Auction {
   type        AuctionTypeEnum @default(REAL)
 
   // Global per-auction bid increment (applies to all items in this auction)
-  bidIncrement Decimal @default(50000) @db.Decimal(10, 2)
+  bidIncrement Int @default(50000)
+  itemIds      String[] @default([])
 
   // Relations
   tenantId             String
@@ -206,7 +208,7 @@ model AuctionItem {
   isDeleted   Boolean  @default(false)
   deletedAt   DateTime?
 
-  startingBid Decimal  @db.Decimal(10, 2)
+  startingBid Int
 
   // Relations
   auctionId   String
@@ -246,7 +248,7 @@ model Bid {
   deletedAt   DateTime?
 
   // Bid-specific fields matching TypeORM entity
-  offered_price Decimal  @db.Decimal(10, 2)
+  offered_price Int
   bid_time      DateTime @default(now())
 
   // Relations

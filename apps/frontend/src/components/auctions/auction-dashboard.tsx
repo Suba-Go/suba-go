@@ -13,29 +13,30 @@ import { AuctionCreateModal } from './auction-create-modal';
 import { AuctionEditModal } from './auction-edit-modal';
 import { AuctionCard } from './auction-card';
 import { useFetchData } from '@/hooks/use-fetch-data';
-import type { AuctionListItem, AuctionData } from '@/types/auction.types';
+import {
+  AuctionDto,
+  AuctionWithItemsAndBidsDto,
+} from '@suba-go/shared-validation';
+import { useRouter } from 'next-nprogress-bar';
 
 interface AuctionDashboardProps {
+  auctions: AuctionWithItemsAndBidsDto[];
+  isLoading: boolean;
+  error: Error;
   subdomain: string;
 }
 
-export function AuctionDashboard({ subdomain }: AuctionDashboardProps) {
+export function AuctionDashboard({
+  auctions,
+  isLoading,
+  error,
+  subdomain,
+}: AuctionDashboardProps) {
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
-  const [selectedAuction, setSelectedAuction] =
-    useState<AuctionListItem | null>(null);
-
-  // Fetch auctions data
-  const {
-    data: auctions,
-    isLoading,
-    error,
-    refetch,
-  } = useFetchData<AuctionListItem[]>({
-    url: `/api/auctions`,
-    key: ['auctions', subdomain],
-  });
-
+  const [selectedAuction, setSelectedAuction] = useState<AuctionDto | null>(
+    null
+  );
   // Fetch dashboard stats
   const { data: stats } = useFetchData<{
     totalAuctions: number;
@@ -46,9 +47,8 @@ export function AuctionDashboard({ subdomain }: AuctionDashboardProps) {
     url: `/api/auctions/stats`,
     key: ['auction-stats', subdomain],
   });
-
+  const router = useRouter();
   const handleAuctionCreated = () => {
-    refetch();
     setIsCreateModalOpen(false);
   };
 
@@ -56,7 +56,7 @@ export function AuctionDashboard({ subdomain }: AuctionDashboardProps) {
     return (
       <div className="text-center py-8">
         <p className="text-red-600">Error al cargar las subastas</p>
-        <Button onClick={() => refetch()} className="mt-4">
+        <Button onClick={() => router.refresh()} className="mt-4">
           Reintentar
         </Button>
       </div>
@@ -163,10 +163,9 @@ export function AuctionDashboard({ subdomain }: AuctionDashboardProps) {
             <AuctionCard
               key={auction.id}
               auction={auction}
-              subdomain={subdomain}
-              onUpdate={refetch}
+              onUpdate={() => null}
               onEdit={(auction) => {
-                setSelectedAuction(auction as AuctionListItem);
+                setSelectedAuction(auction);
                 setIsEditModalOpen(true);
               }}
             />
@@ -198,15 +197,16 @@ export function AuctionDashboard({ subdomain }: AuctionDashboardProps) {
       />
 
       {/* Edit Auction Modal */}
-      <AuctionEditModal
-        isOpen={isEditModalOpen}
-        onClose={() => setIsEditModalOpen(false)}
-        onSuccess={() => {
-          setIsEditModalOpen(false);
-          refetch();
-        }}
-        auction={selectedAuction as AuctionData}
-      />
+      {selectedAuction && (
+        <AuctionEditModal
+          isOpen={isEditModalOpen}
+          onClose={() => setIsEditModalOpen(false)}
+          onSuccess={() => {
+            setIsEditModalOpen(false);
+          }}
+          auction={selectedAuction}
+        />
+      )}
     </div>
   );
 }

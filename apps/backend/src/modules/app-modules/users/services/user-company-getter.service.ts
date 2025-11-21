@@ -1,5 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { UserPrismaRepository } from './user-prisma-repository.service';
+import { normalizeCompanyName } from '../../../../utils/company-normalization';
 
 // Define User with relations type for this service
 type UserWithRelations = {
@@ -28,14 +29,7 @@ export class UserCompanyGetterService {
       );
     }
 
-    // Check if company has a tenant
-    if (!user.company.tenant) {
-      throw new NotFoundException(
-        `La empresa del usuario ${userEmail} no tiene un tenant asignado`
-      );
-    }
-
-    // Return the lowercase company name (which is the subdomain)
-    return user.company.nameLowercase || user.company.name.toLowerCase();
+    // Return the normalized company name (which is the subdomain)
+    return normalizeCompanyName(user.company.name);
   }
 }

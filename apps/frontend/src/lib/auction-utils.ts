@@ -4,6 +4,8 @@
  * @author Suba&Go
  */
 
+import { UserRolesEnum } from '@suba-go/shared-validation';
+
 /**
  * Calculate the next minimum bid amount
  * Formula: max(currentHigh, startingBid) + bidIncrement
@@ -58,5 +60,5 @@ export function parseDocs(docsJson: string | null | undefined): string[] {
  * Check if user has USER role
  */
 export function isUserRole(role: string | null | undefined): boolean {
-  return role === 'USER';
+  return role === UserRolesEnum.USER;
 }

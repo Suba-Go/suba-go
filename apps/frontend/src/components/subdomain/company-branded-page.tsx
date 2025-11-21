@@ -6,12 +6,10 @@ import { UserHomePage } from './user-home-page';
 
 interface CompanyBrandedPageProps {
   company: CompanyDto;
-  subdomain?: string;
 }
 
 export default function CompanyBrandedPage({
   company,
-  subdomain,
 }: CompanyBrandedPageProps) {
   const { data: session } = useSession();
   const userRole = session?.user?.role;
@@ -19,7 +17,7 @@ export default function CompanyBrandedPage({
 
   // If user is logged in and is a regular USER, show the user home page
   if (session && userRole === 'USER') {
-    return <UserHomePage company={company} subdomain={subdomain || ''} />;
+    return <UserHomePage company={company} />;
   }
 
   // For AUCTION_MANAGER or not logged in, show "under development" page

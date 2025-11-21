@@ -7,19 +7,22 @@
 import { TrendingUp, User } from 'lucide-react';
 import { ScrollArea } from '@suba-go/shared-components/components/ui/scroll-area';
 
-interface Bid {
+type AnyBid = {
   id?: string;
-  amount?: number;
   offered_price?: number;
+  amount?: number;
   userId?: string;
   userName?: string;
+  bid_time?: string | Date;
+  createdAt?: string | Date;
   user?: {
-    public_name?: string;
+    public_name?: string | null;
+    email?: string | null;
   };
-}
+};
 
 interface ItemBidHistoryProps {
-  bids: Bid[];
+  bids: AnyBid[];
   currentUserId?: string;
   maxItems?: number;
   title?: string;
@@ -47,32 +50,37 @@ export function ItemBidHistory({
 
   // Remove duplicates based on id
   const uniqueBids = bids.reduce((acc, bid) => {
-    // If bid has an id, use it for deduplication
+    const amount = bid.offered_price ?? bid.amount ?? 0;
+    const ts =
+      (bid as { timestamp?: number }).timestamp ??
+      (bid.bid_time ? new Date(bid.bid_time).getTime() : undefined) ??
+      (bid.createdAt ? new Date(bid.createdAt).getTime() : undefined);
+
     if (bid.id) {
-      if (!acc.some((b) => b.id === bid.id)) {
-        acc.push(bid);
+      if (!acc.some((b) => b.id === bid.id)) acc.push({ ...bid, amount, ts });
+    } else if (bid.userId) {
+      if (
+        !acc.some(
+          (b) =>
+            b.userId === bid.userId &&
+            (b.offered_price ?? (b as AnyBid).amount ?? 0) === amount
+        )
+      ) {
+        acc.push({ ...bid, amount, ts });
       }
     } else {
-      // Fallback: if no id, use combination of userId + amount + timestamp
-      const amount = bid.amount || bid.offered_price || 0;
-      if (
-        !acc.some((b) => {
-          const existingAmount = b.amount || b.offered_price || 0;
-          return b.userId === bid.userId && existingAmount === amount;
-        })
-      ) {
-        acc.push(bid);
-      }
+      acc.push({ ...bid, amount, ts });
     }
 
     return acc;
-  }, [] as Bid[]);
+  }, [] as (AnyBid & { amount: number; ts?: number })[]);
 
   // Sort bids by amount (highest first)
   const sortedBids = [...uniqueBids].sort((a, b) => {
-    const amountA = a.amount || a.offered_price || 0;
-    const amountB = b.amount || b.offered_price || 0;
-    return amountB - amountA;
+    const amountA = a.amount ?? a.offered_price ?? 0;
+    const amountB = b.amount ?? b.offered_price ?? 0;
+    if (amountB !== amountA) return amountB - amountA;
+    return (b.ts ?? 0) - (a.ts ?? 0);
   });
 
   const displayBids = maxItems ? sortedBids.slice(0, maxItems) : sortedBids;
@@ -86,13 +94,19 @@ export function ItemBidHistory({
       <ScrollArea className={`${maxHeight} overflow-y-auto`}>
         <div className="space-y-2">
           {displayBids.map((bid, index) => {
-            const amount = bid.amount || bid.offered_price || 0;
-            const userName = bid.userName || bid.user?.public_name || 'Usuario';
+            const amount = bid.amount ?? bid.offered_price ?? 0;
+            const userName =
+              bid.user?.public_name ||
+              bid.user?.email ||
+              bid.userName ||
+              'Usuario';
             const isCurrentUser = bid.userId === currentUserId;
             const isWinning = index === 0;
 
             // Create unique key based on bid content to avoid duplicates
-            const uniqueKey = `${bid.userId || 'unknown'}-${amount}-${index}`;
+            const uniqueKey = bid.id
+              ? bid.id
+              : `${bid.userId || 'unknown'}-${amount}-${index}`;
 
             return (
               <div

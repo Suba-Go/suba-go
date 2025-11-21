@@ -3,10 +3,14 @@ import {
   ConflictException,
   BadRequestException,
 } from '@nestjs/common';
-import { CompanyCreateDto } from '@suba-go/shared-validation';
-import type { Company } from '@prisma/client';
+import type { Company, Prisma } from '@prisma/client';
 import { CompanyPrismaRepository } from './company-prisma-repository.service';
 import { TenantPrismaRepository } from '../../tenants/services/tenant-prisma-repository.service';
+import { normalizeCompanyName } from '../../../../utils/company-normalization';
+import {
+  CompanyCreateCompactDto,
+  CompanyWithTenantDto,
+} from '@suba-go/shared-validation';
 
 @Injectable()
 export class CompanyCreatorService {
@@ -16,9 +20,9 @@ export class CompanyCreatorService {
   ) {}
 
   async createCompany(
-    companyData: CompanyCreateDto,
+    companyData: CompanyCreateCompactDto,
     tenantId?: string
-  ): Promise<Company> {
+  ): Promise<CompanyWithTenantDto> {
     let tenant = null;
 
     if (tenantId) {
@@ -41,21 +45,20 @@ export class CompanyCreatorService {
         );
       }
     }
+    const tenantToConnectId = tenant?.id ?? tenantId;
+    if (!tenantToConnectId) {
+      throw new BadRequestException(
+        'El tenantId es requerido para crear empresa'
+      );
+    }
 
-    // Create company with lowercase name for case-insensitive subdomain lookup
+    // Create company with normalized name for case-insensitive subdomain lookup
     return await this.companyRepository.create({
       name: companyData.name,
-      nameLowercase: companyData.name.toLowerCase(),
-      logo: companyData.logo,
+      nameLowercase: normalizeCompanyName(companyData.name),
       principal_color: companyData.principal_color,
-      principal_color2: companyData.principal_color2,
-      secondary_color: companyData.secondary_color,
-      secondary_color2: companyData.secondary_color2,
-      secondary_color3: companyData.secondary_color3,
-      tenant: tenant
-        ? { connect: { id: tenant.id } }
-        : { connect: { id: tenantId } },
-    });
+      tenant: { connect: { id: tenantToConnectId } },
+    } as Prisma.CompanyCreateInput);
   }
 
   async getCompaniesByTenant(tenantId: string): Promise<Company[]> {

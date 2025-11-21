@@ -7,6 +7,7 @@ import type {
   AuctionTypeEnum,
   AuctionStatusEnum,
 } from '@prisma/client';
+import { AuctionDto } from '@suba-go/shared-validation';
 
 @Injectable()
 export class AuctionPrismaService {
@@ -21,25 +22,10 @@ export class AuctionPrismaService {
     tenantId: string;
     type?: AuctionTypeEnum;
     bidIncrement?: number;
-  }): Promise<Auction> {
+    itemIds?: string[];
+  }): Promise<AuctionDto> {
     return this.prisma.auction.create({
       data,
-      include: {
-        tenant: true,
-        items: {
-          include: {
-            item: true,
-            bids: {
-              include: {
-                user: true,
-              },
-              orderBy: {
-                offered_price: 'desc',
-              },
-            },
-          },
-        },
-      },
     });
   }
 
@@ -256,7 +242,6 @@ export class AuctionPrismaService {
               },
             },
             bids: {
-              take: 1,
               orderBy: {
                 offered_price: 'desc',
               },
@@ -310,31 +295,10 @@ export class AuctionPrismaService {
       type?: AuctionTypeEnum;
       bidIncrement?: number;
     }
-  ): Promise<Auction> {
+  ): Promise<AuctionDto> {
     return this.prisma.auction.update({
       where: { id },
       data,
-      include: {
-        tenant: true,
-        items: {
-          include: {
-            item: true,
-            bids: {
-              include: {
-                user: {
-                  select: {
-                    id: true,
-                    email: true,
-                  },
-                },
-              },
-              orderBy: {
-                createdAt: 'desc',
-              },
-            },
-          },
-        },
-      },
     });
   }
 
@@ -467,6 +431,7 @@ export class AuctionPrismaService {
         },
       },
     });
+    console.log('adding items to auctions', auctionId, items);
     const auctionItems = items.map((item) => ({
       auctionId,
       itemId: item.id,

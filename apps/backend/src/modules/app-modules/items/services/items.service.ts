@@ -149,8 +149,8 @@ export class ItemsService {
   async getItemStats(tenantId: string): Promise<ItemStatsDto> {
     const [totalItems, availableItems, inAuctionItems] = await Promise.all([
       this.itemRepository.count(tenantId),
-      this.itemRepository.findByState('DISPONIBLE', tenantId),
-      this.itemRepository.findByState('EN_SUBASTA', tenantId),
+      this.itemRepository.findByState(ItemStateEnum.DISPONIBLE, tenantId),
+      this.itemRepository.findByState(ItemStateEnum.EN_SUBASTA, tenantId),
     ]);
 
     return {
@@ -173,5 +173,9 @@ export class ItemsService {
     await this.getItemById(id, tenantId); // Validate access
 
     return this.itemRepository.update(id, { state: state as ItemStateEnum });
+  }
+
+  async getItemsSoldToUser(userId: string, tenantId: string): Promise<Item[]> {
+    return this.itemRepository.findSoldToUser(userId, tenantId);
   }
 }

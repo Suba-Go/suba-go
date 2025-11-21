@@ -16,7 +16,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     }
 
     // Get tenant from user session
-    const tenantId = session.user.tenant?.id;
+    const tenantId = session.user.tenantId;
     if (!tenantId) {
       return NextResponse.json(
         { error: 'Usuario sin tenant' },
@@ -80,7 +80,7 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
     }
 
     // Get tenant from user session
-    const tenantId = session.user.tenant?.id;
+    const tenantId = session.user.tenantId;
     if (!tenantId) {
       return NextResponse.json(
         { error: 'Usuario sin tenant' },
@@ -135,7 +135,7 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
     }
 
     // Get tenant from user session
-    const tenantId = session.user.tenant?.id;
+    const tenantId = session.user.tenantId;
     if (!tenantId) {
       return NextResponse.json(
         { error: 'Usuario sin tenant' },

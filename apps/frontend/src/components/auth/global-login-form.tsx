@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { Button } from '@suba-go/shared-components/components/ui/button';
-import { Input } from '@suba-go/shared-components/components/ui/input';
+import { FormattedInput } from '@/components/ui/formatted-input';
 import { Label } from '@suba-go/shared-components/components/ui/label';
 import { useToast } from '@suba-go/shared-components/components/ui/toaster';
 import { getNodeEnv } from '@suba-go/shared-components';
@@ -21,10 +21,10 @@ export default function GlobalLoginForm() {
 
   const validateForm = (): boolean => {
     const newErrors: { email?: string } = {};
-
-    if (!email.trim()) {
+    const normalized = email.trim().toLowerCase();
+    if (!normalized) {
       newErrors.email = 'El email es requerido';
-    } else if (!validateEmail(email)) {
+    } else if (!validateEmail(normalized)) {
       newErrors.email = 'Formato de email inválido';
     }
 
@@ -43,8 +43,9 @@ export default function GlobalLoginForm() {
 
     try {
       // Call backend to find user's company
+      const emailNormalized = email.trim().toLowerCase();
       const response = await fetch(
-        `/api/users/company-by-email?email=${encodeURIComponent(email)}`
+        `/api/users/company-by-email?email=${encodeURIComponent(emailNormalized)}`
       );
 
       if (!response.ok) {
@@ -69,18 +70,18 @@ export default function GlobalLoginForm() {
           // Local: http://{company}.localhost:3000/login
           companyLoginUrl = `http://${
             data.data.companyDomain
-          }.localhost:3000/login?email=${encodeURIComponent(email)}`;
+          }.localhost:3000/login?email=${encodeURIComponent(emailNormalized)}`;
         } else if (nodeEnv === 'development') {
           // Development: https://{company}.development.subago.cl
           companyLoginUrl = `https://${
             data.data.companyDomain
-          }.development.subago.cl/login?email=${encodeURIComponent(email)}`;
+          }.development.subago.cl/login?email=${encodeURIComponent(emailNormalized)}`;
         } else {
           // Production: https://{company}.subago.cl
           const rootDomain = process.env.NEXT_PUBLIC_ROOT_DOMAIN || 'subago.cl';
           companyLoginUrl = `https://${
             data.data.companyDomain
-          }.${rootDomain}/login?email=${encodeURIComponent(email)}`;
+          }.${rootDomain}/login?email=${encodeURIComponent(emailNormalized)}`;
         }
 
         toast({
@@ -122,13 +123,15 @@ export default function GlobalLoginForm() {
       <form onSubmit={handleSubmit} className="space-y-6">
         <div className="space-y-2">
           <Label htmlFor="email">Email</Label>
-          <Input
+          <FormattedInput
             id="email"
             type="email"
             placeholder="tu@email.com"
             value={email}
-            onChange={(e) => {
-              setEmail(e.target.value);
+            formatType="email"
+            onChange={(val) => {
+              const v = (val ?? '').toString();
+              setEmail(v);
               if (errors.email) {
                 setErrors({ ...errors, email: undefined });
               }
