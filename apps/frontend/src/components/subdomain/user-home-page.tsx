@@ -153,7 +153,8 @@ export function UserHomePage({ company }: UserHomePageProps) {
                         <div className="aspect-video bg-gray-100 rounded-lg overflow-hidden mb-3">
                           <Image
                             src={photoUrl}
-                            fill
+                            height={40}
+                            width={40}
                             alt={`${item.brand} ${item.model}`}
                             className="w-full h-full object-cover"
                           />

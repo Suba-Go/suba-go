@@ -5,6 +5,7 @@
  */
 'use client';
 
+import { useCallback } from 'react';
 import { useFetchData } from '@/hooks/use-fetch-data';
 import { AuctionDetail } from './auction-detail';
 import { AuctionActiveBiddingView } from './user-view/auction-active-bidding-view';
@@ -43,21 +44,32 @@ export function AuctionViewRouter({
     data: auction,
     isLoading: isLoadingAuction,
     error: errorAuction,
+    refetch: refetchAuction,
   } = useFetchData<AuctionDto>({
     url: `/api/auctions/${auctionId}`,
     key: ['auction', auctionId],
     revalidateOnMount: true,
+    refreshInterval: 5,
+    dedupingInterval: 0,
   });
 
   const {
     data: auctionItems,
     isLoading: isLoadingAuctionItems,
     error: errorAuctionItems,
+    refetch: refetchAuctionItems,
   } = useFetchData<AuctionItemWithItmeAndBidsDto[]>({
     url: `/api/auction-items/${auctionId}`,
     key: ['auctionItems', auctionId],
     revalidateOnMount: true,
+    refreshInterval: 5,
+    dedupingInterval: 0,
   });
+
+  const handleRealtimeSnapshot = useCallback(() => {
+    refetchAuction();
+    refetchAuctionItems();
+  }, [refetchAuction, refetchAuctionItems]);
 
   if (isLoadingAuction || isLoadingAuctionItems) {
     return <AuctionDetailSkeleton />;
@@ -82,6 +94,7 @@ export function AuctionViewRouter({
         userId={userId}
         accessToken={accessToken}
         tenantId={tenantId}
+        onRealtimeSnapshot={handleRealtimeSnapshot}
       />
     );
   }
@@ -119,6 +132,7 @@ export function AuctionViewRouter({
             accessToken={accessToken}
             tenantId={tenantId}
             userId={userId}
+            onRealtimeSnapshot={handleRealtimeSnapshot}
           />
         );
 
@@ -153,6 +167,7 @@ export function AuctionViewRouter({
             userId={userId}
             accessToken={accessToken}
             tenantId={tenantId}
+            onRealtimeSnapshot={handleRealtimeSnapshot}
           />
         );
     }
@@ -167,6 +182,7 @@ export function AuctionViewRouter({
       userId={userId}
       accessToken={accessToken}
       tenantId={tenantId}
+      onRealtimeSnapshot={handleRealtimeSnapshot}
     />
   );
 }

@@ -21,6 +21,7 @@ export default function SubastasPage({
     url: `/api/auctions`,
     key: ['auctions', subdomain],
     revalidateOnMount: true,
+    refreshInterval: 3,
   });
 
   if (!auctions || error) return;

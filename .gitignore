@@ -47,7 +47,6 @@ out
 
 # Prisma
 **/generated/prisma-client
-**/prisma/migrations
 .cursor/rules/nx-rules.mdc
 .github/instructions/nx.instructions.md
 .cursor
