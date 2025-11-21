@@ -311,18 +311,18 @@ export function AuctionDetail({
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center gap-4">
+      <div className="flex flex-col md:flex-row md:items-center gap-4">
         <Button
           variant="ghost"
           size="sm"
           onClick={() => router.back()}
-          className="gap-2"
+          className="gap-2 self-start"
         >
           <ArrowLeft className="h-4 w-4" />
           Volver
         </Button>
         <div className="flex-1">
-          <div className="flex items-center gap-3 mb-2">
+          <div className="flex items-center gap-3 mb-2 flex-wrap">
             <h1 className="text-2xl font-bold text-gray-900">
               {auction.title}
             </h1>
@@ -350,7 +350,7 @@ export function AuctionDetail({
 
         {/* Action buttons for auction managers */}
         {userRole === 'AUCTION_MANAGER' && (
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-4 md:flex-shrink-0 order-3 md:order-2">
             {/* Show message for completed auctions */}
             {auction.status === 'COMPLETADA' ? (
               <Button

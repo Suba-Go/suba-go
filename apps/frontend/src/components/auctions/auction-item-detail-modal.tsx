@@ -76,8 +76,19 @@ export function AuctionItemDetailModal({
   const [currentPhotoIndex, setCurrentPhotoIndex] = useState(0);
   const [photoCount, setPhotoCount] = useState(0);
   const [bidAmount, setBidAmount] = useState(currentHighestBid + bidIncrement);
+  const [isMobile, setIsMobile] = useState(false);
 
   const item = auctionItem.item;
+
+  // Detect mobile device
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.matchMedia('(max-width: 768px)').matches);
+    };
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
 
   // Update bid amount when currentHighestBid changes
   useEffect(() => {
@@ -97,26 +108,33 @@ export function AuctionItemDetailModal({
   }, [photoCarouselApi]);
 
   useEffect(() => {
-    if (!photoCarouselApi) return;
+    if (!photoCarouselApi || isMobile) return;
 
     const carouselNode = photoCarouselApi.rootNode() as HTMLElement;
     if (!carouselNode) return;
 
+    const viewport = photoCarouselApi.containerNode() as HTMLElement;
+    
+    if (!viewport) return;
+
     const preventHorizontalScroll = (e: WheelEvent) => {
-      if (Math.abs(e.deltaX) > Math.abs(e.deltaY)) {
+      if (Math.abs(e.deltaX) > Math.abs(e.deltaY) && Math.abs(e.deltaX) > 5) {
         e.preventDefault();
         e.stopPropagation();
+        return false;
       }
     };
 
     if (window.matchMedia('(pointer: fine)').matches) {
       carouselNode.addEventListener('wheel', preventHorizontalScroll, { passive: false });
+      viewport.addEventListener('wheel', preventHorizontalScroll, { passive: false });
     }
 
     return () => {
       carouselNode.removeEventListener('wheel', preventHorizontalScroll);
+      viewport.removeEventListener('wheel', preventHorizontalScroll);
     };
-  }, [photoCarouselApi]);
+  }, [photoCarouselApi, isMobile]);
 
   const handleDownload = (url: string, filename: string) => {
     const link = document.createElement('a');
@@ -191,15 +209,17 @@ export function AuctionItemDetailModal({
                     align: 'start',
                     dragFree: false,
                     containScroll: 'trimSnaps',
-                    watchDrag: false,
+                    // Enable drag only on mobile, disable on desktop
+                    watchDrag: isMobile,
                     skipSnaps: false,
                   }}
                 >
                   <CarouselContent 
                     className="-ml-0"
                     style={{
-                      touchAction: 'pan-y',
-                      overscrollBehaviorX: 'none',
+                      // Allow touch scroll on mobile, prevent on desktop
+                      touchAction: isMobile ? 'pan-x' : 'pan-y',
+                      overscrollBehaviorX: isMobile ? 'auto' : 'none',
                     }}
                   >
                     {photoUrls.map((url: string, index: number) => (
@@ -209,17 +229,19 @@ export function AuctionItemDetailModal({
                             src={url}
                             fill
                             alt={`Foto ${index + 1}`}
-                            className="object-contain select-none pointer-events-none"
+                            className="object-contain select-none"
                             draggable={false}
+                            style={{ pointerEvents: isMobile ? 'auto' : 'none' }}
                           />
                         </div>
                       </CarouselItem>
                     ))}
                   </CarouselContent>
+                  {/* Show arrows only on desktop/laptop, hide on mobile */}
                   {photoUrls.length > 1 && (
                     <>
-                      <CarouselPrevious className="left-2 md:left-4 z-20 opacity-100" />
-                      <CarouselNext className="right-2 md:right-4 z-20 opacity-100" />
+                      <CarouselPrevious className="left-2 md:left-4 z-20 hidden md:flex" />
+                      <CarouselNext className="right-2 md:right-4 z-20 hidden md:flex" />
                     </>
                   )}
                 </Carousel>
@@ -410,3 +432,4 @@ export function AuctionItemDetailModal({
     </Dialog>
   );
 }
+
