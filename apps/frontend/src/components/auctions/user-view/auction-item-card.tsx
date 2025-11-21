@@ -17,9 +17,10 @@ import { BidInput } from './bid-input';
 import { AutoBidToggle } from './auto-bid-toggle';
 import { ItemBidHistory } from './item-bid-history';
 import type { AutoBidSetting } from '@/hooks/use-auto-bid-settings';
+import { AuctionItemWithItmeAndBidsDto } from '@suba-go/shared-validation';
 
 interface AuctionItemCardProps {
-  auctionItem: any;
+  auctionItem: AuctionItemWithItmeAndBidsDto;
   currentHighest: number;
   minNextBid: number;
   bidIncrement: number;
@@ -140,10 +141,21 @@ export function AuctionItemCard({
         )}
 
         {/* Bid Increment Info */}
-        <div className="flex items-center gap-2 text-sm text-gray-600">
-          <TrendingUp className="h-4 w-4" />
-          <span>Incremento mínimo: {formatCurrency(bidIncrement)}</span>
-        </div>
+        {(() => {
+          const numericValue = Number(bidState.amount) || 0;
+          const isValidBid = numericValue >= minNextBid;
+          const textColorClass = isValidBid ? 'text-gray-600' : 'text-red-600';
+          const iconClass = `${isValidBid ? '' : 'text-red-600'} h-4 w-4`;
+
+          return (
+            <div
+              className={`flex items-center gap-2 text-sm ${textColorClass}`}
+            >
+              <TrendingUp className={iconClass} />
+              <span>Incremento mínimo: {formatCurrency(bidIncrement)}</span>
+            </div>
+          );
+        })()}
 
         {/* Bid History - Show last 5 bids */}
         {(bidHistory.length > 0 ||

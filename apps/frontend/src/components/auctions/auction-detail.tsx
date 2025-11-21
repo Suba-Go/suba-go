@@ -67,6 +67,7 @@ interface AuctionDetailProps {
   userId?: string;
   accessToken?: string;
   tenantId?: string;
+  onRealtimeSnapshot?: () => void;
 }
 
 export function AuctionDetail({
@@ -75,6 +76,7 @@ export function AuctionDetail({
   userRole,
   accessToken,
   tenantId,
+  onRealtimeSnapshot,
 }: AuctionDetailProps) {
   const router = useRouter();
   const { toast } = useToast();
@@ -185,6 +187,7 @@ export function AuctionDetail({
             if (message.data.participantCount) {
               setLiveParticipantCount(message.data.participantCount);
             }
+            onRealtimeSnapshot?.();
             break;
 
           case 'PARTICIPANT_COUNT':
@@ -203,6 +206,8 @@ export function AuctionDetail({
             //   ...prev.slice(0, 19), // Keep last 20 bids
             // ]);
             // Refetch auction data to update highest bids
+            refetchParticipants();
+            router.refresh();
             break;
 
           case 'AUCTION_STATUS_CHANGED':
@@ -231,7 +236,17 @@ export function AuctionDetail({
       wsRef.current = null;
       connectionAttemptedRef.current = false;
     };
-  }, [userRole, accessToken, tenantId, auction, auction.id]);
+  }, [
+    userRole,
+    accessToken,
+    tenantId,
+    auction,
+    auction.id,
+    participants,
+    refetchParticipants,
+    router,
+    onRealtimeSnapshot,
+  ]);
 
   const handleCancelToggle = async (checked: boolean) => {
     try {

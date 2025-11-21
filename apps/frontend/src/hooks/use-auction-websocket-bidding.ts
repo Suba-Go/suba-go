@@ -32,6 +32,7 @@ interface UseAuctionWebSocketBiddingProps {
   onBidRejected?: (data: { auctionItemId: string; reason: string }) => void;
   onTimeExtension?: (data: TimeExtensionData) => void;
   onStatusChanged?: (status: string) => void;
+  onJoined?: () => void;
 }
 
 interface UseAuctionWebSocketBiddingReturn {
@@ -61,6 +62,7 @@ export function useAuctionWebSocketBidding({
   onBidRejected,
   onTimeExtension,
   onStatusChanged,
+  onJoined,
 }: UseAuctionWebSocketBiddingProps): UseAuctionWebSocketBiddingReturn {
   const wsRef = useRef<WebSocket | null>(null);
   const connectionKey = `${tenantId}:${auctionId}`;
@@ -134,6 +136,7 @@ export function useAuctionWebSocketBidding({
             if (message.data.participantCount) {
               setParticipantCount(message.data.participantCount);
             }
+            onJoined?.();
             break;
 
           case 'PARTICIPANT_COUNT':
