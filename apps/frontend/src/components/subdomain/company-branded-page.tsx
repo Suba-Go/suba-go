@@ -26,7 +26,7 @@ export default function CompanyBrandedPage({
   // For AUCTION_MANAGER or not logged in, show "under development" page
   return (
     <div
-      className="min-h-screen"
+      className="min-h-screen relative"
       style={
         {
           '--primary-color': primaryColor,
@@ -34,6 +34,18 @@ export default function CompanyBrandedPage({
         } as React.CSSProperties
       }
     >
+      {/* Background logo if enabled */}
+      {company.background_logo_enabled && company.logo && (
+        <div
+          className="absolute inset-0 bg-repeat opacity-5 pointer-events-none"
+          style={{
+            backgroundImage: `url(${company.logo})`,
+            backgroundSize: '200px 200px',
+            backgroundPosition: 'center',
+          }}
+        />
+      )}
+
       {/* Custom CSS variables for the company colors */}
       <style jsx>{`
         :root {
@@ -43,14 +55,33 @@ export default function CompanyBrandedPage({
         }
       `}</style>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 relative z-10">
         <div className="text-center">
+          {/* Company logo */}
+          {company.logo && !company.background_logo_enabled && (
+            <div className="mb-6 flex justify-center">
+              <img
+                src={company.logo}
+                alt={`${company.name} logo`}
+                className="h-24 object-contain"
+              />
+            </div>
+          )}
+
           <h2
             className="text-4xl font-bold mb-4"
             style={{ color: primaryColor }}
           >
             Bienvenido a {company.name}
           </h2>
+
+          {/* Subtitle/Mission */}
+          {company.subtitle && (
+            <p className="text-xl text-gray-700 mb-4 italic max-w-2xl mx-auto">
+              {company.subtitle}
+            </p>
+          )}
+
           <p className="text-xl text-gray-600 mb-8">
             {userRole === 'AUCTION_MANAGER'
               ? 'Página en desarrollo para administradores'

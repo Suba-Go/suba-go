@@ -7,7 +7,7 @@ import { getNodeEnv } from '@suba-go/shared-components';
 import { Button } from '@suba-go/shared-components/components/ui/button';
 import { useSession, signOut } from 'next-auth/react';
 import { useEffect, useState } from 'react';
-import { User, LogOut, ChevronDown, Gavel, Package, Users } from 'lucide-react';
+import { User, LogOut, ChevronDown, Gavel, Package, Users, MessageSquare } from 'lucide-react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { Spinner } from '@suba-go/shared-components/components/ui/spinner';
@@ -123,6 +123,18 @@ export default function CompanyNavbar({
                 >
                   <Users className="h-4 w-4" />
                   Usuarios
+                </Button>
+              </Link>
+            )}
+            {/* Feedback - Only for AUCTION_MANAGER */}
+            {session?.user?.role === 'AUCTION_MANAGER' && (
+              <Link href={`/s/${subdomain}/feedback`}>
+                <Button
+                  variant="ghost"
+                  className="text-gray-600 hover:text-gray-900 flex items-center gap-2"
+                >
+                  <MessageSquare className="h-4 w-4" />
+                  Feedback
                 </Button>
               </Link>
             )}

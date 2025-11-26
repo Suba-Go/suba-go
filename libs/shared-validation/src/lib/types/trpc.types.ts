@@ -15,6 +15,7 @@ export const userCreateInputSchema = z.object({
 export const companyCreateInputSchema = z.object({
   name: z.string(),
   logo: z.string().nullable().optional(),
+  background_logo_enabled: z.boolean().optional().default(false),
   principal_color: z.string().nullable().optional(),
   principal_color2: z.string().nullable().optional(),
   secondary_color: z.string().nullable().optional(),
@@ -39,6 +40,7 @@ export const connectUserInputSchema = z.object({
     id: z.string(),
     name: z.string(),
     nameLowercase: z.string(),
+    background_logo_enabled: z.boolean().optional().default(false),
   }),
 });
 

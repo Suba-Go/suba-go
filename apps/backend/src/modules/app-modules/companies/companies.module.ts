@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { CompaniesController } from './companies.controller';
 import { CompanyCreatorService } from './services/company-creator.service';
 import { CompanyGetterService } from './services/company-getter.service';
+import { CompanyUpdaterService } from './services/company-updater.service';
 import { CompanyPrismaRepository } from './services/company-prisma-repository.service';
 import { TenantPrismaRepository } from '../tenants/services/tenant-prisma-repository.service';
 
@@ -11,12 +12,14 @@ import { TenantPrismaRepository } from '../tenants/services/tenant-prisma-reposi
   providers: [
     CompanyCreatorService,
     CompanyGetterService,
+    CompanyUpdaterService,
     CompanyPrismaRepository,
     TenantPrismaRepository,
   ],
   exports: [
     CompanyCreatorService,
     CompanyGetterService,
+    CompanyUpdaterService,
     CompanyPrismaRepository,
     TenantPrismaRepository,
   ],

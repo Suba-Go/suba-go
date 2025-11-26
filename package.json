@@ -14,6 +14,7 @@
     "db:push": "prisma db push --schema=apps/backend/prisma/schema.prisma",
     "db:migrate": "prisma migrate dev --schema=apps/backend/prisma/schema.prisma",
     "db:generate": "prisma generate --schema=apps/backend/prisma/schema.prisma",
+    "db:seed": "prisma db seed --schema=apps/backend/prisma/schema.prisma",
     "backend:start": "nx run backend:serve",
     "backend:build": "nx run backend:build",
     "frontend:start": "nx run frontend:serve",
@@ -134,5 +135,8 @@
   },
   "optionalDependencies": {
     "bufferutil": "^4.0.9"
+  },
+  "prisma": {
+    "seed": "ts-node apps/backend/prisma/seed.ts"
   }
 }

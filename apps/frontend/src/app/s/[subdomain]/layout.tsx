@@ -73,12 +73,33 @@ export default async function SubdomainLayout({
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Company Navbar - Conditionally included (not in login) */}
-      <ConditionalNavbar company={company} subdomain={subdomain} />
+    <div 
+      className="min-h-screen bg-gray-50 relative"
+      style={
+        company.background_logo_enabled && company.logo
+          ? {
+              backgroundImage: `url(${company.logo})`,
+              backgroundRepeat: 'no-repeat',
+              backgroundPosition: 'center center',
+              backgroundSize: '40%',
+              backgroundAttachment: 'fixed',
+            }
+          : undefined
+      }
+    >
+      {/* Overlay to make background logo more subtle */}
+      {company.background_logo_enabled && company.logo && (
+        <div className="fixed inset-0 bg-gray-50/90 pointer-events-none z-0" />
+      )}
 
-      {/* Page content */}
-      {children}
+      {/* Content wrapper with higher z-index */}
+      <div className="relative z-10">
+        {/* Company Navbar - Conditionally included (not in login) */}
+        <ConditionalNavbar company={company} subdomain={subdomain} />
+
+        {/* Page content */}
+        {children}
+      </div>
     </div>
   );
 }

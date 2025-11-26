@@ -86,6 +86,10 @@ export class PrismaService implements OnModuleInit, OnModuleDestroy {
     return this.prisma.auditLog;
   }
 
+  get feedback() {
+    return this.prisma.feedback;
+  }
+
   // Health check method
   async healthCheck(): Promise<boolean> {
     try {

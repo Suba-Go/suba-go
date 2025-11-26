@@ -10,6 +10,7 @@ import { AuctionsModule } from './modules/app-modules/auctions/auctions.module';
 import { ItemsModule } from './modules/app-modules/items/items.module';
 import { ParticipantsModule } from './modules/app-modules/participants/participants.module';
 import { BidsModule } from './modules/app-modules/bids/bids.module';
+import { FeedbackModule } from './modules/app-modules/feedback/feedback.module';
 import { MultiStepFormModule } from './modules/app-modules/multi-step-form/multi-step-form.module';
 import { TrpcModule } from './trpc/trpc.module';
 import { RealtimeModule } from './modules/providers-modules/realtime/realtime.module';
@@ -29,6 +30,7 @@ import { RealtimeModule } from './modules/providers-modules/realtime/realtime.mo
     ItemsModule,
     ParticipantsModule,
     BidsModule,
+    FeedbackModule,
     MultiStepFormModule,
     TrpcModule,
     RealtimeModule, // Native WebSocket with double handshake

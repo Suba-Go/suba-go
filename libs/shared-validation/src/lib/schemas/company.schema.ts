@@ -9,12 +9,15 @@ export const companySchema = baseSchema
   .extend({
     name: name,
     nameLowercase: z.string(), // Lowercase version for case-insensitive subdomain lookup
+    subtitle: z.string().nullable().optional(),
     logo: z.string().nullable().optional(),
+    background_logo_enabled: z.boolean().optional().default(false),
     principal_color: z.string().nullable().optional(),
     principal_color2: z.string().nullable().optional(),
     secondary_color: z.string().nullable().optional(),
     secondary_color2: z.string().nullable().optional(),
     secondary_color3: z.string().nullable().optional(),
+    rut: z.string().nullable().optional(),
   })
   .strict();
 
@@ -31,3 +34,18 @@ export const companyCreateSchema = companySchema
 
 export type CompanyDto = z.infer<typeof companySchema>;
 export type CompanyCreateDto = z.infer<typeof companyCreateSchema>;
+
+// Update schema allows partial updates
+export const companyUpdateSchema = companySchema
+  .omit({
+    id: true,
+    createdAt: true,
+    updatedAt: true,
+    deletedAt: true,
+    is_deleted: true,
+    nameLowercase: true,
+  })
+  .partial()
+  .strict();
+
+export type CompanyUpdateDto = z.infer<typeof companyUpdateSchema>;
