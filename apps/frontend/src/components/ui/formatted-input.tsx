@@ -65,7 +65,7 @@ export function FormattedInput({
           setDisplayValue(formatPrice(value));
           break;
         case 'rut':
-          setDisplayValue(formatRut(value.toString()))
+          setDisplayValue(formatRut(value.toString()));
           break;
         case 'phone':
           setDisplayValue(formatPhoneChile(value.toString()));
@@ -87,6 +87,9 @@ export function FormattedInput({
     formatNumberWithSeparators,
     formatSimpleNumber,
     formatPrice,
+    formatEmailLower,
+    formatPhoneChile,
+    formatRut,
   ]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -139,7 +142,7 @@ export function FormattedInput({
 
       case 'phone': {
         formattedValue = formatPhoneChile(inputValue);
-        parsedValue = formattedValue; // return formatted string; who consumes can clean if needed  
+        parsedValue = formattedValue; // return formatted string; who consumes can clean if needed
         break;
       }
 
