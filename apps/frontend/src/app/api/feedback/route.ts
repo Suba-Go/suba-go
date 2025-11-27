@@ -81,7 +81,7 @@ export async function GET() {
     let deserializedData = data;
     if (data && data.superjson) {
       try {
-        deserializedData = superjson.deserialize(data.superjson);
+        deserializedData = JSON.parse(JSON.stringify(data.superjson));
       } catch (error) {
         console.error('Failed to deserialize superjson response:', error);
         deserializedData = data;

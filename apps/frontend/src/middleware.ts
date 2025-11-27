@@ -24,7 +24,7 @@ export default auth(async function middleware(request: NextRequest) {
   }
 
   // rutas públicas (agrega estáticos si los sirves fuera del matcher)
-  const publicPrefixes = ['/api', '/_next', '/favicon.ico', '/login'];
+  const publicPrefixes = ['/api', '/_next', '/favicon.ico', '/login', '/invite', '/company-invite'];
 
   if (subdomain) {
     // Clean URL rewrites - transform user-facing URLs to internal s/{subdomain} structure
@@ -77,10 +77,24 @@ export default auth(async function middleware(request: NextRequest) {
       );
     }
 
+    // Invite user page
+    if (pathname === '/users/invite') {
+      return NextResponse.rewrite(
+        new URL(`/s/${subdomain}/users/invite`, request.url)
+      );
+    }
+
     // Feedback page
     if (pathname === '/feedback') {
       return NextResponse.rewrite(
         new URL(`/s/${subdomain}/feedback`, request.url)
+      );
+    }
+
+    // Company invite generation page
+    if (pathname === '/companies/invite') {
+      return NextResponse.rewrite(
+        new URL(`/s/${subdomain}/companies/invite`, request.url)
       );
     }
 
@@ -95,6 +109,12 @@ export default auth(async function middleware(request: NextRequest) {
     if (pathname === '/subastas') {
       return NextResponse.rewrite(
         new URL(`/s/${subdomain}/subastas`, request.url)
+      );
+    }
+    // Stats page
+    if (pathname === '/estadisticas') {
+      return NextResponse.rewrite(
+        new URL(`/s/${subdomain}/estadisticas`, request.url)
       );
     }
     

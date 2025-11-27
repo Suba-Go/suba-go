@@ -1,4 +1,5 @@
 import nx from '@nx/eslint-plugin';
+import reactHooks from 'eslint-plugin-react-hooks';
 import globals from 'globals';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -26,6 +27,7 @@ export default [
   {
     plugins: {
       '@nx': nx,
+      'react-hooks': reactHooks,
     },
   },
   {
@@ -68,6 +70,7 @@ export default [
     ...config,
     files: ['**/*.ts', '**/*.tsx'],
   })),
+  ...compat.extends('plugin:react-hooks/recommended'),
   //{
   //files: ['libs/shared-validation/src/lib/schemas/**/*.ts'],
   //rules: {
