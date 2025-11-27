@@ -73,7 +73,6 @@ export class AuctionsController {
     @Request() req: AuthenticatedRequest
   ) {
     const tenantId = req.user.tenantId;
-    console.log(tenantId, 'controller to create auction');
     return this.auctionsService.createAuction(createAuctionDto, tenantId);
   }
 
