@@ -77,6 +77,8 @@ export default function CompanyNavbar({
                 <Image
                   src={company.logo}
                   alt={`${company.name} logo`}
+                  width={32}
+                  height={32}
                   className="h-8 w-8 object-contain hover:cursor-pointer"
                 />
               )}
@@ -128,7 +130,7 @@ export default function CompanyNavbar({
             )}
             {/* Feedback - Only for AUCTION_MANAGER */}
             {session?.user?.role === 'AUCTION_MANAGER' && (
-              <Link href={`/s/${subdomain}/feedback`}>
+              <Link href="/feedback">
                 <Button
                   variant="ghost"
                   className="text-gray-600 hover:text-gray-900 flex items-center gap-2"

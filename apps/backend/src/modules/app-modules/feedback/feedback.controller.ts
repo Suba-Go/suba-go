@@ -38,7 +38,7 @@ export class FeedbackController {
     @Body() feedbackData: FeedbackCreateDto,
     @Request() req: any
   ) {
-    const userId = req.user.userId;
+    const userId = req.user.id;
     const tenantId = req.user.tenantId;
 
     return await this.feedbackCreatorService.createFeedback(
@@ -56,7 +56,7 @@ export class FeedbackController {
   async getFeedback(@Request() req: any) {
     const role = req.user.role;
     const tenantId = req.user.tenantId;
-    const userId = req.user.userId;
+    const userId = req.user.id;
 
     // ADMIN can see all feedback from all tenants
     // AUCTION_MANAGER can see only their own feedback

@@ -77,6 +77,13 @@ export default auth(async function middleware(request: NextRequest) {
       );
     }
 
+    // Feedback page
+    if (pathname === '/feedback') {
+      return NextResponse.rewrite(
+        new URL(`/s/${subdomain}/feedback`, request.url)
+      );
+    }
+
     // Company settings page
     if (pathname === '/configuracion') {
       return NextResponse.rewrite(

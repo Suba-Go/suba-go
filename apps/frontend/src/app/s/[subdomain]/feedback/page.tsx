@@ -1,7 +1,6 @@
 import { auth } from '@/auth';
 import { redirect } from 'next/navigation';
-import FeedbackForm from '@/components/feedback/feedback-form';
-import FeedbackList from '@/components/feedback/feedback-list';
+import ClientFeedbackTabs from '@/components/feedback/feedback-tabs-wrapper';
 
 export default async function FeedbackPage({
   params,
@@ -27,25 +26,8 @@ export default async function FeedbackPage({
         </p>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        {/* Feedback Form */}
-        <div className="bg-white p-6 rounded-lg border border-gray-200 shadow-sm">
-          <h2 className="text-xl font-semibold text-gray-900 mb-4">
-            Enviar Nuevo Feedback
-          </h2>
-          <FeedbackForm />
-        </div>
+      <ClientFeedbackTabs />
 
-        {/* Feedback List */}
-        <div className="bg-white p-6 rounded-lg border border-gray-200 shadow-sm">
-          <h2 className="text-xl font-semibold text-gray-900 mb-4">
-            Tu Feedback Enviado
-          </h2>
-          <FeedbackList />
-        </div>
-      </div>
-
-      {/* Info Section */}
       <div className="mt-8 p-6 bg-blue-50 border border-blue-200 rounded-lg">
         <h3 className="text-lg font-semibold text-blue-900 mb-2">
           ¿Cómo funciona el feedback?

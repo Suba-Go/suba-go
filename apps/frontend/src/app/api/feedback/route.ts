@@ -78,7 +78,16 @@ export async function GET() {
     }
 
     const data = await response.json();
-    return NextResponse.json(data);
+    let deserializedData = data;
+    if (data && data.superjson) {
+      try {
+        deserializedData = superjson.deserialize(data.superjson);
+      } catch (error) {
+        console.error('Failed to deserialize superjson response:', error);
+        deserializedData = data;
+      }
+    }
+    return NextResponse.json(deserializedData);
   } catch (error) {
     console.error('Error fetching feedback:', error);
     return NextResponse.json(

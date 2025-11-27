@@ -23,7 +23,12 @@ export default function FeedbackList() {
       }
 
       const data = await res.json();
-      setFeedbackList(data);
+      const list = Array.isArray(data)
+        ? data
+        : Array.isArray((data as any)?.data)
+        ? (data as any).data
+        : [];
+      setFeedbackList(list);
     } catch (err: any) {
       setError(err.message || 'Error al cargar feedback');
     } finally {
