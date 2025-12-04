@@ -3,6 +3,7 @@
 import { CompanyDto } from '@suba-go/shared-validation';
 import { useSession } from 'next-auth/react';
 import { UserHomePage } from './user-home-page';
+import { useRouter } from 'next-nprogress-bar';
 
 interface CompanyBrandedPageProps {
   company: CompanyDto;
@@ -14,12 +15,15 @@ export default function CompanyBrandedPage({
   const { data: session } = useSession();
   const userRole = session?.user?.role;
   const primaryColor = company.principal_color || '#3B82F6'; // Default blue if no color set
+  const router = useRouter();
 
   // If user is logged in and is a regular USER, show the user home page
   if (session && userRole === 'USER') {
     return <UserHomePage company={company} />;
+  } else if (session && userRole === 'AUCTION_MANAGER') {
+    router.push(`/subastas`);
+    return null;
   }
-
   // For AUCTION_MANAGER or not logged in, show "under development" page
   return (
     <div
