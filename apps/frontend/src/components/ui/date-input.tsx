@@ -1,7 +1,11 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Input } from '@suba-go/shared-components/components/ui/input';
+import { Button } from '@suba-go/shared-components/components/ui/button';
+import { Calendar } from 'lucide-react';
+import { DayPicker } from 'react-day-picker';
+import 'react-day-picker/dist/style.css';
 
 interface DateInputProps {
   value?: Date;
@@ -10,6 +14,7 @@ interface DateInputProps {
   className?: string;
   error?: boolean;
   disabled?: boolean;
+  style?: React.CSSProperties;
 }
 
 export function DateInput({
@@ -19,8 +24,11 @@ export function DateInput({
   className = '',
   error = false,
   disabled = false,
+  style,
 }: DateInputProps) {
   const [inputValue, setInputValue] = useState('');
+  const [isCalendarOpen, setIsCalendarOpen] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
 
   // Format date to dd/mm/yyyy
   const formatDate = (date: Date | undefined): string => {
@@ -72,6 +80,25 @@ export function DateInput({
   useEffect(() => {
     setInputValue(formatDate(value));
   }, [value]);
+
+  // Close calendar when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (
+        containerRef.current &&
+        !containerRef.current.contains(event.target as Node)
+      ) {
+        setIsCalendarOpen(false);
+      }
+    };
+
+    if (isCalendarOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => {
+        document.removeEventListener('mousedown', handleClickOutside);
+      };
+    }
+  }, [isCalendarOpen]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     let newValue = e.target.value;
@@ -130,16 +157,53 @@ export function DateInput({
     }
   };
 
+  const handleCalendarSelect = (date: Date | undefined) => {
+    if (date) {
+      onChange(date);
+      setIsCalendarOpen(false);
+    }
+  };
+
   return (
-    <Input
-      type="text"
-      value={inputValue}
-      onChange={handleChange}
-      onBlur={handleBlur}
-      placeholder="dd/mm/yyyy"
-      className={`${className} ${error ? 'border-red-500' : ''}`}
-      disabled={disabled}
-      maxLength={10}
-    />
+    <div ref={containerRef} className="relative">
+      <div className="flex gap-2">
+        <Input
+          type="text"
+          value={inputValue}
+          onChange={handleChange}
+          onBlur={handleBlur}
+          placeholder="dd/mm/yyyy"
+          className={`flex-1 ${className} ${
+            error
+              ? 'border-red-500 focus-visible:ring-red-500'
+              : 'focus-visible:ring-1'
+          }`}
+          style={error ? undefined : style}
+          disabled={disabled}
+          maxLength={10}
+        />
+        <Button
+          type="button"
+          variant="outline"
+          size="icon"
+          onClick={() => setIsCalendarOpen(!isCalendarOpen)}
+          disabled={disabled}
+          className="shrink-0"
+        >
+          <Calendar className="h-4 w-4" />
+        </Button>
+      </div>
+      {isCalendarOpen && (
+        <div className="absolute z-50 mt-2 bg-white border rounded-lg shadow-lg p-3">
+          <DayPicker
+            mode="single"
+            selected={value}
+            onSelect={handleCalendarSelect}
+            disabled={minDate ? { before: minDate } : undefined}
+            className="rdp"
+          />
+        </div>
+      )}
+    </div>
   );
 }
