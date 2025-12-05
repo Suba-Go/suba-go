@@ -1,5 +1,8 @@
 {
   "name": "@suba-and-go/source",
+  "prisma": {
+    "seed": "ts-node apps/backend/prisma/seed.ts"
+  },
   "version": "0.0.1",
   "license": "MIT",
   "packageManager": "pnpm@10.12.1",
@@ -12,7 +15,9 @@
     "lint": "pnpm eslint .",
     "postinstall": "prisma generate --no-engine --schema=apps/backend/prisma/schema.prisma",
     "db:push": "prisma db push --schema=apps/backend/prisma/schema.prisma",
+    "db:seed": "prisma db seed",
     "db:migrate": "prisma migrate dev --schema=apps/backend/prisma/schema.prisma",
+    "db:reset": "prisma migrate reset --force --schema=apps/backend/prisma/schema.prisma",
     "db:generate": "prisma generate --schema=apps/backend/prisma/schema.prisma",
     "backend:start": "nx run backend:serve",
     "backend:build": "nx run backend:build",

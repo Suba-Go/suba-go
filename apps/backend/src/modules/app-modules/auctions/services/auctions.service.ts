@@ -54,7 +54,6 @@ export class AuctionsService {
     } else if (createAuctionDto.type === SharedAuctionTypeEnum.REAL) {
       auctionType = PrismaAuctionTypeEnum.REAL;
     }
-    console.log('creating auction');
 
     const auction = await this.auctionRepository.createAuction({
       title: createAuctionDto.title,
@@ -66,11 +65,9 @@ export class AuctionsService {
       bidIncrement: createAuctionDto.bidIncrement,
       itemIds: createAuctionDto.itemIds,
     });
-    console.log('auction', auction);
 
     // Add selected items to auction
     if (auction.itemIds) {
-      console.log('trying');
       await this.auctionRepository.addItemsToAuction(
         auction.id,
         createAuctionDto.itemIds

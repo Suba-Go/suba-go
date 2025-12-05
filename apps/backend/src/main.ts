@@ -114,15 +114,6 @@ async function bootstrap() {
   } else if (process.env.RAILWAY_PUBLIC_DOMAIN) {
     // Railway deployment (auto-generated)
     serverUrl = `https://${process.env.RAILWAY_PUBLIC_DOMAIN}`;
-  } else if (process.env.RAILWAY_STATIC_URL) {
-    // Railway static URL (alternative)
-    serverUrl = process.env.RAILWAY_STATIC_URL;
-  } else if (process.env.RENDER_EXTERNAL_URL) {
-    // Render deployment (auto-generated)
-    serverUrl = process.env.RENDER_EXTERNAL_URL;
-  } else if (process.env.VERCEL_URL) {
-    // Vercel deployment (auto-generated)
-    serverUrl = `https://${process.env.VERCEL_URL}`;
   } else {
     // Fallback for unknown environments
     serverUrl = `http://0.0.0.0:${PORT}`;

@@ -208,7 +208,6 @@ export function AuctionCreateModal({
       });
     } finally {
       setIsLoading(false);
-      console.log(data.itemIds);
     }
   };
   const handleClose = () => {

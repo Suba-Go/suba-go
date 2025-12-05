@@ -11,6 +11,9 @@ import { AuctionDetail } from './auction-detail';
 import { AuctionActiveBiddingView } from './user-view/auction-active-bidding-view';
 import { AuctionPendingView } from './user-view/auction-pending-view';
 import { AuctionCompletedView } from './user-view/auction-completed-view';
+import { AuctionManagerActiveView } from './manager-view/auction-manager-active-view';
+import { AuctionManagerPendingView } from './manager-view/auction-manager-pending-view';
+import { AuctionManagerCompletedView } from './manager-view/auction-manager-completed-view';
 import { AuctionDetailSkeleton } from './auction-detail-skeleton';
 import {
   Alert,
@@ -49,7 +52,7 @@ export function AuctionViewRouter({
     url: `/api/auctions/${auctionId}`,
     key: ['auction', auctionId],
     revalidateOnMount: true,
-    refreshInterval: 5,
+    refreshInterval: 600,
     dedupingInterval: 0,
   });
 
@@ -62,7 +65,7 @@ export function AuctionViewRouter({
     url: `/api/auction-items/${auctionId}`,
     key: ['auctionItems', auctionId],
     revalidateOnMount: true,
-    refreshInterval: 5,
+    refreshInterval: 600,
     dedupingInterval: 0,
   });
 
@@ -86,17 +89,69 @@ export function AuctionViewRouter({
 
   // AUCTION_MANAGER always sees the management view
   if (userRole === UserRolesEnum.AUCTION_MANAGER) {
-    return (
-      <AuctionDetail
-        auction={auction}
-        auctionItems={auctionItems}
-        userRole={userRole}
-        userId={userId}
-        accessToken={accessToken}
-        tenantId={tenantId}
-        onRealtimeSnapshot={handleRealtimeSnapshot}
-      />
-    );
+    // Determine actual status based on time (same logic as user)
+    const now = new Date();
+    const startTime = new Date(auction.startTime);
+    const endTime = new Date(auction.endTime);
+
+    let actualStatus = auction.status;
+
+    // Override status based on time if not cancelled/deleted
+    if (
+      auction.status !== AuctionStatusEnum.CANCELADA &&
+      auction.status !== AuctionStatusEnum.ELIMINADA
+    ) {
+      if (now < startTime) {
+        actualStatus = AuctionStatusEnum.PENDIENTE;
+      } else if (now >= startTime && now < endTime) {
+        actualStatus = AuctionStatusEnum.ACTIVA;
+      } else {
+        actualStatus = AuctionStatusEnum.COMPLETADA;
+      }
+    }
+
+    switch (actualStatus) {
+      case AuctionStatusEnum.ACTIVA:
+        return (
+          <AuctionManagerActiveView
+            auction={auction}
+            auctionItems={auctionItems}
+            accessToken={accessToken}
+            tenantId={tenantId}
+            onRealtimeSnapshot={handleRealtimeSnapshot}
+            userRole={userRole}
+            userId={userId}
+          />
+        );
+      case AuctionStatusEnum.PENDIENTE:
+        return (
+          <AuctionManagerPendingView
+            auction={auction}
+            auctionItems={auctionItems}
+          />
+        );
+      case AuctionStatusEnum.COMPLETADA:
+        return (
+          <AuctionManagerCompletedView
+            auction={auction}
+            auctionItems={auctionItems}
+          />
+        );
+      case AuctionStatusEnum.CANCELADA:
+        return (
+          <AuctionManagerPendingView
+            auction={auction}
+            auctionItems={auctionItems}
+          />
+        );
+      default:
+        return (
+          <AuctionManagerPendingView
+            auction={auction}
+            auctionItems={auctionItems}
+          />
+        );
+    }
   }
 
   // USER sees different views based on auction status

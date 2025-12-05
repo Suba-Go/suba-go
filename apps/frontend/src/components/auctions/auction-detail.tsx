@@ -121,17 +121,37 @@ export function AuctionDetail({
     auction?.endTime || new Date()
   );
 
-  // WebSocket connection for AUCTION_MANAGER real-time updates
+  // Store callbacks in refs to avoid reconnection when they change
+  const onRealtimeSnapshotRef = useRef(onRealtimeSnapshot);
+  const refetchParticipantsRef = useRef(refetchParticipants);
+  const routerRef = useRef(router);
+
+  // Update refs when callbacks change (without causing reconnection)
+  useEffect(() => {
+    onRealtimeSnapshotRef.current = onRealtimeSnapshot;
+    refetchParticipantsRef.current = refetchParticipants;
+    routerRef.current = router;
+  }, [onRealtimeSnapshot, refetchParticipants, router]);
+
+  // WebSocket connection for AUCTION_MANAGER - ONLY for participant count
   useEffect(() => {
     // Only connect if user is AUCTION_MANAGER and we have required data
-    // Don't connect if auction is already completed
     if (
       userRole !== UserRolesEnum.AUCTION_MANAGER ||
       !accessToken ||
       !tenantId ||
-      !auction ||
-      auction.status === AuctionStatusEnum.COMPLETADA
+      !auction?.id
     ) {
+      return;
+    }
+
+    // Don't connect if auction is already completed
+    if (auction.status === AuctionStatusEnum.COMPLETADA) {
+      if (wsRef.current) {
+        wsRef.current.close();
+        wsRef.current = null;
+      }
+      setIsWsConnected(false);
       return;
     }
 
@@ -158,12 +178,20 @@ export function AuctionDetail({
 
     const wsEndpoint = getWebSocketUrl();
     const wsUrl = `${wsEndpoint}?token=${encodeURIComponent(accessToken)}`;
+    const auctionId = auction.id;
 
     const ws = new WebSocket(wsUrl);
     wsRef.current = ws;
 
     ws.onopen = () => {
-      ws.send(JSON.stringify({ event: 'HELLO', data: {} }));
+      setIsWsConnected(true);
+      // Join auction room immediately (no HELLO handshake needed)
+      ws.send(
+        JSON.stringify({
+          event: 'JOIN_AUCTION',
+          data: { tenantId, auctionId },
+        })
+      );
     };
 
     ws.onmessage = (event) => {
@@ -171,46 +199,24 @@ export function AuctionDetail({
         const message = JSON.parse(event.data);
 
         switch (message.event) {
-          case 'HELLO_OK':
-            setIsWsConnected(true);
-            // Join auction room
-            ws.send(
-              JSON.stringify({
-                event: 'JOIN_AUCTION',
-                data: { tenantId, auctionId: auction.id },
-              })
-            );
+          case 'CONNECTED':
+            // Connection acknowledged
             break;
 
           case 'JOINED':
-            // setIsWsJoined(true);
-            if (message.data.participantCount) {
+            if (message.data.participantCount !== undefined) {
               setLiveParticipantCount(message.data.participantCount);
             }
-            onRealtimeSnapshot?.();
+            onRealtimeSnapshotRef.current?.();
             break;
 
           case 'PARTICIPANT_COUNT':
             setLiveParticipantCount(message.data.count);
             break;
 
-          case 'BID_PLACED':
-            // Add to live bid updates
-            // setLiveBidUpdates((prev) => [
-            //   {
-            //     auctionItemId: message.data.auctionItemId,
-            //     amount: message.data.amount,
-            //     userName: message.data.userName || 'Usuario',
-            //     timestamp: message.data.timestamp || new Date().toISOString(),
-            //   },
-            //   ...prev.slice(0, 19), // Keep last 20 bids
-            // ]);
-            // Refetch auction data to update highest bids
-            refetchParticipants();
-            router.refresh();
-            break;
-
-          case 'AUCTION_STATUS_CHANGED':
+          case 'ERROR':
+            console.error('[Manager WS] Server error:', message.data);
+            setIsWsConnected(false);
             break;
         }
       } catch (error) {
@@ -220,17 +226,20 @@ export function AuctionDetail({
 
     ws.onerror = (error) => {
       console.error('[Manager WS] Error:', error);
+      setIsWsConnected(false);
     };
 
     ws.onclose = () => {
       setIsWsConnected(false);
-      // setIsWsJoined(false);
       connectionAttemptedRef.current = false; // Allow reconnection
     };
 
     // Cleanup on unmount
     return () => {
-      if (ws.readyState === WebSocket.OPEN) {
+      if (
+        ws.readyState === WebSocket.OPEN ||
+        ws.readyState === WebSocket.CONNECTING
+      ) {
         ws.close();
       }
       wsRef.current = null;
@@ -240,12 +249,8 @@ export function AuctionDetail({
     userRole,
     accessToken,
     tenantId,
-    auction,
-    auction.id,
-    participants,
-    refetchParticipants,
-    router,
-    onRealtimeSnapshot,
+    auction?.id, // Only use auction.id, not the whole object
+    auction?.status, // Only use auction.status
   ]);
 
   const handleCancelToggle = async (checked: boolean) => {
