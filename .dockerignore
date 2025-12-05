@@ -1,0 +1,18 @@
+# Directorios generados
+node_modules
+dist
+
+# Archivos de la herramienta Nx
+.nx/
+
+# Archivos de control de versión
+.git
+.gitignore
+
+# Archivos de desarrollo
+*.log
+.vscode
+
+# Archivos de caché/desarrollo de Prisma
+prisma/
+!prisma/schema.prisma
