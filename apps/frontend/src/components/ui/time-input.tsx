@@ -9,6 +9,7 @@ interface TimeInputProps {
   className?: string;
   error?: boolean;
   disabled?: boolean;
+  style?: React.CSSProperties;
 }
 
 export function TimeInput({
@@ -17,6 +18,7 @@ export function TimeInput({
   className = '',
   error = false,
   disabled = false,
+  style,
 }: TimeInputProps) {
   const [inputValue, setInputValue] = useState(value);
 
@@ -27,33 +29,52 @@ export function TimeInput({
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     let newValue = e.target.value;
-    
-    // Remove any non-digit characters except :
-    newValue = newValue.replace(/[^\d:]/g, '');
-    
-    // Auto-add colon as user types
-    if (newValue.length === 2 && inputValue.length === 1 && !newValue.includes(':')) {
-      newValue += ':';
+
+    // Remove any non-digit characters
+    newValue = newValue.replace(/\D/g, '');
+
+    // Limit to 4 digits (HHMM)
+    if (newValue.length > 4) {
+      newValue = newValue.slice(0, 4);
     }
-    
-    // Limit to 5 characters (HH:MM)
-    if (newValue.length > 5) {
-      newValue = newValue.slice(0, 5);
+
+    // Format as HH:MM
+    let formatted = newValue;
+    if (newValue.length >= 2) {
+      formatted = newValue.slice(0, 2) + ':' + newValue.slice(2);
     }
-    
-    setInputValue(newValue);
-    
+
+    setInputValue(formatted);
+
     // Validate and update if complete
-    if (newValue.length === 5) {
-      const [hours, minutes] = newValue.split(':');
+    if (formatted.length === 5) {
+      const [hours, minutes] = formatted.split(':');
       const h = parseInt(hours, 10);
       const m = parseInt(minutes, 10);
-      
+
       if (h >= 0 && h <= 23 && m >= 0 && m <= 59) {
-        onChange(newValue);
+        onChange(formatted);
       }
-    } else if (newValue.length === 0) {
+    } else if (formatted.length === 0) {
       onChange('');
+    }
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    // Prevent deleting the colon
+    if (e.key === 'Backspace' || e.key === 'Delete') {
+      const cursorPos = (e.target as HTMLInputElement).selectionStart || 0;
+      const value = (e.target as HTMLInputElement).value;
+
+      // If trying to delete the colon, prevent it
+      if (value[cursorPos] === ':') {
+        e.preventDefault();
+        // Move cursor to the left
+        (e.target as HTMLInputElement).setSelectionRange(
+          cursorPos - 1,
+          cursorPos - 1
+        );
+      }
     }
   };
 
@@ -63,9 +84,12 @@ export function TimeInput({
       const [hours, minutes] = inputValue.split(':');
       const h = parseInt(hours, 10);
       const m = parseInt(minutes, 10);
-      
+
       if (h >= 0 && h <= 23 && m >= 0 && m <= 59) {
-        const formatted = `${hours.padStart(2, '0')}:${minutes.padStart(2, '0')}`;
+        const formatted = `${hours.padStart(2, '0')}:${minutes.padStart(
+          2,
+          '0'
+        )}`;
         setInputValue(formatted);
         onChange(formatted);
       }
@@ -77,12 +101,17 @@ export function TimeInput({
       type="text"
       value={inputValue}
       onChange={handleChange}
+      onKeyDown={handleKeyDown}
       onBlur={handleBlur}
-      placeholder="HH:MM"
-      className={`${className} ${error ? 'border-red-500' : ''}`}
+      placeholder="10:00"
+      className={`${className} ${
+        error
+          ? 'border-red-500 focus-visible:ring-red-500'
+          : 'focus-visible:ring-1'
+      } font-mono`}
+      style={error ? undefined : style}
       disabled={disabled}
       maxLength={5}
     />
   );
 }
-

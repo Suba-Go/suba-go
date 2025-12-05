@@ -45,7 +45,9 @@ export default function GlobalLoginForm() {
       // Call backend to find user's company
       const emailNormalized = email.trim().toLowerCase();
       const response = await fetch(
-        `/api/users/company-by-email?email=${encodeURIComponent(emailNormalized)}`
+        `/api/users/company-by-email?email=${encodeURIComponent(
+          emailNormalized
+        )}`
       );
 
       if (!response.ok) {
@@ -75,7 +77,9 @@ export default function GlobalLoginForm() {
           // Development: https://{company}.development.subago.cl
           companyLoginUrl = `https://${
             data.data.companyDomain
-          }.development.subago.cl/login?email=${encodeURIComponent(emailNormalized)}`;
+          }.development.subago.cl/login?email=${encodeURIComponent(
+            emailNormalized
+          )}`;
         } else {
           // Production: https://{company}.subago.cl
           const rootDomain = process.env.NEXT_PUBLIC_ROOT_DOMAIN || 'subago.cl';
@@ -84,15 +88,7 @@ export default function GlobalLoginForm() {
           }.${rootDomain}/login?email=${encodeURIComponent(emailNormalized)}`;
         }
 
-        toast({
-          title: 'Redirigiendo...',
-          description: `Te estamos llevando a la página de ${data.data.companyName}`,
-        });
-
-        // Small delay to show the toast
-        setTimeout(() => {
-          window.location.href = companyLoginUrl;
-        }, 1500);
+        window.location.href = companyLoginUrl;
       } else {
         throw new Error('Respuesta inválida del servidor');
       }

@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { Calendar, Clock, DollarSign, Package } from 'lucide-react';
+import { Calendar, Clock, Package } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -20,7 +20,8 @@ import { Switch } from '@suba-go/shared-components/components/ui/switch';
 import { ItemSelector } from './item-selector';
 import { useCompany } from '@/hooks/use-company';
 import { DateInput } from '@/components/ui/date-input';
-import { TimeInput } from '@/components/ui/time-input';
+import { TimeSelector } from '@/components/ui/time-selector';
+import { FormattedInput } from '@/components/ui/formatted-input';
 import {
   auctionCreateSchema,
   AuctionTypeEnum,
@@ -51,6 +52,7 @@ export function AuctionCreateModal({
   const [startDate, setStartDate] = useState<Date>(getDefaultStartDate);
   const [startTimeInput, setStartTimeInput] = useState('10:00');
   const [durationMinutes, setDurationMinutes] = useState(30);
+  const [showItemError, setShowItemError] = useState(false);
   const { toast } = useToast();
 
   const {
@@ -76,6 +78,15 @@ export function AuctionCreateModal({
   const { company } = useCompany();
   const primaryColor = company?.principal_color || '#3B82F6';
 
+  // Create dynamic style for focus ring
+  const inputFocusStyle = useMemo(
+    () =>
+      ({
+        '--tw-ring-color': primaryColor,
+      } as React.CSSProperties),
+    [primaryColor]
+  );
+
   useEffect(() => {
     if (company?.tenantId) {
       setValue('tenantId', company.tenantId);
@@ -84,12 +95,16 @@ export function AuctionCreateModal({
 
   const durationOptions = useMemo(
     () => [
+      { value: 5, label: '5 minutos' },
+      { value: 10, label: '10 minutos' },
       { value: 15, label: '15 minutos' },
       { value: 30, label: '30 minutos' },
       { value: 45, label: '45 minutos' },
       { value: 60, label: '1 hora' },
       { value: 120, label: '2 horas' },
       { value: 300, label: '5 horas' },
+      { value: 1440, label: '1 dia' },
+      { value: 10080, label: '7 dias' },
     ],
     []
   );
@@ -130,6 +145,7 @@ export function AuctionCreateModal({
     }
 
     if (!data.itemIds.length) {
+      setShowItemError(true);
       toast({
         title: 'Error',
         description: 'Debe seleccionar al menos un item para la subasta',
@@ -137,6 +153,8 @@ export function AuctionCreateModal({
       });
       return;
     }
+
+    setShowItemError(false);
 
     const now = new Date();
     if (data.startTime <= now) {
@@ -196,6 +214,7 @@ export function AuctionCreateModal({
       setDurationMinutes(30);
       setSelectedItems([]);
       setIsTestAuction(false);
+      setShowItemError(false);
       onSuccess();
     } catch (error) {
       toast({
@@ -227,6 +246,7 @@ export function AuctionCreateModal({
     setDurationMinutes(30);
     setSelectedItems([]);
     setIsTestAuction(false);
+    setShowItemError(false);
     onClose();
   };
 
@@ -238,7 +258,7 @@ export function AuctionCreateModal({
 
   return (
     <Dialog open={isOpen} onOpenChange={handleClose}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto p-4 sm:p-6">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Calendar className="h-5 w-5" />
@@ -258,7 +278,12 @@ export function AuctionCreateModal({
                 id="title"
                 {...register('title')}
                 placeholder="Ej: Subasta de Vehiculos Enero 2024"
-                className={errors.title ? 'border-red-500' : ''}
+                className={
+                  errors.title
+                    ? 'border-red-500 focus-visible:ring-red-500'
+                    : 'focus-visible:ring-1'
+                }
+                style={errors.title ? undefined : inputFocusStyle}
               />
               {errors.title && (
                 <p className="text-sm text-red-600 mt-1">
@@ -268,94 +293,128 @@ export function AuctionCreateModal({
             </div>
 
             <div>
-              <Label htmlFor="description">Descripcion (Opcional)</Label>
+              <Label htmlFor="description">Descripcion</Label>
+              <p className="text-xs text-gray-500 mb-2">(Opcional)</p>
               <Textarea
                 id="description"
                 {...register('description')}
                 placeholder="Describe los detalles de la subasta..."
                 rows={3}
+                className="focus-visible:ring-1"
+                style={inputFocusStyle}
               />
             </div>
           </div>
 
           <div className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <Label htmlFor="startDate" className="flex items-center gap-2">
-                  <Calendar className="h-4 w-4" />
-                  Fecha de Inicio * (dd/mm/yyyy)
-                </Label>
-                <DateInput
-                  value={startDate}
-                  onChange={(date) => date && setStartDate(date)}
-                  minDate={today}
-                />
-                <p className="text-xs text-gray-500 mt-1">
-                  Formato: dia/mes/ano
-                </p>
+              <div className="flex flex-col">
+                <div className="h-6 flex items-center mb-2">
+                  <Label
+                    htmlFor="startDate"
+                    className="flex items-center gap-2"
+                  >
+                    <Calendar className="h-4 w-4" />
+                    Fecha de Inicio *
+                  </Label>
+                </div>
+                <div className="min-h-[3rem] flex flex-col justify-end">
+                  <p className="text-xs mb-2 text-gray-500">
+                    Formato: dd/mm/yyyy
+                  </p>
+                  <DateInput
+                    value={startDate}
+                    onChange={(date) => date && setStartDate(date)}
+                    minDate={today}
+                    className="focus-visible:ring-1"
+                    style={inputFocusStyle}
+                  />
+                </div>
               </div>
 
-              <div>
-                <Label htmlFor="startTime" className="flex items-center gap-2">
-                  <Clock className="h-4 w-4" />
-                  Hora de Inicio * (HH:MM)
-                </Label>
-                <TimeInput
-                  value={startTimeInput}
-                  onChange={setStartTimeInput}
-                />
-                <p className="text-xs text-gray-500 mt-1">
-                  Formato: 24 horas (ej: 14:30)
-                </p>
+              <div className="flex flex-col">
+                <div className="h-6 flex items-center mb-2">
+                  <Label
+                    htmlFor="startTime"
+                    className="flex items-center gap-2"
+                  >
+                    <Clock className="h-4 w-4" />
+                    Hora de Inicio *
+                  </Label>
+                </div>
+                <div className="min-h-[3rem] flex flex-col justify-end">
+                  <p className="text-xs mb-2 text-gray-500">
+                    Formato: 24 horas (ej: 14:30)
+                  </p>
+                  <TimeSelector
+                    value={startTimeInput}
+                    onChange={setStartTimeInput}
+                    style={inputFocusStyle}
+                  />
+                </div>
               </div>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <Label className="flex items-center gap-2">
-                  <Clock className="h-4 w-4" />
-                  Duracion de la Subasta *
-                </Label>
-                <select
-                  value={durationMinutes}
-                  onChange={(event) =>
-                    setDurationMinutes(Number(event.target.value))
-                  }
-                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  {durationOptions.map((option) => (
-                    <option key={option.value} value={option.value}>
-                      {option.label}
-                    </option>
-                  ))}
-                </select>
+              <div className="flex flex-col">
+                <div className="h-6 flex items-center mb-2">
+                  <Label className="flex items-center gap-2">
+                    <Clock className="h-4 w-4" />
+                    Duracion de la Subasta *
+                  </Label>
+                </div>
+                <div className="min-h-[3rem] flex flex-col justify-end">
+                  <select
+                    value={durationMinutes}
+                    onChange={(event) =>
+                      setDurationMinutes(Number(event.target.value))
+                    }
+                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 pr-8 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 appearance-none"
+                    style={inputFocusStyle}
+                  >
+                    {durationOptions.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
               </div>
 
-              <div>
-                <Label
-                  htmlFor="bidIncrement"
-                  className="flex items-center gap-2"
-                >
-                  <DollarSign className="h-4 w-4" />
-                  Incremento Minimo de Puja (CLP) *
-                </Label>
-                <Input
-                  id="bidIncrement"
-                  type="number"
-                  {...register('bidIncrement', { valueAsNumber: true })}
-                  placeholder="50000"
-                  min="1000"
-                  step="1000"
-                  className={errors.bidIncrement ? 'border-red-500' : ''}
-                />
-                {errors.bidIncrement && (
-                  <p className="text-sm text-red-600 mt-1">
-                    {errors.bidIncrement.message as string}
-                  </p>
-                )}
-                <p className="text-sm text-gray-600 mt-1">
-                  Los participantes deberan pujar en incrementos de este monto
-                </p>
+              <div className="flex flex-col">
+                <div className="h-6 flex items-center mb-2">
+                  <Label
+                    htmlFor="bidIncrement"
+                    className="flex items-center gap-2"
+                  >
+                    Incremento Minimo de Puja (CLP) *
+                  </Label>
+                </div>
+                <div className="min-h-[3rem] flex flex-col justify-end">
+                  <FormattedInput
+                    id="bidIncrement"
+                    formatType="price"
+                    placeholder="Ej: $50.000"
+                    className={
+                      errors.bidIncrement
+                        ? 'border-red-500 focus-visible:ring-red-500'
+                        : 'focus-visible:ring-1'
+                    }
+                    style={errors.bidIncrement ? undefined : inputFocusStyle}
+                    onChange={(value) => {
+                      const numValue =
+                        typeof value === 'number' ? value : Number(value);
+                      setValue('bidIncrement', numValue || 0, {
+                        shouldValidate: true,
+                      });
+                    }}
+                  />
+                  {errors.bidIncrement && (
+                    <p className="text-sm text-red-600 mt-1">
+                      {errors.bidIncrement.message as string}
+                    </p>
+                  )}
+                </div>
               </div>
             </div>
           </div>
@@ -412,7 +471,7 @@ export function AuctionCreateModal({
                 setValue('itemIds', items);
               }}
             />
-            {selectedItems.length === 0 && (
+            {showItemError && selectedItems.length === 0 && (
               <p className="text-sm text-red-600 mt-1">
                 Debe seleccionar al menos un item
               </p>
