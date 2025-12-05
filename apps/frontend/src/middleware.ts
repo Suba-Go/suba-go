@@ -15,7 +15,13 @@ const ROOT_DOMAIN =
 
 export default auth(async function middleware(request: NextRequest) {
   const host = request.headers.get('host') ?? '';
-  const subdomain = getSubdomainFromHost(host, ROOT_DOMAIN);
+  let domain = ROOT_DOMAIN;
+
+  if (host.includes('development.subago.cl')) {
+    domain = 'development.subago.cl';
+  }
+
+  const subdomain = getSubdomainFromHost(host, domain);
   const { pathname } = request.nextUrl;
 
   // Prevent direct access to internal /s/ routes
