@@ -1,8 +1,6 @@
 import { z } from 'zod';
 import { ItemStateEnum, LegalStatusEnum } from '../enums/item';
 import { baseSchema } from './base.schema';
-// import { tenantSchema } from './tenant.schema';
-// import { auctionItemSchema } from './auction-item.schema';
 import { userBasicInfoSchema } from './user.schema';
 
 export const itemSchema = baseSchema
@@ -10,8 +8,7 @@ export const itemSchema = baseSchema
     plate: z
       .string()
       .min(6, 'La patente debe tener exactamente 6 caracteres')
-      .max(6, 'La patente debe tener exactamente 6 caracteres')
-      .nullable(),
+      .max(6, 'La patente debe tener exactamente 6 caracteres'),
     brand: z.string().nullable(),
     model: z.string().nullable(),
     year: z.number().int().min(1900).max(3000).nullable(),
@@ -19,8 +16,8 @@ export const itemSchema = baseSchema
     photos: z.string().nullable(),
     docs: z.string().nullable(),
     kilometraje: z.number().int().nullable(),
-    legal_status: z.nativeEnum(LegalStatusEnum).nullable(),
-    state: z.nativeEnum(ItemStateEnum).default(ItemStateEnum.DISPONIBLE),
+    legal_status: z.enum(LegalStatusEnum).nullable(),
+    state: z.enum(ItemStateEnum).default(ItemStateEnum.DISPONIBLE),
     description: z.string().optional().nullable(),
     basePrice: z.number().nullable(),
     soldPrice: z.number().nullable(),
@@ -41,9 +38,8 @@ export const itemCreateSchema = z
     plate: z
       .string()
       .min(6, 'La patente debe tener exactamente 6 caracteres')
-      .max(6, 'La patente debe tener exactamente 6 caracteres')
-      .optional(),
-    brand: z.string().optional(),
+      .max(6, 'La patente debe tener exactamente 6 caracteres'),
+    brand: z.string().min(2, 'La marca es requerida'),
     model: z.string().optional(),
     year: z
       .number()
@@ -53,8 +49,11 @@ export const itemCreateSchema = z
       .optional(),
     version: z.string().optional(),
     kilometraje: z.number().int().min(0).optional(),
-    legal_status: z.nativeEnum(LegalStatusEnum).optional(),
-    basePrice: z.number().positive().optional(),
+    legal_status: z.enum(LegalStatusEnum),
+    basePrice: z
+      .number({ message: 'El precio base debe ser un número' })
+      .positive('El precio base debe ser un número positivo')
+      .min(1, 'El precio base debe ser mayor a 0'),
     photos: z.array(z.string()).optional(),
     docs: z.array(z.instanceof(File)).optional(),
   })
@@ -85,7 +84,7 @@ export const itemEditSchema = z
         return Math.floor(num);
       })
       .optional(),
-    legal_status: z.nativeEnum(LegalStatusEnum).optional(),
+    legal_status: z.enum(LegalStatusEnum).optional(),
     basePrice: z
       .any()
       .transform((val) => {
