@@ -17,6 +17,7 @@
     "db:push": "prisma db push --schema=apps/backend/prisma/schema.prisma",
     "db:seed": "prisma db seed",
     "db:migrate": "prisma migrate dev --schema=apps/backend/prisma/schema.prisma",
+    "db:migrate:deploy": "prisma migrate deploy --schema=apps/backend/prisma/schema.prisma",
     "db:reset": "prisma migrate reset --force --schema=apps/backend/prisma/schema.prisma",
     "db:generate": "prisma generate --schema=apps/backend/prisma/schema.prisma",
     "backend:start": "nx run backend:serve",
