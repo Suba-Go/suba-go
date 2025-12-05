@@ -14,7 +14,7 @@ import { Button } from '@suba-go/shared-components/components/ui/button';
 import { Badge } from '@suba-go/shared-components/components/ui/badge';
 import { Input } from '@suba-go/shared-components/components/ui/input';
 import { useAvailableItems } from '@/hooks/use-items';
-import { ItemCreateModal2 } from './item-create-modal2';
+import { ItemCreateModal } from '@/components/items/item-create-modal';
 import { Spinner } from '@suba-go/shared-components/components/ui/spinner';
 import { useCompany } from '@/hooks/use-company';
 import {
@@ -472,7 +472,7 @@ export function ItemSelector({
         </DialogContent>
       </Dialog>
 
-      <ItemCreateModal2
+      <ItemCreateModal
         isOpen={isCreateModalOpen}
         onClose={() => setIsCreateModalOpen(false)}
         onSuccess={handleCreateSuccess}
