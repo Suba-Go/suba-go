@@ -1,8 +1,5 @@
 {
   "name": "@suba-and-go/source",
-  "prisma": {
-    "seed": "ts-node apps/backend/prisma/seed.ts"
-  },
   "version": "0.0.1",
   "license": "MIT",
   "packageManager": "pnpm@10.12.1",
