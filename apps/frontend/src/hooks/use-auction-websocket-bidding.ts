@@ -4,7 +4,7 @@
  */
 import { useState, useEffect, useRef, useCallback } from 'react';
 
-interface BidData {
+export interface BidData {
   auctionItemId: string;
   amount: number;
   userId: string;

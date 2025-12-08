@@ -431,7 +431,6 @@ export class AuctionPrismaService {
         },
       },
     });
-    console.log('adding items to auctions', auctionId, items);
     const auctionItems = items.map((item) => ({
       auctionId,
       itemId: item.id,
