@@ -11,6 +11,16 @@ export const metadata: Metadata = {
 export default function Home() {
   return (
     <main className="flex-1">
+      {/* CTA: vender via Suba&Go */}
+      <section className="bg-primary/10 border-b border-primary/20">
+        <div className="container mx-auto px-4 py-4 text-center">
+          <p className="text-sm md:text-base text-gray-700">
+            ¿Quieres vender a través de Suba&Go? Escríbenos a{' '}
+            <a href="mailto:ventas@subago.cl" className="text-primary font-semibold underline">ventas@subago.cl</a>
+            {' '}o completa el formulario más abajo.
+          </p>
+        </div>
+      </section>
       {/* Hero Section */}
       <section className="bg-gradient-to-br from-primary via-primary/90 to-primary/80 text-white py-20">
         <div className="container mx-auto px-4">

@@ -10,4 +10,5 @@ export * from './item.schema';
 export * from './bid.schema';
 export * from './audit-log.schema';
 export * from './observation.schema';
+export * from './feedback.schema';
 export * from './main.schema';
