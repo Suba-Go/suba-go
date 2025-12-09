@@ -53,14 +53,18 @@ export default function ConditionalLayout({
     // Only enforce onboarding guard when inside a subdomain
     if (!isSubdomain) return;
 
-    const user = session?.user;
+    // Only redirect to onboarding if user is logged in but profile is incomplete
+    // If user is not logged in, let middleware handle redirect to /login
+    if (!session) return;
+
+    const user = session.user;
     const isIncomplete =
       !user ||
       !user.name ||
       user.name.trim().length < 3 ||
       !user.phone ||
       !user.rut;
-    if (isIncomplete && pathname !== '/onboarding') {
+    if (isIncomplete && pathname !== '/onboarding' && pathname !== '/login') {
       router.replace('/onboarding');
     }
   }, [status, session, pathname, router, isSubdomain, isLoading]);
