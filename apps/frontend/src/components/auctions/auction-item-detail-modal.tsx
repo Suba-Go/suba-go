@@ -76,8 +76,19 @@ export function AuctionItemDetailModal({
   const [currentPhotoIndex, setCurrentPhotoIndex] = useState(0);
   const [photoCount, setPhotoCount] = useState(0);
   const [bidAmount, setBidAmount] = useState(currentHighestBid + bidIncrement);
+  const [isMobile, setIsMobile] = useState(false);
 
   const item = auctionItem.item;
+
+  // Detect mobile device
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.matchMedia('(max-width: 768px)').matches);
+    };
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
 
   // Update bid amount when currentHighestBid changes
   useEffect(() => {
@@ -95,6 +106,35 @@ export function AuctionItemDetailModal({
       setCurrentPhotoIndex(photoCarouselApi.selectedScrollSnap());
     });
   }, [photoCarouselApi]);
+
+  useEffect(() => {
+    if (!photoCarouselApi || isMobile) return;
+
+    const carouselNode = photoCarouselApi.rootNode() as HTMLElement;
+    if (!carouselNode) return;
+
+    const viewport = photoCarouselApi.containerNode() as HTMLElement;
+    
+    if (!viewport) return;
+
+    const preventHorizontalScroll = (e: WheelEvent) => {
+      if (Math.abs(e.deltaX) > Math.abs(e.deltaY) && Math.abs(e.deltaX) > 5) {
+        e.preventDefault();
+        e.stopPropagation();
+        return false;
+      }
+    };
+
+    if (window.matchMedia('(pointer: fine)').matches) {
+      carouselNode.addEventListener('wheel', preventHorizontalScroll, { passive: false });
+      viewport.addEventListener('wheel', preventHorizontalScroll, { passive: false });
+    }
+
+    return () => {
+      carouselNode.removeEventListener('wheel', preventHorizontalScroll);
+      viewport.removeEventListener('wheel', preventHorizontalScroll);
+    };
+  }, [photoCarouselApi, isMobile]);
 
   const handleDownload = (url: string, filename: string) => {
     const link = document.createElement('a');
@@ -162,30 +202,51 @@ export function AuctionItemDetailModal({
                 <h3 className="text-lg font-semibold">Fotos</h3>
               </div>
               <div className="relative">
-                <Carousel className="w-full" setApi={setPhotoCarouselApi}>
-                  <CarouselContent>
+                <Carousel
+                  className="w-full"
+                  setApi={setPhotoCarouselApi}
+                  opts={{
+                    align: 'start',
+                    dragFree: false,
+                    containScroll: 'trimSnaps',
+                    // Enable drag only on mobile, disable on desktop
+                    watchDrag: isMobile,
+                    skipSnaps: false,
+                  }}
+                >
+                  <CarouselContent 
+                    className="-ml-0"
+                    style={{
+                      // Allow touch scroll on mobile, prevent on desktop
+                      touchAction: isMobile ? 'pan-x' : 'pan-y',
+                      overscrollBehaviorX: isMobile ? 'auto' : 'none',
+                    }}
+                  >
                     {photoUrls.map((url: string, index: number) => (
-                      <CarouselItem key={index}>
+                      <CarouselItem key={index} className="pl-0">
                         <div className="aspect-video relative bg-gray-100 rounded-lg overflow-hidden">
                           <Image
                             src={url}
                             fill
                             alt={`Foto ${index + 1}`}
-                            className="object-contain"
+                            className="object-contain select-none"
+                            draggable={false}
+                            style={{ pointerEvents: isMobile ? 'auto' : 'none' }}
                           />
                         </div>
                       </CarouselItem>
                     ))}
                   </CarouselContent>
+                  {/* Show arrows only on desktop/laptop, hide on mobile */}
                   {photoUrls.length > 1 && (
                     <>
-                      <CarouselPrevious />
-                      <CarouselNext />
+                      <CarouselPrevious className="left-2 md:left-4 z-20 hidden md:flex" />
+                      <CarouselNext className="right-2 md:right-4 z-20 hidden md:flex" />
                     </>
                   )}
                 </Carousel>
                 {photoCount > 0 && (
-                  <div className="absolute top-2 right-2 bg-black/70 text-white px-3 py-1 rounded-full text-sm font-medium">
+                  <div className="absolute top-2 right-2 bg-black/70 text-white px-3 py-1 rounded-full text-sm font-medium z-10">
                     {currentPhotoIndex + 1} de {photoCount}
                   </div>
                 )}
@@ -371,3 +432,4 @@ export function AuctionItemDetailModal({
     </Dialog>
   );
 }
+
