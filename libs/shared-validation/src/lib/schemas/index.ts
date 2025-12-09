@@ -5,6 +5,7 @@ export * from './tenant.schema';
 export * from './company.schema';
 export * from './auction.schema';
 export * from './auction-item.schema';
+export * from './auction-registration.schema';
 export * from './item.schema';
 export * from './bid.schema';
 export * from './audit-log.schema';

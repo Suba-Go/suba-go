@@ -1,35 +1,32 @@
 import { z } from 'zod';
-import { errorMap } from '../errors/error-map';
 import { baseSchema } from './base.schema';
-
-z.setErrorMap(errorMap);
+import { userSafeSchema } from './user.schema';
 
 export const bidSchema = baseSchema
   .extend({
+    requestId: z.uuid().nullable(),
     offered_price: z.number().positive(),
     bid_time: z.date(),
+    tenantId: z.uuid(),
+    userId: z.uuid(),
+    auctionId: z.uuid(),
+    auctionItemId: z.uuid(),
+  })
+  .strict();
+
+export const bidWithUserSchema = bidSchema
+  .extend({
+    user: userSafeSchema,
+  })
+  .strict();
+
+export const bidCreateSchema = z
+  .object({
+    auctionItemId: z.uuid(),
+    offered_price: z.number().positive('El precio ofrecido debe ser positivo'),
   })
   .strict();
 
 export type BidDto = z.infer<typeof bidSchema>;
-
-// Schema for creating new bids
-export const bidCreateSchema = z.object({
-  auctionItemId: z.string().min(1, 'ID del item de subasta es requerido'),
-  offeredPrice: z.number().positive('El precio ofrecido debe ser positivo'),
-});
-
-export type BidCreateDto = z.infer<typeof bidCreateSchema>;
-
-// Schema for bid with user information for display
-export const bidWithUserSchema = bidSchema.extend({
-  user: z.object({
-    id: z.string(),
-    public_name: z.string().nullable(),
-    name: z.string().nullable(),
-    email: z.string(),
-    phone: z.string().nullable(),
-  }),
-});
-
 export type BidWithUserDto = z.infer<typeof bidWithUserSchema>;
+export type BidCreateDto = z.infer<typeof bidCreateSchema>;

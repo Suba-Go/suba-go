@@ -28,27 +28,17 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@suba-go/shared-components/components/ui/dialog';
-
-interface Participant {
-  id: string;
-  name: string | null;
-  email: string;
-  public_name: string | null;
-  phone: string | null;
-  rut: string | null;
-  role: string;
-  createdAt: string;
-}
+import { AuctionDto, UserSafeDto } from '@suba-go/shared-validation';
 
 interface ParticipantsListProps {
-  auctionId: string;
-  participants: Participant[];
+  auction: AuctionDto;
+  participants: UserSafeDto[];
   isManager: boolean;
   onRefresh: () => void;
 }
 
 export function ParticipantsList({
-  auctionId,
+  auction,
   participants,
   isManager,
   onRefresh,
@@ -56,7 +46,7 @@ export function ParticipantsList({
   const { toast } = useToast();
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [participantToRemove, setParticipantToRemove] =
-    useState<Participant | null>(null);
+    useState<UserSafeDto | null>(null);
 
   // Ensure participants is always an array
   const participantsList = Array.isArray(participants) ? participants : [];
@@ -72,7 +62,7 @@ export function ParticipantsList({
     const fetchConnectedUsers = async () => {
       try {
         const response = await fetch(
-          `/api/auctions/${auctionId}/connected-users`
+          `/api/auctions/${auction.id}/connected-users`
         );
         if (response.ok) {
           const data = await response.json();
@@ -93,7 +83,7 @@ export function ParticipantsList({
     const interval = setInterval(fetchConnectedUsers, 5000);
 
     return () => clearInterval(interval);
-  }, [auctionId, isManager]);
+  }, [auction.id, isManager]);
 
   const handleRemoveParticipant = async () => {
     if (!participantToRemove) return;
@@ -101,7 +91,7 @@ export function ParticipantsList({
     setIsRemoving(true);
     try {
       const response = await fetch(
-        `/api/auctions/${auctionId}/register/${participantToRemove.id}`,
+        `/api/auctions/${auction.id}/register/${participantToRemove.id}`,
         {
           method: 'DELETE',
         }
@@ -132,7 +122,7 @@ export function ParticipantsList({
     }
   };
 
-  const formatDate = (dateString: string) => {
+  const formatDate = (dateString: Date) => {
     return new Date(dateString).toLocaleDateString('es-CL', {
       year: 'numeric',
       month: 'short',
@@ -251,7 +241,8 @@ export function ParticipantsList({
                         )}
                         <div className="flex items-center gap-1">
                           <Calendar className="h-3 w-3" />
-                          Registrado: {formatDate(participant.createdAt)}
+                          Registrado:{' '}
+                          {formatDate(participant.createdAt || new Date(''))}
                         </div>
                       </div>
                     </div>
@@ -273,7 +264,7 @@ export function ParticipantsList({
 
       {/* Add Participant Modal */}
       <AddParticipantModal
-        auctionId={auctionId}
+        auction={auction}
         isOpen={isAddModalOpen}
         onClose={() => setIsAddModalOpen(false)}
         onSuccess={async () => {

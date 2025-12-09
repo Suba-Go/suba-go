@@ -1,28 +1,43 @@
 'use client';
 
+import { useEffect } from 'react';
 import { CompanyDto } from '@suba-go/shared-validation';
 import { useSession } from 'next-auth/react';
 import { UserHomePage } from './user-home-page';
+import { useRouter } from 'next-nprogress-bar';
 
 interface CompanyBrandedPageProps {
   company: CompanyDto;
-  subdomain?: string;
 }
 
 export default function CompanyBrandedPage({
   company,
-  subdomain,
 }: CompanyBrandedPageProps) {
-  const { data: session } = useSession();
+  const { data: session, status } = useSession();
   const userRole = session?.user?.role;
-  const primaryColor = company.principal_color || '#3B82F6'; // Default blue if no color set
-  
+  const router = useRouter();
+
+  // Redirect AUCTION_MANAGER to /subastas using useEffect to avoid render-time navigation
+  useEffect(() => {
+    if (status === 'loading') return;
+    if (!session) {
+      router.push('/login');
+      return;
+    }
+
+    if (session && userRole === 'AUCTION_MANAGER') {
+      router.push('/subastas');
+    }
+    // Note: If not logged in, middleware will handle redirect to /login
+    // We don't need to redirect here to avoid conflicts
+  }, [session, userRole, status, router]);
 
   // If user is logged in and is a regular USER, show the user home page
   if (session && userRole === 'USER') {
-    return <UserHomePage company={company} subdomain={subdomain || ''} />;
+    return <UserHomePage company={company} />;
   }
 
+<<<<<<< HEAD
   // For AUCTION_MANAGER or not logged in, show "under development" page
   return (
     <div
@@ -176,4 +191,7 @@ function darkenColor(hex: string, percent: number): string {
       .toString(16)
       .slice(1)
   );
+=======
+  return;
+>>>>>>> development
 }

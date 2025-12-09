@@ -11,17 +11,16 @@ import { User, LogOut, ChevronDown, Gavel, Package, Users, MessageSquare, UserPl
 import Link from 'next/link';
 import Image from 'next/image';
 import { Spinner } from '@suba-go/shared-components/components/ui/spinner';
-import { isUserProfileComplete, isUserAdminOrManager } from '@/utils/subdomain-profile-validation';
+import {
+  isUserProfileComplete,
+  isUserAdminOrManager,
+} from '@/utils/subdomain-profile-validation';
 
 interface CompanyNavbarProps {
   company: CompanyDto;
-  subdomain: string;
 }
 
-export default function CompanyNavbar({
-  company,
-  subdomain,
-}: CompanyNavbarProps) {
+export default function CompanyNavbar({ company }: CompanyNavbarProps) {
   const primaryColor = company.principal_color || '#3B82F6';
   const { data: session, status } = useSession();
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
@@ -94,6 +93,7 @@ export default function CompanyNavbar({
           {/* Navigation Menu */}
           {/* check if the profile is complete */}
           {isUserProfileComplete(session) && (
+<<<<<<< HEAD
           <nav className="hidden md:flex flex-wrap items-center gap-3">
             <Link href="/subastas">
               <Button
@@ -184,6 +184,45 @@ export default function CompanyNavbar({
               </Link>
             )}
           </nav>
+=======
+            <nav className="hidden md:flex items-center space-x-6">
+              {isUserAdminOrManager(session) && (
+                <Link href="/subastas">
+                  <Button
+                    variant="ghost"
+                    className="text-gray-600 hover:text-gray-900 flex items-center gap-2"
+                  >
+                    <Gavel className="h-4 w-4" />
+                    Subastas
+                  </Button>
+                </Link>
+              )}
+              {/* Products - Only for AUCTION_MANAGER and ADMIN */}
+              {isUserAdminOrManager(session) && (
+                <Link href="/items">
+                  <Button
+                    variant="ghost"
+                    className="text-gray-600 hover:text-gray-900 flex items-center gap-2"
+                  >
+                    <Package className="h-4 w-4" />
+                    Productos
+                  </Button>
+                </Link>
+              )}
+              {/* Users - Only for AUCTION_MANAGER and ADMIN */}
+              {isUserAdminOrManager(session) && (
+                <Link href="/usuarios">
+                  <Button
+                    variant="ghost"
+                    className="text-gray-600 hover:text-gray-900 flex items-center gap-2"
+                  >
+                    <Users className="h-4 w-4" />
+                    Usuarios
+                  </Button>
+                </Link>
+              )}
+            </nav>
+>>>>>>> development
           )}
 
           {/* Right side actions */}
@@ -261,15 +300,17 @@ export default function CompanyNavbar({
       {/* Mobile menu (hidden by default, can be toggled) */}
       <div className="md:hidden border-t border-gray-200">
         <div className="px-4 py-2 space-y-1">
-          <Link href="/subastas">
-            <Button
-              variant="ghost"
-              className="w-full text-left justify-start text-gray-600 hover:text-gray-900 flex items-center gap-2"
-            >
-              <Gavel className="h-4 w-4" />
-              Subastas
-            </Button>
-          </Link>
+          {isUserAdminOrManager(session) && (
+            <Link href="/subastas">
+              <Button
+                variant="ghost"
+                className="w-full text-left justify-start text-gray-600 hover:text-gray-900 flex items-center gap-2"
+              >
+                <Gavel className="h-4 w-4" />
+                Subastas
+              </Button>
+            </Link>
+          )}
           {/* Products - Only for AUCTION_MANAGER and ADMIN */}
           {isUserAdminOrManager(session) && (
             <Link href="/items">

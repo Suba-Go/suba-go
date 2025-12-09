@@ -10,7 +10,6 @@ import {
   Request,
   HttpStatus,
   HttpCode,
-  Inject,
   Optional,
 } from '@nestjs/common';
 import {
@@ -25,12 +24,12 @@ import { RolesGuard } from '../../../common/guards/roles.guard';
 import { Roles } from '../../../common/decorators/roles.decorator';
 import { AuctionsService } from './services/auctions.service';
 import {
-  CreateAuctionDto,
   UpdateAuctionDto,
   AuctionStatsDto,
   AuctionResponseDto,
 } from './dto/auction.dto';
 import { AuctionsGateway } from '../../providers-modules/realtime/auctions.gateway';
+import { AuctionCreateDto } from '@suba-go/shared-validation';
 
 interface AuthenticatedRequest extends Request {
   user: {
@@ -70,7 +69,7 @@ export class AuctionsController {
   @ApiResponse({ status: 403, description: 'Sin permisos para crear subastas' })
   @HttpCode(HttpStatus.CREATED)
   async createAuction(
-    @Body() createAuctionDto: CreateAuctionDto,
+    @Body() createAuctionDto: AuctionCreateDto,
     @Request() req: AuthenticatedRequest
   ) {
     const tenantId = req.user.tenantId;

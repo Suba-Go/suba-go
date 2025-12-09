@@ -37,7 +37,11 @@ export default function ConditionalLayout({
     }
 
     const host = window.location.host; // includes port if present
-    const subdomain = getSubdomainFromHost(host, ROOT_DOMAIN);
+    let domain = ROOT_DOMAIN;
+    if (host.includes('development.subago.cl')) {
+      domain = 'development.subago.cl';
+    }
+    const subdomain = getSubdomainFromHost(host, domain);
     setIsSubdomain(subdomain !== null);
     setIsLoading(false);
   }, [pathname]);
@@ -48,10 +52,19 @@ export default function ConditionalLayout({
     if (status === 'loading' || isLoading) return;
     // Only enforce onboarding guard when inside a subdomain
     if (!isSubdomain) return;
-    
-    const user = session?.user;
-    const isIncomplete = !user || !user.name || user.name.trim().length < 3 || !user.phone || !user.rut;
-    if (isIncomplete && pathname !== '/onboarding') {
+
+    // Only redirect to onboarding if user is logged in but profile is incomplete
+    // If user is not logged in, let middleware handle redirect to /login
+    if (!session) return;
+
+    const user = session.user;
+    const isIncomplete =
+      !user ||
+      !user.name ||
+      user.name.trim().length < 3 ||
+      !user.phone ||
+      !user.rut;
+    if (isIncomplete && pathname !== '/onboarding' && pathname !== '/login') {
       router.replace('/onboarding');
     }
   }, [status, session, pathname, router, isSubdomain, isLoading]);

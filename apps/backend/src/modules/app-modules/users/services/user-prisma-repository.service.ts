@@ -2,12 +2,12 @@ import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../../providers-modules/prisma/prisma.service';
 import type { User, Prisma } from '@prisma/client';
 
-// Define User with relations type
-// Note: Tenant no longer has a name field - company name is used as subdomain
-type UserWithRelations = User & {
-  tenant?: { id: string };
-  company?: { id: string; name: string; principal_color?: string };
-};
+type UserWithCompanyAndTenant = Prisma.UserGetPayload<{
+  include: {
+    tenant: true;
+    company: true;
+  };
+}>;
 
 @Injectable()
 export class UserPrismaRepository {
@@ -55,12 +55,12 @@ export class UserPrismaRepository {
 
   async findByEmailWithRelations(
     email: string
-  ): Promise<UserWithRelations | null> {
+  ): Promise<UserWithCompanyAndTenant | null> {
     return this.prisma.user.findUnique({
       where: { email },
       include: {
-        tenant: true,
         company: true,
+        tenant: true,
       },
     });
   }

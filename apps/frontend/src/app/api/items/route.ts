@@ -11,7 +11,7 @@ export async function GET() {
     }
 
     // Get tenant from user session
-    const tenantId = session.user.tenant?.id;
+    const tenantId = session.user.tenantId;
     if (!tenantId) {
       return NextResponse.json(
         { error: 'Usuario sin tenant' },
@@ -74,7 +74,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Get tenant from user session
-    const tenantId = session.user.tenant?.id;
+    const tenantId = session.user.tenantId;
     if (!tenantId) {
       return NextResponse.json(
         { error: 'Usuario sin tenant' },

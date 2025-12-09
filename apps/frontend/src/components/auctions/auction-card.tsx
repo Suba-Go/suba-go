@@ -33,39 +33,21 @@ import {
   getAuctionStatusLabel,
 } from '@/lib/auction-badge-colors';
 import { useAuctionStatus } from '@/hooks/use-auction-status';
+import {
+  AuctionDto,
+  AuctionItemWithItmeAndBidsDto,
+  AuctionTypeEnum,
+  BidDto,
+} from '@suba-go/shared-validation';
+import { useFetchData } from '@/hooks/use-fetch-data';
 
 interface AuctionCardProps {
-  auction: {
-    id: string;
-    title: string;
-    description?: string;
-    startTime: string;
-    endTime: string;
-    status: string;
-    type?: string;
-    tenantId?: string;
-    items?: Array<{
-      id: string;
-      item: {
-        id: string;
-        plate?: string;
-        brand?: string;
-        model?: string;
-      };
-      bids: Array<{ offered_price: number }>;
-    }>;
-  };
-  subdomain: string;
+  auction: AuctionDto;
   onUpdate: () => void;
   onEdit?: (auction: AuctionCardProps['auction']) => void;
 }
 
-export function AuctionCard({
-  auction,
-  subdomain,
-  onUpdate,
-  onEdit,
-}: AuctionCardProps) {
+export function AuctionCard({ auction, onUpdate, onEdit }: AuctionCardProps) {
   const startTime = new Date(auction.startTime);
   const endTime = new Date(auction.endTime);
   const [showCompletedDialog, setShowCompletedDialog] = useState(false);
@@ -76,6 +58,12 @@ export function AuctionCard({
     auction.startTime,
     auction.endTime
   );
+
+  const { data: auctionItems } = useFetchData<AuctionItemWithItmeAndBidsDto[]>({
+    url: `/api/auction-items/${auction.id}`,
+    key: ['auctionItems', auction.id],
+    revalidateOnMount: true,
+  });
 
   const getStatusBadge = () => {
     return (
@@ -104,15 +92,15 @@ export function AuctionCard({
     return '';
   };
 
-  const totalItems = auction.items?.length || 0;
+  const totalItems = auctionItems?.length || 0;
   const totalBids =
-    auction.items?.reduce((sum, item) => sum + (item.bids?.length || 0), 0) ||
-    0;
+    auctionItems?.reduce((sum, item) => sum + (item.bids?.length || 0), 0) || 0;
   const highestBid =
-    auction.items?.reduce((max, item) => {
+    auctionItems?.reduce((max, item) => {
       const itemMax =
         item.bids?.reduce(
-          (itemMax, bid) => Math.max(itemMax, Number(bid.offered_price) || 0),
+          (itemMax, bid: BidDto) =>
+            Math.max(itemMax, Number(bid.offered_price) || 0),
           0
         ) || 0;
       return Math.max(max, itemMax);
@@ -150,7 +138,7 @@ export function AuctionCard({
           </div>
           <div className="flex items-center gap-2">
             {getStatusBadge()}
-            {auction.type === 'TEST' && (
+            {auction.type === AuctionTypeEnum.TEST && (
               <Badge className="text-xs bg-orange-100 text-orange-600">
                 Prueba
               </Badge>

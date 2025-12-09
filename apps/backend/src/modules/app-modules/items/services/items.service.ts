@@ -6,7 +6,7 @@ import {
 } from '@nestjs/common';
 import { ItemPrismaRepository } from './item-prisma-repository.service';
 import { CreateItemDto, UpdateItemDto, ItemStatsDto } from '../dto/item.dto';
-import type { Item, AuctionItem, Auction } from '@prisma/client';
+import type { Item, AuctionItem, Auction, Prisma } from '@prisma/client';
 import { ItemStateEnum, LegalStatusEnum } from '@prisma/client';
 
 type ItemWithRelations = Item & {
@@ -71,14 +71,36 @@ export class ItemsService {
       legalStatus = LegalStatusEnum.OTRO;
     }
 
-    return this.itemRepository.create({
-      ...itemData,
+    // Ensure required fields are present (TypeScript should catch this, but we validate at runtime too)
+    if (!itemData.plate) {
+      throw new BadRequestException('La patente es requerida');
+    }
+    if (!itemData.brand) {
+      throw new BadRequestException('La marca es requerida');
+    }
+    if (!itemData.basePrice || itemData.basePrice <= 0) {
+      throw new BadRequestException('El precio base es requerido y debe ser positivo');
+    }
+
+    // Build the create input with all required fields explicitly typed
+    const createInput: Prisma.ItemCreateInput = {
+      plate: itemData.plate,
+      brand: itemData.brand,
+      model: itemData.model,
+      year: itemData.year,
+      version: itemData.version,
+      kilometraje: itemData.kilometraje,
+      basePrice: itemData.basePrice,
+      photos: itemData.photos,
+      docs: itemData.docs,
       state,
       legal_status: legalStatus,
       tenant: {
         connect: { id: tenantId },
       },
-    });
+    };
+
+    return this.itemRepository.create(createInput);
   }
 
   async getItemsByTenant(tenantId: string): Promise<Item[]> {
@@ -149,8 +171,8 @@ export class ItemsService {
   async getItemStats(tenantId: string): Promise<ItemStatsDto> {
     const [totalItems, availableItems, inAuctionItems] = await Promise.all([
       this.itemRepository.count(tenantId),
-      this.itemRepository.findByState('DISPONIBLE', tenantId),
-      this.itemRepository.findByState('EN_SUBASTA', tenantId),
+      this.itemRepository.findByState(ItemStateEnum.DISPONIBLE, tenantId),
+      this.itemRepository.findByState(ItemStateEnum.EN_SUBASTA, tenantId),
     ]);
 
     return {
@@ -173,5 +195,9 @@ export class ItemsService {
     await this.getItemById(id, tenantId); // Validate access
 
     return this.itemRepository.update(id, { state: state as ItemStateEnum });
+  }
+
+  async getItemsSoldToUser(userId: string, tenantId: string): Promise<Item[]> {
+    return this.itemRepository.findSoldToUser(userId, tenantId);
   }
 }

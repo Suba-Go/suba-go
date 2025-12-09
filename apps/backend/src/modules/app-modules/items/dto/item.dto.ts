@@ -13,19 +13,20 @@ import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { LegalStatusEnum, ItemStateEnum } from '@prisma/client';
 
 export class CreateItemDto {
-  @ApiPropertyOptional({
+  @ApiProperty({
     description: 'Patente del vehículo',
     minLength: 6,
     maxLength: 6,
   })
-  @IsOptional()
   @IsString()
-  plate?: string;
+  @MinLength(6, { message: 'La patente debe tener exactamente 6 caracteres' })
+  @MaxLength(6, { message: 'La patente debe tener exactamente 6 caracteres' })
+  plate: string;
 
-  @ApiPropertyOptional({ description: 'Marca del vehículo' })
-  @IsOptional()
+  @ApiProperty({ description: 'Marca del vehículo' })
   @IsString()
-  brand?: string;
+  @MinLength(1, { message: 'La marca es requerida' })
+  brand: string;
 
   @ApiPropertyOptional({ description: 'Modelo del vehículo' })
   @IsOptional()
@@ -61,12 +62,11 @@ export class CreateItemDto {
   @IsEnum(LegalStatusEnum, { message: 'Estado legal inválido' })
   legal_status?: LegalStatusEnum;
 
-  @ApiPropertyOptional({ description: 'Precio base del item' })
-  @IsOptional()
+  @ApiProperty({ description: 'Precio base del item' })
   @IsNumber({}, { message: 'El precio base debe ser un número' })
   @IsPositive({ message: 'El precio base debe ser positivo' })
   @Transform(({ value }) => Number(value))
-  basePrice?: number;
+  basePrice: number;
 
   @ApiPropertyOptional({ description: 'URLs de fotos separadas por comas' })
   @IsOptional()

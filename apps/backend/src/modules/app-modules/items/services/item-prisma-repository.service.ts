@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../../providers-modules/prisma/prisma.service';
-import type { Item, Prisma, ItemStateEnum } from '@prisma/client';
+import { Item, Prisma, ItemStateEnum } from '@prisma/client';
 
 @Injectable()
 export class ItemPrismaRepository {
@@ -113,11 +113,52 @@ export class ItemPrismaRepository {
     return this.prisma.item.findMany({
       where: {
         tenantId,
-        state: 'DISPONIBLE',
+        state: ItemStateEnum.DISPONIBLE,
         isDeleted: false,
       },
       include: {
         tenant: true,
+      },
+    });
+  }
+
+  async findSoldToUser(userId: string, tenantId: string): Promise<Item[]> {
+    return this.prisma.item.findMany({
+      where: {
+        tenantId,
+        soldToUserId: userId,
+        state: ItemStateEnum.VENDIDO,
+        isDeleted: false,
+      },
+      include: {
+        tenant: true,
+        soldToUser: {
+          select: {
+            id: true,
+            email: true,
+            public_name: true,
+            role: true,
+          },
+        },
+        auctionItems: {
+          include: {
+            auction: {
+              select: {
+                id: true,
+                title: true,
+                status: true,
+                endTime: true,
+              },
+            },
+          },
+          orderBy: {
+            createdAt: 'desc',
+          },
+          take: 1, // Get the most recent auction
+        },
+      },
+      orderBy: {
+        soldAt: 'desc',
       },
     });
   }

@@ -1,9 +1,9 @@
 'use client';
 
-import { useState } from 'react';
-import { useForm, Controller } from 'react-hook-form';
+import { useEffect, useMemo, useState } from 'react';
+import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { Calendar, Clock, DollarSign, Package } from 'lucide-react';
+import { Calendar, Clock, Package } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -20,7 +20,8 @@ import { Switch } from '@suba-go/shared-components/components/ui/switch';
 import { ItemSelector } from './item-selector';
 import { useCompany } from '@/hooks/use-company';
 import { DateInput } from '@/components/ui/date-input';
-import { TimeInput } from '@/components/ui/time-input';
+import { TimeSelector } from '@/components/ui/time-selector';
+import { FormattedInput } from '@/components/ui/formatted-input';
 import {
   auctionCreateSchema,
   AuctionTypeEnum,
@@ -33,6 +34,13 @@ interface AuctionCreateModalProps {
   onSuccess: () => void;
 }
 
+const getDefaultStartDate = () => {
+  const base = new Date();
+  base.setDate(base.getDate() + 1);
+  base.setHours(0, 0, 0, 0);
+  return base;
+};
+
 export function AuctionCreateModal({
   isOpen,
   onClose,
@@ -41,6 +49,10 @@ export function AuctionCreateModal({
   const [isLoading, setIsLoading] = useState(false);
   const [selectedItems, setSelectedItems] = useState<string[]>([]);
   const [isTestAuction, setIsTestAuction] = useState(false);
+  const [startDate, setStartDate] = useState<Date>(getDefaultStartDate);
+  const [startTimeInput, setStartTimeInput] = useState('10:00');
+  const [durationMinutes, setDurationMinutes] = useState(30);
+  const [showItemError, setShowItemError] = useState(false);
   const { toast } = useToast();
 
   const {
@@ -49,34 +61,91 @@ export function AuctionCreateModal({
     formState: { errors },
     reset,
     setValue,
-    control,
-  } = useForm({
+  } = useForm<AuctionCreateDto>({
     resolver: zodResolver(auctionCreateSchema),
     defaultValues: {
+      title: '',
+      description: '',
+      startTime: getDefaultStartDate(),
+      endTime: new Date(getDefaultStartDate().getTime() + 30 * 60000),
       bidIncrement: 50000,
-      durationMinutes: 30,
-      selectedItems: [],
-      startDate: new Date(new Date().getTime() + 24 * 60 * 60 * 1000), // Tomorrow
-      startTime: '10:00',
+      tenantId: '',
+      itemIds: [],
       type: AuctionTypeEnum.REAL,
     },
   });
 
-  // Opciones predefinidas para la duración
-  const durationOptions = [
-    { value: 15, label: '15 minutos' },
-    { value: 30, label: '30 minutos' },
-    { value: 45, label: '45 minutos' },
-    { value: 60, label: '1 hora' },
-    { value: 120, label: '2 horas' },
-    { value: 300, label: '5 horas' },
-  ];
+  const { company } = useCompany();
+  const primaryColor = company?.principal_color || '#3B82F6';
 
-  const onSubmit = async (
-    data: AuctionCreateDto & { selectedItems: string[] }
-  ) => {
-    // Validar que hay items seleccionados
-    if (!data.selectedItems || data.selectedItems.length === 0) {
+  // Create dynamic style for focus ring
+  const inputFocusStyle = useMemo(
+    () =>
+      ({
+        '--tw-ring-color': primaryColor,
+      } as React.CSSProperties),
+    [primaryColor]
+  );
+
+  useEffect(() => {
+    if (company?.tenantId) {
+      setValue('tenantId', company.tenantId);
+    }
+  }, [company?.tenantId, setValue]);
+
+  const durationOptions = useMemo(
+    () => [
+      { value: 5, label: '5 minutos' },
+      { value: 10, label: '10 minutos' },
+      { value: 15, label: '15 minutos' },
+      { value: 30, label: '30 minutos' },
+      { value: 45, label: '45 minutos' },
+      { value: 60, label: '1 hora' },
+      { value: 120, label: '2 horas' },
+      { value: 300, label: '5 horas' },
+      { value: 1440, label: '1 dia' },
+      { value: 10080, label: '7 dias' },
+    ],
+    []
+  );
+
+  useEffect(() => {
+    const [hoursStr, minutesStr] = startTimeInput.split(':');
+    const hours = Number(hoursStr);
+    const minutes = Number(minutesStr);
+
+    if (
+      Number.isNaN(hours) ||
+      Number.isNaN(minutes) ||
+      hours < 0 ||
+      hours > 23 ||
+      minutes < 0 ||
+      minutes > 59
+    ) {
+      return;
+    }
+
+    const startDateTime = new Date(startDate);
+    startDateTime.setHours(hours, minutes, 0, 0);
+
+    const endDateTime = new Date(startDateTime);
+    endDateTime.setMinutes(endDateTime.getMinutes() + durationMinutes);
+
+    setValue('startTime', startDateTime);
+    setValue('endTime', endDateTime);
+  }, [startDate, startTimeInput, durationMinutes, setValue]);
+  const onSubmit = async (data: AuctionCreateDto) => {
+    if (!company?.tenantId) {
+      toast({
+        title: 'Error',
+        description: 'No se pudo determinar el tenant actual.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    if (!data.itemIds.length) {
+      setShowItemError(true);
       toast({
         title: 'Error',
         description: 'Debe seleccionar al menos un item para la subasta',
@@ -85,23 +154,16 @@ export function AuctionCreateModal({
       return;
     }
 
-    // Validar que la fecha y hora de inicio sea futura
-    const [hours, minutes] = data.startTime.split(':');
-    const startDateTime = new Date(data.startDate);
-    startDateTime.setHours(parseInt(hours), parseInt(minutes), 0, 0);
+    setShowItemError(false);
 
     const now = new Date();
-
-    // Allow same-day auctions if the time is in the future
-    if (startDateTime <= now) {
-      const isToday = startDateTime.toDateString() === now.toDateString();
-      const errorMessage = isToday
-        ? 'La hora de inicio debe ser posterior a la hora actual'
-        : 'La fecha y hora de inicio debe ser futura';
-
+    if (data.startTime <= now) {
+      const isToday = data.startTime.toDateString() === now.toDateString();
       toast({
         title: 'Error',
-        description: errorMessage,
+        description: isToday
+          ? 'La hora de inicio debe ser posterior a la hora actual'
+          : 'La fecha y hora de inicio debe ser futura',
         variant: 'destructive',
       });
       return;
@@ -109,28 +171,21 @@ export function AuctionCreateModal({
 
     setIsLoading(true);
     try {
-      // Combinar fecha y hora para crear startTime
-
-      // Calcular endTime basado en la duración
-      const endDateTime = new Date(startDateTime);
-      endDateTime.setMinutes(endDateTime.getMinutes() + data.durationMinutes);
-
-      const requestBody = {
-        title: data.title,
-        description: data.description,
-        startTime: startDateTime.toISOString(),
-        endTime: endDateTime.toISOString(),
-        bidIncrement: data.bidIncrement,
-        selectedItems: data.selectedItems,
-        type: isTestAuction ? AuctionTypeEnum.TEST : AuctionTypeEnum.REAL,
-      };
-
       const response = await fetch('/api/auctions', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(requestBody),
+        body: JSON.stringify({
+          title: data.title,
+          description: data.description,
+          startTime: data.startTime.toISOString(),
+          endTime: data.endTime.toISOString(),
+          bidIncrement: data.bidIncrement,
+          type: isTestAuction ? AuctionTypeEnum.TEST : data.type,
+          tenantId: data.tenantId,
+          itemIds: data.itemIds,
+        }),
       });
 
       if (!response.ok) {
@@ -139,12 +194,27 @@ export function AuctionCreateModal({
       }
 
       toast({
-        title: 'Éxito',
+        title: 'Exito',
         description: 'Subasta creada correctamente',
       });
 
-      reset();
+      const resetStartDate = getDefaultStartDate();
+      reset({
+        title: '',
+        description: '',
+        startTime: resetStartDate,
+        endTime: new Date(resetStartDate.getTime() + 30 * 60000),
+        bidIncrement: 50000,
+        tenantId: company?.tenantId ?? '',
+        itemIds: [],
+        type: AuctionTypeEnum.REAL,
+      });
+      setStartDate(resetStartDate);
+      setStartTimeInput('10:00');
+      setDurationMinutes(30);
       setSelectedItems([]);
+      setIsTestAuction(false);
+      setShowItemError(false);
       onSuccess();
     } catch (error) {
       toast({
@@ -152,30 +222,43 @@ export function AuctionCreateModal({
         description:
           error instanceof Error
             ? error.message
-            : 'No se pudo crear la subasta. Inténtalo de nuevo.',
+            : 'No se pudo crear la subasta. Intentalo de nuevo.',
         variant: 'destructive',
       });
     } finally {
       setIsLoading(false);
     }
   };
-
   const handleClose = () => {
-    reset();
+    const resetStartDate = getDefaultStartDate();
+    reset({
+      title: '',
+      description: '',
+      startTime: resetStartDate,
+      endTime: new Date(resetStartDate.getTime() + 30 * 60000),
+      bidIncrement: 50000,
+      tenantId: company?.tenantId ?? '',
+      itemIds: [],
+      type: AuctionTypeEnum.REAL,
+    });
+    setStartDate(resetStartDate);
+    setStartTimeInput('10:00');
+    setDurationMinutes(30);
     setSelectedItems([]);
+    setIsTestAuction(false);
+    setShowItemError(false);
     onClose();
   };
 
-  // Set minimum date to today
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-
-  const { company } = useCompany();
-  const primaryColor = company?.principal_color || '#3B82F6';
+  const today = useMemo(() => {
+    const t = new Date();
+    t.setHours(0, 0, 0, 0);
+    return t;
+  }, []);
 
   return (
     <Dialog open={isOpen} onOpenChange={handleClose}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto p-4 sm:p-6">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Calendar className="h-5 w-5" />
@@ -188,152 +271,159 @@ export function AuctionCreateModal({
         </DialogHeader>
 
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
-          {/* Basic Information */}
           <div className="space-y-4">
             <div>
-              <Label htmlFor="title">Título de la Subasta *</Label>
+              <Label htmlFor="title">Titulo de la Subasta *</Label>
               <Input
                 id="title"
                 {...register('title')}
-                placeholder="Ej: Subasta de Vehículos Enero 2024"
-                className={errors.title ? 'border-red-500' : ''}
+                placeholder="Ej: Subasta de Vehiculos Enero 2024"
+                className={
+                  errors.title
+                    ? 'border-red-500 focus-visible:ring-red-500'
+                    : 'focus-visible:ring-1'
+                }
+                style={errors.title ? undefined : inputFocusStyle}
               />
               {errors.title && (
                 <p className="text-sm text-red-600 mt-1">
-                  {errors.title.message}
+                  {errors.title.message as string}
                 </p>
               )}
             </div>
 
             <div>
-              <Label htmlFor="description">Descripción (Opcional)</Label>
+              <Label htmlFor="description">Descripcion</Label>
+              <p className="text-xs text-gray-500 mb-2">(Opcional)</p>
               <Textarea
                 id="description"
                 {...register('description')}
                 placeholder="Describe los detalles de la subasta..."
                 rows={3}
+                className="focus-visible:ring-1"
+                style={inputFocusStyle}
               />
             </div>
           </div>
 
-          {/* Timing */}
           <div className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <Label htmlFor="startDate" className="flex items-center gap-2">
-                  <Calendar className="h-4 w-4" />
-                  Fecha de Inicio * (dd/mm/yyyy)
-                </Label>
-                <Controller
-                  name="startDate"
-                  control={control}
-                  render={({ field }) => (
-                    <DateInput
-                      value={field.value}
-                      onChange={field.onChange}
-                      minDate={today}
-                      error={!!errors.startDate}
-                    />
-                  )}
-                />
-                {errors.startDate && (
-                  <p className="text-sm text-red-600 mt-1">
-                    {errors.startDate.message}
+              <div className="flex flex-col">
+                <div className="h-6 flex items-center mb-2">
+                  <Label
+                    htmlFor="startDate"
+                    className="flex items-center gap-2"
+                  >
+                    <Calendar className="h-4 w-4" />
+                    Fecha de Inicio *
+                  </Label>
+                </div>
+                <div className="min-h-[3rem] flex flex-col justify-end">
+                  <p className="text-xs mb-2 text-gray-500">
+                    Formato: dd/mm/yyyy
                   </p>
-                )}
-                <p className="text-xs text-gray-500 mt-1">
-                  Formato: día/mes/año
-                </p>
+                  <DateInput
+                    value={startDate}
+                    onChange={(date) => date && setStartDate(date)}
+                    minDate={today}
+                    className="focus-visible:ring-1"
+                    style={inputFocusStyle}
+                  />
+                </div>
               </div>
 
-              <div>
-                <Label htmlFor="startTime" className="flex items-center gap-2">
-                  <Clock className="h-4 w-4" />
-                  Hora de Inicio * (HH:MM)
-                </Label>
-                <Controller
-                  name="startTime"
-                  control={control}
-                  render={({ field }) => (
-                    <TimeInput
-                      value={field.value}
-                      onChange={field.onChange}
-                      error={!!errors.startTime}
-                    />
-                  )}
-                />
-                {errors.startTime && (
-                  <p className="text-sm text-red-600 mt-1">
-                    {errors.startTime.message}
+              <div className="flex flex-col">
+                <div className="h-6 flex items-center mb-2">
+                  <Label
+                    htmlFor="startTime"
+                    className="flex items-center gap-2"
+                  >
+                    <Clock className="h-4 w-4" />
+                    Hora de Inicio *
+                  </Label>
+                </div>
+                <div className="min-h-[3rem] flex flex-col justify-end">
+                  <p className="text-xs mb-2 text-gray-500">
+                    Formato: 24 horas (ej: 14:30)
                   </p>
-                )}
-                <p className="text-xs text-gray-500 mt-1">
-                  Formato: 24 horas (ej: 14:30)
-                </p>
+                  <TimeSelector
+                    value={startTimeInput}
+                    onChange={setStartTimeInput}
+                    style={inputFocusStyle}
+                  />
+                </div>
               </div>
             </div>
 
-            <div>
-              <Label
-                htmlFor="durationMinutes"
-                className="flex items-center gap-2"
-              >
-                <Clock className="h-4 w-4" />
-                Duración de la Subasta *
-              </Label>
-              <div className="flex gap-2 items-center justify-between grid grid-cols-2">
-                <select
-                  {...register('durationMinutes', { valueAsNumber: true })}
-                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  {durationOptions.map((option) => (
-                    <option key={option.value} value={option.value}>
-                      {option.label}
-                    </option>
-                  ))}
-                </select>
-                {errors.durationMinutes && (
-                  <p className="text-sm text-red-600 mt-1">
-                    {errors.durationMinutes.message}
-                  </p>
-                )}
-                {/* Bid Increment */}
-                <div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="flex flex-col">
+                <div className="h-6 flex items-center mb-2">
+                  <Label className="flex items-center gap-2">
+                    <Clock className="h-4 w-4" />
+                    Duracion de la Subasta *
+                  </Label>
+                </div>
+                <div className="min-h-[3rem] flex flex-col justify-end">
+                  <select
+                    value={durationMinutes}
+                    onChange={(event) =>
+                      setDurationMinutes(Number(event.target.value))
+                    }
+                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 pr-8 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 appearance-none"
+                    style={inputFocusStyle}
+                  >
+                    {durationOptions.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              <div className="flex flex-col">
+                <div className="h-6 flex items-center mb-2">
                   <Label
                     htmlFor="bidIncrement"
                     className="flex items-center gap-2"
                   >
-                    <DollarSign className="h-4 w-4" />
-                    Incremento Mínimo de Puja (CLP) *
+                    Incremento Minimo de Puja (CLP) *
                   </Label>
-                  <Input
+                </div>
+                <div className="min-h-[3rem] flex flex-col justify-end">
+                  <FormattedInput
                     id="bidIncrement"
-                    type="number"
-                    {...register('bidIncrement', { valueAsNumber: true })}
-                    placeholder="50000"
-                    min="1000"
-                    step="1000"
-                    className={errors.bidIncrement ? 'border-red-500' : ''}
+                    formatType="price"
+                    placeholder="Ej: $50.000"
+                    className={
+                      errors.bidIncrement
+                        ? 'border-red-500 focus-visible:ring-red-500'
+                        : 'focus-visible:ring-1'
+                    }
+                    style={errors.bidIncrement ? undefined : inputFocusStyle}
+                    onChange={(value) => {
+                      const numValue =
+                        typeof value === 'number' ? value : Number(value);
+                      setValue('bidIncrement', numValue || 0, {
+                        shouldValidate: true,
+                      });
+                    }}
                   />
                   {errors.bidIncrement && (
                     <p className="text-sm text-red-600 mt-1">
-                      {errors.bidIncrement.message}
+                      {errors.bidIncrement.message as string}
                     </p>
                   )}
-                  <p className="text-sm text-gray-600 mt-1">
-                    Los participantes deberán pujar en incrementos de este monto
-                  </p>
                 </div>
               </div>
             </div>
           </div>
 
-          {/* Auction Type */}
           <div className="flex items-center justify-between p-4 border rounded-lg bg-gray-50">
             <div className="space-y-1">
               <Label className="text-sm font-medium">Tipo de Subasta</Label>
               <p className="text-sm text-gray-600">
-                Las subastas de prueba no aparecen en estadísticas
+                Las subastas de prueba no aparecen en estadisticas
               </p>
             </div>
             <div className="flex items-center gap-3">
@@ -348,7 +438,13 @@ export function AuctionCreateModal({
               </span>
               <Switch
                 checked={isTestAuction}
-                onCheckedChange={setIsTestAuction}
+                onCheckedChange={(checked) => {
+                  setIsTestAuction(checked);
+                  setValue(
+                    'type',
+                    checked ? AuctionTypeEnum.TEST : AuctionTypeEnum.REAL
+                  );
+                }}
               />
               <span
                 className={`text-sm ${
@@ -372,10 +468,10 @@ export function AuctionCreateModal({
               selectedItems={selectedItems}
               onItemsChange={(items) => {
                 setSelectedItems(items);
-                setValue('selectedItems', items);
+                setValue('itemIds', items);
               }}
             />
-            {selectedItems.length === 0 && (
+            {showItemError && selectedItems.length === 0 && (
               <p className="text-sm text-red-600 mt-1">
                 Debe seleccionar al menos un item
               </p>

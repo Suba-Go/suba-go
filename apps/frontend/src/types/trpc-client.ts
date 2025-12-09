@@ -4,25 +4,28 @@
  */
 
 import type {
-  UserCreateInput,
-  CompanyCreateInput,
-  TenantCreateInput,
-  ConnectUserInput,
   MultiStepFormInput,
   ApiResponse,
   UserDto,
   CompanyDto,
   TenantDto,
+  UserSafeDto,
+  UserCreateDto,
+  CompanyCreateCompactDto,
+  TenantCreateDto,
+  UserWithTenantAndCompanyDto,
 } from '@suba-go/shared-validation';
 
 // Define the structure of our tRPC router for type safety
 export interface AppRouterClient {
   user: {
     create: {
-      mutate: (input: UserCreateInput) => Promise<ApiResponse<UserDto>>;
+      mutate: (input: UserCreateDto) => Promise<ApiResponse<UserSafeDto>>;
     };
     connectToCompanyAndTenant: {
-      mutate: (input: ConnectUserInput) => Promise<ApiResponse<UserDto>>;
+      mutate: (
+        input: UserWithTenantAndCompanyDto
+      ) => Promise<ApiResponse<UserDto>>;
     };
     getCompanyDomain: {
       query: (input: {
@@ -32,12 +35,14 @@ export interface AppRouterClient {
   };
   company: {
     create: {
-      mutate: (input: CompanyCreateInput) => Promise<ApiResponse<CompanyDto>>;
+      mutate: (
+        input: CompanyCreateCompactDto
+      ) => Promise<ApiResponse<CompanyDto>>;
     };
   };
   tenant: {
     create: {
-      mutate: (input: TenantCreateInput) => Promise<ApiResponse<TenantDto>>;
+      mutate: (input: TenantCreateDto) => Promise<ApiResponse<TenantDto>>;
     };
   };
   multiStepForm: {
@@ -46,7 +51,6 @@ export interface AppRouterClient {
         ApiResponse<{
           user: UserDto;
           company: CompanyDto;
-          tenant: TenantDto;
         }>
       >;
     };

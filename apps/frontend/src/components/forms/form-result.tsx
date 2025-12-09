@@ -1,26 +1,7 @@
 import { CompanyDto } from '@suba-go/shared-validation';
 import Link from 'next/link';
 import { Button } from '@suba-go/shared-components/components/ui/button';
-import { getNodeEnv } from '@suba-go/shared-components';
-
-// Helper to build company URL based on environment
-function getCompanyUrl(companyNameLowercase: string): string {
-  if (typeof window === 'undefined') return '#';
-
-  const nodeEnv = getNodeEnv();
-
-  if (nodeEnv === 'local') {
-    // Local: http://{company}.localhost:3000
-    return `http://${companyNameLowercase}.localhost:3000/login`;
-  } else if (nodeEnv === 'development') {
-    // Development: https://{company}.development.subago.cl
-    return `https://${companyNameLowercase}.development.subago.cl/login`;
-  } else {
-    // Production: https://{company}.subago.cl
-    const rootDomain = process.env.NEXT_PUBLIC_ROOT_DOMAIN || 'subago.cl';
-    return `https://${companyNameLowercase}.${rootDomain}/login`;
-  }
-}
+import getCompanyUrl from './helper/company-url';
 
 export default function FormResult({
   companyData,

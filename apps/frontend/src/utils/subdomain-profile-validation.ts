@@ -1,3 +1,4 @@
+import { UserRolesEnum } from '@suba-go/shared-validation';
 import { Session } from 'next-auth';
 
 /**
@@ -19,14 +20,6 @@ export function isUserProfileComplete(session: Session | null): boolean {
     rut &&
     rut.trim().length > 0
   );
-
-  console.log('Profile validation:', {
-    email: session.user.email,
-    name: name ? `${name.substring(0, 3)}...` : 'missing',
-    phone: phone ? `${phone.substring(0, 3)}...` : 'missing',
-    rut: rut ? `${rut.substring(0, 3)}...` : 'missing',
-    isComplete
-  });
 
   return isComplete;
 }
@@ -60,7 +53,10 @@ export function getMissingProfileFields(session: Session | null): string[] {
 /**
  * Verifies if the user belongs to the subdomain company
  */
-export function isUserInCorrectCompany(session: Session | null, subdomain: string): boolean {
+export function isUserInCorrectCompany(
+  session: Session | null,
+  subdomain: string
+): boolean {
   if (!session?.user?.company?.name) {
     return false;
   }
@@ -76,5 +72,8 @@ export function isUserAdminOrManager(session: Session | null): boolean {
     return false;
   }
 
-  return session.user.role === 'AUCTION_MANAGER' || session.user.role === 'ADMIN';
+  return (
+    session.user.role === UserRolesEnum.AUCTION_MANAGER ||
+    session.user.role === UserRolesEnum.ADMIN
+  );
 }

@@ -13,9 +13,10 @@ import { Button } from '@suba-go/shared-components/components/ui/button';
 import { useToast } from '@suba-go/shared-components/components/ui/toaster';
 import { UserPlus } from 'lucide-react';
 import { ParticipantSelector } from './participant-selector';
+import { AuctionDto } from '@suba-go/shared-validation';
 
 interface AddParticipantModalProps {
-  auctionId: string;
+  auction: AuctionDto;
   isOpen: boolean;
   onClose: () => void;
   onSuccess: () => void;
@@ -23,7 +24,7 @@ interface AddParticipantModalProps {
 }
 
 export function AddParticipantModal({
-  auctionId,
+  auction,
   isOpen,
   onClose,
   onSuccess,
@@ -52,7 +53,7 @@ export function AddParticipantModal({
     try {
       // Register each participant
       const promises = selectedParticipants.map((userId) =>
-        fetch(`/api/auctions/${auctionId}/register`, {
+        fetch(`/api/auctions/${auction.id}/register`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',

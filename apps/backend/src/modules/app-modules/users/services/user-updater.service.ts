@@ -28,7 +28,9 @@ export class UserUpdaterService {
           updateData.email
         );
         if (userWithEmail && userWithEmail.id !== userId) {
-          throw new ConflictException('El email ya está en uso por otro usuario');
+          throw new ConflictException(
+            'El email ya está en uso por otro usuario'
+          );
         }
       }
 
@@ -42,12 +44,12 @@ export class UserUpdaterService {
         }
       }
 
-
       const updatePayload = {
         ...updateData,
         phone: updateData.phone === '' ? null : updateData.phone,
         rut: updateData.rut === '' ? null : updateData.rut,
-        public_name: updateData.public_name === '' ? null : updateData.public_name,
+        public_name:
+          updateData.public_name === '' ? null : updateData.public_name,
       };
 
       // Update user and return safe data
@@ -61,13 +63,15 @@ export class UserUpdaterService {
       return userSafe as UserSafeDto;
     } catch (error) {
       console.error('Error in updateUserProfile:', error);
-      
-      if (error instanceof NotFoundException || 
-          error instanceof ConflictException || 
-          error instanceof BadRequestException) {
+
+      if (
+        error instanceof NotFoundException ||
+        error instanceof ConflictException ||
+        error instanceof BadRequestException
+      ) {
         throw error;
       }
-      
+
       throw new InternalServerErrorException(
         `Error interno al actualizar el perfil: ${error.message}`
       );

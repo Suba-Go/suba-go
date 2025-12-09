@@ -1,4 +1,5 @@
 ignoredBuiltDependencies:
+  - '@vercel/speed-insights'
   - bcrypt
   - bufferutil
   - unrs-resolver

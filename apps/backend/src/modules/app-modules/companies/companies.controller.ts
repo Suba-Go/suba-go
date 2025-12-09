@@ -3,6 +3,7 @@ import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import { CompanyCreatorService } from './services/company-creator.service';
 import { CompanyGetterService } from './services/company-getter.service';
+<<<<<<< HEAD
 import { CompanyUpdaterService } from './services/company-updater.service';
 import { JwtAuthGuard } from '../../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../../common/guards/roles.guard';
@@ -16,6 +17,9 @@ enum UserRolesEnum {
   USER = 'USER',
   AUCTION_MANAGER = 'AUCTION_MANAGER',
 }
+=======
+import { CompanyCreateCompactDto } from '@suba-go/shared-validation';
+>>>>>>> development
 
 @Controller('companies')
 export class CompaniesController {
@@ -28,13 +32,13 @@ export class CompaniesController {
   ) {}
 
   @Post()
-  async createCompanyStandalone(@Body() companyData: CompanyCreateDto) {
+  async createCompanyStandalone(@Body() companyData: CompanyCreateCompactDto) {
     return await this.companyCreatorService.createCompany(companyData);
   }
 
   @Post('tenant/:tenantId')
   async createCompany(
-    @Body() companyData: CompanyCreateDto,
+    @Body() companyData: CompanyCreateCompactDto,
     @Param('tenantId') tenantId: string
   ) {
     return await this.companyCreatorService.createCompany(

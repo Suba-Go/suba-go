@@ -16,26 +16,20 @@ import {
 import { Badge } from '@suba-go/shared-components/components/ui/badge';
 import { format, formatDistanceToNow } from 'date-fns';
 import { es } from 'date-fns/locale';
+import {
+  AuctionDto,
+  AuctionItemWithItmeAndBidsDto,
+} from '@suba-go/shared-validation';
 
 interface AuctionPendingViewProps {
-  auction: {
-    title: string;
-    description?: string;
-    startTime: string;
-    endTime: string;
-    items?: Array<{
-      id: string;
-      item?: {
-        brand?: string;
-        model?: string;
-        year?: number;
-        plate?: string;
-      };
-    }>;
-  };
+  auction: AuctionDto;
+  auctionItems: AuctionItemWithItmeAndBidsDto[];
 }
 
-export function AuctionPendingView({ auction }: AuctionPendingViewProps) {
+export function AuctionPendingView({
+  auction,
+  auctionItems,
+}: AuctionPendingViewProps) {
   const startTime = new Date(auction.startTime);
   const endTime = new Date(auction.endTime);
   const timeUntilStart = formatDistanceToNow(startTime, {
@@ -107,14 +101,14 @@ export function AuctionPendingView({ auction }: AuctionPendingViewProps) {
       </Card>
 
       {/* Items Preview */}
-      {auction.items && auction.items.length > 0 && (
+      {auctionItems && auctionItems.length > 0 && (
         <Card>
           <CardHeader>
             <CardTitle>Vehículos en esta Subasta</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {auction.items.map((auctionItem) => (
+              {auctionItems.map((auctionItem) => (
                 <div
                   key={auctionItem.id}
                   className="p-4 border rounded-lg bg-gray-50"

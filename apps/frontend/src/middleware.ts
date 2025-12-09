@@ -15,7 +15,13 @@ const ROOT_DOMAIN =
 
 export default auth(async function middleware(request: NextRequest) {
   const host = request.headers.get('host') ?? '';
-  const subdomain = getSubdomainFromHost(host, ROOT_DOMAIN);
+  let domain = ROOT_DOMAIN;
+
+  if (host.includes('development.subago.cl')) {
+    domain = 'development.subago.cl';
+  }
+
+  const subdomain = getSubdomainFromHost(host, domain);
   const { pathname } = request.nextUrl;
 
   // Prevent direct access to internal /s/ routes
@@ -111,6 +117,7 @@ export default auth(async function middleware(request: NextRequest) {
         new URL(`/s/${subdomain}/subastas`, request.url)
       );
     }
+<<<<<<< HEAD
     // Stats page
     if (pathname === '/estadisticas') {
       return NextResponse.rewrite(
@@ -118,6 +125,9 @@ export default auth(async function middleware(request: NextRequest) {
       );
     }
     
+=======
+
+>>>>>>> development
     // Onboarding page
     if (pathname === '/onboarding') {
       return NextResponse.rewrite(
@@ -147,27 +157,19 @@ export default auth(async function middleware(request: NextRequest) {
 
     // Validate user belongs to the company (subdomain is company name)
     if (session && !isPublic) {
-    const userCompanyName = session.user?.company?.name ?? '';
+      const userCompanyName = session.user?.company?.name ?? '';
 
-    if (userCompanyName !== subdomain) {
-      // Redirect to login if user doesn't belong to this company
-      const login = new URL('/login', request.url);
-      return NextResponse.redirect(login);
-    }
+      if (userCompanyName !== subdomain) {
+        // Redirect to login if user doesn't belong to this company
+        const login = new URL('/login', request.url);
+        return NextResponse.redirect(login);
+      }
 
-    // Check if user profile is complete - redirect to /onboarding if not
-    if (!isUserProfileComplete(session)) {
-      console.log('Profile incomplete, redirecting to /onboarding', {
-        user: session.user?.email,
-        name: session.user?.name,
-        phone: session.user?.phone,
-        rut: session.user?.rut,
-        pathname: pathname,
-      });
-      
-      // redirect to public onboarding route
-      return NextResponse.redirect(new URL(`/onboarding`, request.url));
-    }
+      // Check if user profile is complete - redirect to /onboarding if not
+      if (!isUserProfileComplete(session)) {
+        // redirect to public onboarding route
+        return NextResponse.redirect(new URL(`/onboarding`, request.url));
+      }
     }
 
     // bloquea zonas globales desde subdominios
