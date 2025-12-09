@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useRouter } from 'next-nprogress-bar';
+import { useRouter } from 'next/navigation';
 import {
   Car,
   Calendar,
@@ -42,6 +42,7 @@ import {
 import { ItemEditModal } from '@/components/items/item-edit-modal';
 import { useToast } from '@suba-go/shared-components/components/ui/toaster';
 import { useAutoFormat } from '@/hooks/use-auto-format';
+import { useCompanyContextOptional } from '@/contexts/company-context';
 
 interface ItemDetailProps {
   itemId: string;
@@ -49,6 +50,8 @@ interface ItemDetailProps {
 }
 
 export function ItemDetail({ itemId, userRole }: ItemDetailProps) {
+  const companyContext = useCompanyContextOptional();
+  const primaryColor = companyContext?.company?.principal_color;
   const router = useRouter();
   const { toast } = useToast();
   const { formatPrice } = useAutoFormat();
@@ -251,6 +254,24 @@ export function ItemDetail({ itemId, userRole }: ItemDetailProps) {
               variant="outline"
               onClick={() => setIsEditModalOpen(true)}
               className="gap-2"
+              style={
+                primaryColor
+                  ? {
+                      borderColor: primaryColor,
+                      color: primaryColor,
+                    }
+                  : undefined
+              }
+              onMouseEnter={(e) => {
+                if (primaryColor) {
+                  e.currentTarget.style.backgroundColor = `${primaryColor}15`;
+                }
+              }}
+              onMouseLeave={(e) => {
+                if (primaryColor) {
+                  e.currentTarget.style.backgroundColor = 'transparent';
+                }
+              }}
             >
               <Edit className="h-4 w-4" />
               Editar
@@ -514,7 +535,28 @@ export function ItemDetail({ itemId, userRole }: ItemDetailProps) {
                       </div>
                     </div>
 
-                    <Button variant="outline" className="w-full gap-2">
+                    <Button
+                      variant="outline"
+                      className="w-full gap-2"
+                      style={
+                        primaryColor
+                          ? {
+                              borderColor: primaryColor,
+                              color: primaryColor,
+                            }
+                          : undefined
+                      }
+                      onMouseEnter={(e) => {
+                        if (primaryColor) {
+                          e.currentTarget.style.backgroundColor = `${primaryColor}15`;
+                        }
+                      }}
+                      onMouseLeave={(e) => {
+                        if (primaryColor) {
+                          e.currentTarget.style.backgroundColor = 'transparent';
+                        }
+                      }}
+                    >
                       <Gavel className="h-4 w-4" />
                       Ver Subasta
                     </Button>

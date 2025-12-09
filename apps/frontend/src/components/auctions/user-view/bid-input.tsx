@@ -7,6 +7,8 @@
 import { Button } from '@suba-go/shared-components/components/ui/button';
 import { FormattedInput } from '@/components/ui/formatted-input';
 import { Gavel, Clock } from 'lucide-react';
+import { useCompanyContextOptional } from '@/contexts/company-context';
+import { darkenColor } from '@/utils/color-utils';
 
 interface BidInputProps {
   value: string;
@@ -33,6 +35,8 @@ export function BidInput({
   onChange,
   onSubmit,
 }: BidInputProps) {
+  const companyContext = useCompanyContextOptional();
+  const primaryColor = companyContext?.company?.principal_color;
   const numericValue = Number(value) || 0;
   const isValidBid = numericValue >= minBid;
 
@@ -53,7 +57,28 @@ export function BidInput({
         <Button
           onClick={onSubmit}
           disabled={isPending || isDisabled || !isValidBid}
-          className="min-w-[120px]"
+          className="min-w-[120px] text-white"
+          style={
+            primaryColor
+              ? {
+                  backgroundColor: primaryColor,
+                  borderColor: primaryColor,
+                }
+              : undefined
+          }
+          onMouseEnter={(e) => {
+            if (primaryColor) {
+              e.currentTarget.style.backgroundColor = darkenColor(
+                primaryColor,
+                10
+              );
+            }
+          }}
+          onMouseLeave={(e) => {
+            if (primaryColor) {
+              e.currentTarget.style.backgroundColor = primaryColor;
+            }
+          }}
         >
           {isPending ? (
             <>

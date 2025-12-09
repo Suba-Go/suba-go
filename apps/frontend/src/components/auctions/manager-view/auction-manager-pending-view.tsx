@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { useRouter } from 'next-nprogress-bar';
+import { useRouter } from 'next/navigation';
 import { ArrowLeft, Calendar, Edit, Trophy } from 'lucide-react';
 import { Button } from '@suba-go/shared-components/components/ui/button';
 import { useToast } from '@suba-go/shared-components/components/ui/toaster';
@@ -33,7 +33,6 @@ import {
   AuctionItemWithItmeAndBidsDto,
   AuctionStatusEnum,
   AuctionTypeEnum,
-  BidWithUserDto,
   UserSafeDto,
 } from '@suba-go/shared-validation';
 import { ParticipantsList } from '../participants-list';
@@ -42,11 +41,13 @@ import { AuctionItemDetailModal } from '../auction-item-detail-modal';
 interface AuctionManagerPendingViewProps {
   auction: AuctionDto;
   auctionItems: AuctionItemWithItmeAndBidsDto[];
+  primaryColor?: string;
 }
 
 export function AuctionManagerPendingView({
   auction,
   auctionItems,
+  primaryColor,
 }: AuctionManagerPendingViewProps) {
   const router = useRouter();
   const { toast } = useToast();
@@ -117,9 +118,6 @@ export function AuctionManagerPendingView({
       (sum: number, item) => sum + (item.bids?.length || 0),
       0
     ) || 0;
-  const totalParticipants = new Set(
-    auctionItems?.flatMap((item) => item.bids?.map((bid) => bid.userId) || [])
-  ).size;
 
   return (
     <div className="space-y-6">
@@ -275,13 +273,29 @@ export function AuctionManagerPendingView({
         <TabsList className="grid w-full grid-cols-2 bg-gray-100 p-1 rounded-lg">
           <TabsTrigger
             value="items"
-            className="data-[state=active]:bg-blue-600 data-[state=active]:text-white data-[state=active]:shadow-sm font-medium transition-all"
+            className="data-[state=active]:text-black data-[state=active]:shadow-sm font-medium transition-all"
+            style={
+              activeTab === 'items' && primaryColor
+                ? {
+                    backgroundColor: primaryColor,
+                    color: '#000000',
+                  }
+                : undefined
+            }
           >
             📦 Items de Subasta
           </TabsTrigger>
           <TabsTrigger
             value="participants"
-            className="data-[state=active]:bg-green-600 data-[state=active]:text-white data-[state=active]:shadow-sm font-medium transition-all"
+            className="data-[state=active]:text-black data-[state=active]:shadow-sm font-medium transition-all"
+            style={
+              activeTab === 'participants' && primaryColor
+                ? {
+                    backgroundColor: primaryColor,
+                    color: '#000000',
+                  }
+                : undefined
+            }
           >
             👥 Participantes
           </TabsTrigger>
@@ -368,6 +382,7 @@ export function AuctionManagerPendingView({
             participants={participants || []}
             isManager={true}
             onRefresh={refetchParticipants}
+            primaryColor={primaryColor}
           />
         </TabsContent>
       </Tabs>

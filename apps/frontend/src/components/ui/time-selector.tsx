@@ -1,15 +1,9 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Clock, Calendar } from 'lucide-react';
+import { Clock } from 'lucide-react';
 import { Button } from '@suba-go/shared-components/components/ui/button';
 import { Input } from '@suba-go/shared-components/components/ui/input';
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from '@suba-go/shared-components/components/ui/dialog';
 import { useCompany } from '@/hooks/use-company';
 
 interface TimeSelectorProps {

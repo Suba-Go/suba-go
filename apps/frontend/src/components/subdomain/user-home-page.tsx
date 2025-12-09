@@ -21,7 +21,7 @@ import { Badge } from '@suba-go/shared-components/components/ui/badge';
 import { Spinner } from '@suba-go/shared-components/components/ui/spinner';
 import { Trophy, Gavel } from 'lucide-react';
 import { useAutoFormat } from '@/hooks/use-auto-format';
-import { useRouter } from 'next-nprogress-bar';
+import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { AuctionCard } from '@/components/auctions/auction-card';
 
@@ -84,7 +84,7 @@ export function UserHomePage({ company }: UserHomePageProps) {
   if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <Spinner className="h-8 w-8" />
+        <Spinner className="size-4" />
       </div>
     );
   }
@@ -99,19 +99,6 @@ export function UserHomePage({ company }: UserHomePageProps) {
       }
     >
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Header */}
-        <div className="mb-8">
-          <h1
-            className="text-3xl font-bold mb-2"
-            style={{ color: primaryColor }}
-          >
-            Bienvenido, {session?.user?.name || 'Usuario'}
-          </h1>
-          <p className="text-gray-600">
-            Gestiona tus items adjudicados y participa en subastas disponibles
-          </p>
-        </div>
-
         {/* Adjudicated Items Section */}
         <div className="mb-8">
           <div className="flex items-center gap-2 mb-4">
@@ -214,7 +201,7 @@ export function UserHomePage({ company }: UserHomePageProps) {
         {/* Auctions Section */}
         <div>
           <div className="flex items-center gap-2 mb-4">
-            <Gavel className="h-6 w-6" style={{ color: primaryColor }} />
+            <Gavel className="h-6 w-6" />
             <h2 className="text-2xl font-bold text-gray-900">
               Mis Subastas Registradas
             </h2>

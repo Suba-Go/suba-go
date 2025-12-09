@@ -1,4 +1,4 @@
-import { Injectable, ConflictException } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { TenantCreateDto } from '@suba-go/shared-validation';
 import type { Tenant } from '@prisma/client';
 import { TenantPrismaRepository } from './tenant-prisma-repository.service';

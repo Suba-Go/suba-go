@@ -25,7 +25,7 @@ export default function GlobalLoading() {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-gray-50">
       <div className="text-center">
-        <Spinner className="size-8" />
+        <Spinner className="size-4" />
       </div>
     </div>
   );

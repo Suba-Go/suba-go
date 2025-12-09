@@ -16,7 +16,8 @@ import { Input } from '@suba-go/shared-components/components/ui/input';
 import { useAvailableItems } from '@/hooks/use-items';
 import { ItemCreateModal } from '@/components/items/item-create-modal';
 import { Spinner } from '@suba-go/shared-components/components/ui/spinner';
-import { useCompany } from '@/hooks/use-company';
+import { useCompanyContextOptional } from '@/contexts/company-context';
+import { darkenColor } from '@/utils/color-utils';
 import {
   Dialog,
   DialogContent,
@@ -61,8 +62,8 @@ export function ItemSelector({
   onItemsChange,
 }: ItemSelectorProps) {
   const { items, isLoading, error, refreshItems } = useAvailableItems();
-  const { company } = useCompany();
-  const primaryColor = company?.principal_color || '#3B82F6';
+  const companyContext = useCompanyContextOptional();
+  const primaryColor = companyContext?.company?.principal_color || '#3B82F6';
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [previewItem, setPreviewItem] = useState<Item | null>(null);
   const [searchPlate, setSearchPlate] = useState('');
@@ -143,6 +144,15 @@ export function ItemSelector({
             size="sm"
             disabled
             className="flex items-center gap-2"
+            style={
+              primaryColor
+                ? {
+                    backgroundColor: primaryColor,
+                    borderColor: primaryColor,
+                    opacity: 0.5,
+                  }
+                : undefined
+            }
           >
             <Plus className="h-4 w-4" />
             Crear Nuevo Item
@@ -167,7 +177,28 @@ export function ItemSelector({
             variant="outline"
             size="sm"
             onClick={() => setIsCreateModalOpen(true)}
-            className="flex items-center gap-2"
+            className="flex items-center gap-2 text-black"
+            style={
+              primaryColor
+                ? {
+                    backgroundColor: primaryColor,
+                    borderColor: primaryColor,
+                  }
+                : undefined
+            }
+            onMouseEnter={(e) => {
+              if (primaryColor) {
+                e.currentTarget.style.backgroundColor = darkenColor(
+                  primaryColor,
+                  10
+                );
+              }
+            }}
+            onMouseLeave={(e) => {
+              if (primaryColor) {
+                e.currentTarget.style.backgroundColor = primaryColor;
+              }
+            }}
           >
             <Plus className="h-4 w-4" />
             Crear Nuevo Item
@@ -201,7 +232,28 @@ export function ItemSelector({
             variant="outline"
             size="sm"
             onClick={() => setIsCreateModalOpen(true)}
-            className="flex items-center gap-2"
+            className="flex items-center gap-2 text-black"
+            style={
+              primaryColor
+                ? {
+                    backgroundColor: primaryColor,
+                    borderColor: primaryColor,
+                  }
+                : undefined
+            }
+            onMouseEnter={(e) => {
+              if (primaryColor) {
+                e.currentTarget.style.backgroundColor = darkenColor(
+                  primaryColor,
+                  10
+                );
+              }
+            }}
+            onMouseLeave={(e) => {
+              if (primaryColor) {
+                e.currentTarget.style.backgroundColor = primaryColor;
+              }
+            }}
           >
             <Plus className="h-4 w-4" />
             Crear Nuevo Item
@@ -216,6 +268,19 @@ export function ItemSelector({
             value={searchPlate}
             onChange={(e) => setSearchPlate(e.target.value)}
             className="pl-10"
+            style={
+              primaryColor
+                ? ({
+                    borderColor: primaryColor,
+                  } as React.CSSProperties)
+                : undefined
+            }
+            onFocus={(e) => {
+              if (primaryColor) {
+                e.currentTarget.style.borderColor = primaryColor;
+                e.currentTarget.style.boxShadow = `0 0 0 1px ${primaryColor}`;
+              }
+            }}
           />
         </div>
 
@@ -283,6 +348,17 @@ export function ItemSelector({
                       </h4>
                       <Badge
                         className={`text-xs w-fit ${getStateColor(item.state)}`}
+                        style={
+                          item.state === 'EN_SUBASTA' && primaryColor
+                            ? {
+                                backgroundColor: `${primaryColor}15`,
+                                borderColor: primaryColor,
+                                color: primaryColor,
+                                borderWidth: '1px',
+                                borderStyle: 'solid',
+                              }
+                            : undefined
+                        }
                       >
                         {item.state}
                       </Badge>

@@ -22,7 +22,7 @@ import { getUserCompanyDomainTrpcAction } from '@/domain/trpc-actions/user/get-u
 import { signIn } from 'next-auth/react';
 import FormResult from './form-result';
 import { useToast } from '@suba-go/shared-components/components/ui/toaster';
-import { useRouter } from 'next-nprogress-bar';
+import { useRouter } from 'next/navigation';
 import getCompanyUrl from './helper/company-url';
 
 // Cache management for multi-step form

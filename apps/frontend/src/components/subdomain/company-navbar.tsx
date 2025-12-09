@@ -15,12 +15,26 @@ import {
   isUserProfileComplete,
   isUserAdminOrManager,
 } from '@/utils/subdomain-profile-validation';
+import { useCompany } from '@/hooks/use-company';
 
 interface CompanyNavbarProps {
   company: CompanyDto;
 }
 
-export default function CompanyNavbar({ company }: CompanyNavbarProps) {
+export default function CompanyNavbar({
+  company: companyProp,
+}: CompanyNavbarProps) {
+  const { company: companyFromHook } = useCompany();
+  // Use company from hook if available (more up-to-date), otherwise fallback to prop
+  // The hook returns a Company type which has the same structure for the fields we need
+  const company = companyFromHook
+    ? {
+        ...companyProp,
+        name: companyFromHook.name,
+        logo: companyFromHook.logo,
+        principal_color: companyFromHook.principal_color,
+      }
+    : companyProp;
   const primaryColor = company.principal_color || '#3B82F6';
   const { data: session, status } = useSession();
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
@@ -66,7 +80,7 @@ export default function CompanyNavbar({ company }: CompanyNavbarProps) {
   };
 
   return (
-    <header className="bg-white shadow-sm border-b">
+    <header className="bg-white shadow-sm border-b relative z-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center py-4">
           {/* Company Logo/Name */}
