@@ -142,17 +142,17 @@ model Item {
   deletedAt    DateTime?
 
   // Item-specific fields matching TypeORM entity
-  plate        String?
-  brand        String?
+  plate        String
+  brand        String
   model        String?
   year         Int?
   version      String?
   photos       String?
   docs         String?
   kilometraje  Int?
-  legal_status LegalStatusEnum?
+  legal_status LegalStatusEnum @default(TRANSFERIBLE)
   state        ItemStateEnum @default(DISPONIBLE)
-  basePrice    Int? 
+  basePrice    Int 
   description  String?
 
   // Sale tracking fields

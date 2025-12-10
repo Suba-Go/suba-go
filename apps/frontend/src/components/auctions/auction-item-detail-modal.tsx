@@ -37,6 +37,8 @@ import {
   BidDto,
   BidWithUserDto,
 } from '@suba-go/shared-validation';
+import { useCompanyContextOptional } from '@/contexts/company-context';
+import { darkenColor } from '@/utils/color-utils';
 
 interface SimpleBidHistory {
   id: string;
@@ -72,12 +74,63 @@ export function AuctionItemDetailModal({
   showBidHistory = true,
 }: AuctionItemDetailModalProps) {
   const { formatPrice } = useAutoFormat();
+  const companyContext = useCompanyContextOptional();
+  const primaryColor = companyContext?.company?.principal_color;
   const [photoCarouselApi, setPhotoCarouselApi] = useState<CarouselApi>();
   const [currentPhotoIndex, setCurrentPhotoIndex] = useState(0);
   const [photoCount, setPhotoCount] = useState(0);
   const [bidAmount, setBidAmount] = useState(currentHighestBid + bidIncrement);
+  const [isMobile, setIsMobile] = useState(false);
 
   const item = auctionItem.item;
+
+  // Apply primary color to close button when modal opens
+  useEffect(() => {
+    if (!isOpen || !primaryColor) return;
+
+    let closeButton: HTMLElement | null = null;
+    const applyFocusRing = () => {
+      if (closeButton && primaryColor) {
+        closeButton.style.setProperty('--tw-ring-color', primaryColor);
+      }
+    };
+
+    const timer = setTimeout(() => {
+      // Find the close button in the dialog
+      const dialogContent = document.querySelector(
+        '[data-state="open"]'
+      ) as HTMLElement;
+      if (dialogContent) {
+        closeButton = dialogContent.querySelector(
+          'button[class*="absolute right-4 top-4"]'
+        ) as HTMLElement;
+        if (closeButton) {
+          // Apply primary color to focus ring
+          applyFocusRing();
+          closeButton.addEventListener('focus', applyFocusRing);
+          closeButton.addEventListener('mouseenter', applyFocusRing);
+        }
+      }
+    }, 100);
+
+    return () => {
+      clearTimeout(timer);
+      if (closeButton) {
+        closeButton.removeEventListener('focus', applyFocusRing);
+        closeButton.removeEventListener('mouseenter', applyFocusRing);
+      }
+    };
+  }, [isOpen, primaryColor]);
+
+  // Detect mobile device
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.matchMedia('(max-width: 768px)').matches);
+    };
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
 
   // Update bid amount when currentHighestBid changes
   useEffect(() => {
@@ -95,6 +148,39 @@ export function AuctionItemDetailModal({
       setCurrentPhotoIndex(photoCarouselApi.selectedScrollSnap());
     });
   }, [photoCarouselApi]);
+
+  useEffect(() => {
+    if (!photoCarouselApi || isMobile) return;
+
+    const carouselNode = photoCarouselApi.rootNode() as HTMLElement;
+    if (!carouselNode) return;
+
+    const viewport = photoCarouselApi.containerNode() as HTMLElement;
+
+    if (!viewport) return;
+
+    const preventHorizontalScroll = (e: WheelEvent) => {
+      if (Math.abs(e.deltaX) > Math.abs(e.deltaY) && Math.abs(e.deltaX) > 5) {
+        e.preventDefault();
+        e.stopPropagation();
+        return false;
+      }
+    };
+
+    if (window.matchMedia('(pointer: fine)').matches) {
+      carouselNode.addEventListener('wheel', preventHorizontalScroll, {
+        passive: false,
+      });
+      viewport.addEventListener('wheel', preventHorizontalScroll, {
+        passive: false,
+      });
+    }
+
+    return () => {
+      carouselNode.removeEventListener('wheel', preventHorizontalScroll);
+      viewport.removeEventListener('wheel', preventHorizontalScroll);
+    };
+  }, [photoCarouselApi, isMobile]);
 
   const handleDownload = (url: string, filename: string) => {
     const link = document.createElement('a');
@@ -162,30 +248,53 @@ export function AuctionItemDetailModal({
                 <h3 className="text-lg font-semibold">Fotos</h3>
               </div>
               <div className="relative">
-                <Carousel className="w-full" setApi={setPhotoCarouselApi}>
-                  <CarouselContent>
+                <Carousel
+                  className="w-full"
+                  setApi={setPhotoCarouselApi}
+                  opts={{
+                    align: 'start',
+                    dragFree: false,
+                    containScroll: 'trimSnaps',
+                    // Enable drag only on mobile, disable on desktop
+                    watchDrag: isMobile,
+                    skipSnaps: false,
+                  }}
+                >
+                  <CarouselContent
+                    className="-ml-0"
+                    style={{
+                      // Allow touch scroll on mobile, prevent on desktop
+                      touchAction: isMobile ? 'pan-x' : 'pan-y',
+                      overscrollBehaviorX: isMobile ? 'auto' : 'none',
+                    }}
+                  >
                     {photoUrls.map((url: string, index: number) => (
-                      <CarouselItem key={index}>
+                      <CarouselItem key={index} className="pl-0">
                         <div className="aspect-video relative bg-gray-100 rounded-lg overflow-hidden">
                           <Image
                             src={url}
                             fill
                             alt={`Foto ${index + 1}`}
-                            className="object-contain"
+                            className="object-contain select-none"
+                            draggable={false}
+                            style={{
+                              pointerEvents: isMobile ? 'auto' : 'none',
+                            }}
                           />
                         </div>
                       </CarouselItem>
                     ))}
                   </CarouselContent>
+                  {/* Show arrows only on desktop/laptop, hide on mobile */}
                   {photoUrls.length > 1 && (
                     <>
-                      <CarouselPrevious />
-                      <CarouselNext />
+                      <CarouselPrevious className="left-2 md:left-4 z-20 hidden md:flex" />
+                      <CarouselNext className="right-2 md:right-4 z-20 hidden md:flex" />
                     </>
                   )}
                 </Carousel>
                 {photoCount > 0 && (
-                  <div className="absolute top-2 right-2 bg-black/70 text-white px-3 py-1 rounded-full text-sm font-medium">
+                  <div className="absolute top-2 right-2 bg-black/70 text-white px-3 py-1 rounded-full text-sm font-medium z-10">
                     {currentPhotoIndex + 1} de {photoCount}
                   </div>
                 )}
@@ -332,11 +441,51 @@ export function AuctionItemDetailModal({
                   }}
                   className="text-lg"
                   placeholder={formatPrice(currentHighestBid + bidIncrement)}
+                  style={
+                    primaryColor
+                      ? {
+                          borderColor: primaryColor,
+                        }
+                      : undefined
+                  }
+                  onFocus={(e) => {
+                    if (primaryColor) {
+                      e.currentTarget.style.borderColor = primaryColor;
+                      e.currentTarget.style.boxShadow = `0 0 0 2px ${primaryColor}20`;
+                    }
+                  }}
+                  onBlur={(e) => {
+                    if (primaryColor) {
+                      e.currentTarget.style.borderColor = '';
+                      e.currentTarget.style.boxShadow = '';
+                    }
+                  }}
                 />
                 <Button
                   onClick={handlePlaceBid}
                   disabled={bidAmount < currentHighestBid + bidIncrement}
-                  className="whitespace-nowrap"
+                  className="whitespace-nowrap text-white"
+                  style={
+                    primaryColor
+                      ? {
+                          backgroundColor: primaryColor,
+                          borderColor: primaryColor,
+                        }
+                      : undefined
+                  }
+                  onMouseEnter={(e) => {
+                    if (primaryColor) {
+                      e.currentTarget.style.backgroundColor = darkenColor(
+                        primaryColor,
+                        10
+                      );
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    if (primaryColor) {
+                      e.currentTarget.style.backgroundColor = primaryColor;
+                    }
+                  }}
                 >
                   Pujar {formatPrice(bidAmount)}
                 </Button>

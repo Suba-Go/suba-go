@@ -14,7 +14,7 @@ export default function Navbar() {
     return null;
   }
   return (
-    <header className="flex h-16 w-full items-center justify-between px-4 md:px-6 bg-dark border-b border-gray-800">
+    <header className="flex h-16 w-full items-center justify-between px-4 md:px-6 bg-dark border-b border-gray-800 relative z-50">
       <Link href="/" className="flex items-center space-x-2">
         <Image
           src="/logo-white.png"
