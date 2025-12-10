@@ -6,7 +6,8 @@
 
 'use client';
 
-import { CheckCircle, Trophy, Calendar, TrendingUp } from 'lucide-react';
+import { useState } from 'react';
+import { Trophy, TrendingUp, XCircle } from 'lucide-react';
 import {
   Card,
   CardContent,
@@ -14,12 +15,17 @@ import {
   CardTitle,
 } from '@suba-go/shared-components/components/ui/card';
 import { Badge } from '@suba-go/shared-components/components/ui/badge';
-import { format } from 'date-fns';
-import { es } from 'date-fns/locale';
+import {
+  Alert,
+  AlertDescription,
+} from '@suba-go/shared-components/components/ui/alert';
 import {
   AuctionDto,
   AuctionItemWithItmeAndBidsDto,
 } from '@suba-go/shared-validation';
+import { AuctionCompletedItemCard } from './auction-completed-item-card';
+import { AuctionItemDetailModal } from '../auction-item-detail-modal';
+import { useCompany } from '@/hooks/use-company';
 
 interface AuctionCompletedViewProps {
   auction: AuctionDto;
@@ -32,35 +38,19 @@ export function AuctionCompletedView({
   userId,
   auctionItems,
 }: AuctionCompletedViewProps) {
-  const startTime = new Date(auction.startTime);
-  const endTime = new Date(auction.endTime);
-
+  const [selectedItemForDetail, setSelectedItemForDetail] =
+    useState<AuctionItemWithItmeAndBidsDto | null>(null);
+  const { company: company } = useCompany();
   // Calculate auction statistics
   const totalItems = auctionItems?.length || 0;
-
-  // Count bids made by THIS user (not unique users)
-  const totalUserBids =
-    auctionItems?.reduce((count, item) => {
-      const userBidsForItem =
-        item.bids?.filter((bid) => bid.userId === userId).length || 0;
-      return count + userBidsForItem;
-    }, 0) || 0;
 
   // Count items won by this user
   const itemsWonByUser =
     auctionItems?.filter((item) => item.item?.soldToUserId === userId).length ||
     0;
-  const totalBids =
-    auctionItems?.reduce((sum, item) => sum + (item.bids?.length || 0), 0) || 0;
-  const highestBid =
-    auctionItems?.reduce((max, item) => {
-      const itemMax =
-        item.bids?.reduce(
-          (itemMax, bid) => Math.max(itemMax, Number(bid.offered_price) || 0),
-          0
-        ) || 0;
-      return Math.max(max, itemMax);
-    }, 0) || 0;
+
+  // Determine if user is winner or loser
+  const isWinner = itemsWonByUser > 0;
 
   return (
     <div className="space-y-6">
@@ -77,75 +67,50 @@ export function AuctionCompletedView({
         </Badge>
       </div>
 
-      {/* Status Card */}
-      <Card className="border-green-200 bg-green-50">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-green-800">
-            <CheckCircle className="h-5 w-5" />
-            Subasta Finalizada
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="flex items-center gap-3 text-green-700">
-            <Trophy className="h-5 w-5" />
-            <p className="text-lg font-medium">
-              Esta subasta ha finalizado exitosamente
-            </p>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4 border-t border-green-200">
-            <div className="space-y-2">
-              <div className="flex items-center gap-2 text-green-700">
-                <Calendar className="h-4 w-4" />
-                <span className="font-medium">Inicio</span>
-              </div>
-              <p className="text-gray-900 text-lg">
-                {format(startTime, "dd/MM/yyyy 'a las' HH:mm", { locale: es })}
-              </p>
-            </div>
-
-            <div className="space-y-2">
-              <div className="flex items-center gap-2 text-green-700">
-                <Calendar className="h-4 w-4" />
-                <span className="font-medium">Finalización</span>
-              </div>
-              <p className="text-gray-900 text-lg">
-                {format(endTime, "dd/MM/yyyy 'a las' HH:mm", { locale: es })}
-              </p>
-            </div>
-          </div>
-
-          {/* Auction Statistics */}
-          <div className="grid grid-cols-2 md:grid-cols-5 gap-4 pt-4 border-t border-green-200">
-            <div className="text-center">
-              <p className="text-2xl font-bold text-gray-900">{totalItems}</p>
-              <p className="text-sm text-gray-600">Vehículos</p>
-            </div>
-            <div className="text-center">
-              <p className="text-2xl font-bold text-yellow-600">
-                {itemsWonByUser}
-              </p>
-              <p className="text-sm text-gray-600">Items Ganados</p>
-            </div>
-            <div className="text-center">
-              <p className="text-2xl font-bold text-gray-900">
-                {totalUserBids}
-              </p>
-              <p className="text-sm text-gray-600">Tus Pujas</p>
-            </div>
-            <div className="text-center">
-              <p className="text-2xl font-bold text-gray-900">{totalBids}</p>
-              <p className="text-sm text-gray-600">Total Pujas</p>
-            </div>
-            <div className="text-center">
-              <p className="text-2xl font-bold text-gray-900">
-                ${highestBid.toLocaleString('es-CL')}
-              </p>
-              <p className="text-sm text-gray-600">Puja Máxima</p>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+      {/* Winner/Loser Alert */}
+      {userId && (
+        <Alert
+          className={
+            isWinner
+              ? 'border-green-500 bg-green-50'
+              : 'border-orange-500 bg-orange-50'
+          }
+        >
+          {isWinner ? (
+            <>
+              <Trophy className="h-5 w-5 text-green-600" />
+              <AlertDescription className="text-green-900">
+                <div className="space-y-2">
+                  <p className="text-xl font-bold">
+                    ¡Felicitaciones! Has ganado {itemsWonByUser} de {totalItems}{' '}
+                    {itemsWonByUser === 1 ? 'producto' : 'productos'} en esta
+                    subasta.
+                  </p>
+                  <p className="text-sm">
+                    Vas a ser contactado dentro de los próximos días por{' '}
+                    {company?.name}.
+                  </p>
+                </div>
+              </AlertDescription>
+            </>
+          ) : (
+            <>
+              <XCircle className="h-5 w-5 text-orange-600" />
+              <AlertDescription className="text-orange-900">
+                <div className="space-y-2">
+                  <p className="text-xl font-bold">
+                    No ganaste ningún producto en esta subasta.
+                  </p>
+                  <p className="text-sm">
+                    Puedes ver los detalles de todos los productos a
+                    continuación.
+                  </p>
+                </div>
+              </AlertDescription>
+            </>
+          )}
+        </Alert>
+      )}
 
       {/* Results */}
       {auctionItems && auctionItems.length > 0 && (
@@ -157,84 +122,39 @@ export function AuctionCompletedView({
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="space-y-4">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               {auctionItems.map((auctionItem) => {
-                const highBid = auctionItem.bids?.[0];
-                const hasWinner = highBid && highBid.offered_price > 0;
                 const userWonItem = auctionItem.item?.soldToUserId === userId;
 
                 return (
-                  <div
+                  <AuctionCompletedItemCard
                     key={auctionItem.id}
-                    className={`p-4 border rounded-lg ${
-                      userWonItem
-                        ? 'bg-yellow-50 border-yellow-300'
-                        : 'bg-white'
-                    }`}
-                  >
-                    <div className="flex justify-between items-start">
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2 mb-2">
-                          <p className="font-semibold text-gray-900">
-                            {auctionItem.item?.brand} {auctionItem.item?.model}
-                          </p>
-                          {userWonItem && (
-                            <Badge className="bg-yellow-500 text-white">
-                              <Trophy className="h-3 w-3 mr-1" />
-                              ¡Ganaste!
-                            </Badge>
-                          )}
-                        </div>
-                        {auctionItem.item?.year && (
-                          <p className="text-sm text-gray-600">
-                            Año: {auctionItem.item.year}
-                          </p>
-                        )}
-                        {auctionItem.item?.plate && (
-                          <p className="text-sm text-gray-600">
-                            Patente: {auctionItem.item.plate}
-                          </p>
-                        )}
-                      </div>
-                      <div className="text-right">
-                        {hasWinner ? (
-                          <>
-                            <p className="text-sm text-gray-600">
-                              Precio Final
-                            </p>
-                            <p
-                              className={`text-xl font-bold ${
-                                userWonItem
-                                  ? 'text-yellow-600'
-                                  : 'text-green-600'
-                              }`}
-                            >
-                              ${highBid.offered_price.toLocaleString('es-CL')}
-                            </p>
-                            {!userWonItem && (
-                              <p className="text-xs text-gray-500 mt-1">
-                                Ganador:{' '}
-                                {highBid.user?.public_name || 'Participante'}
-                              </p>
-                            )}
-                          </>
-                        ) : (
-                          <>
-                            <p className="text-sm text-gray-600">Sin Pujas</p>
-                            <p className="text-sm text-gray-500">
-                              Precio Base: $
-                              {auctionItem.startingBid.toLocaleString('es-CL')}
-                            </p>
-                          </>
-                        )}
-                      </div>
-                    </div>
-                  </div>
+                    auctionItem={auctionItem}
+                    isWon={userWonItem}
+                    onViewDetails={() => setSelectedItemForDetail(auctionItem)}
+                  />
                 );
               })}
             </div>
           </CardContent>
         </Card>
+      )}
+
+      {/* Item Detail Modal */}
+      {selectedItemForDetail && (
+        <AuctionItemDetailModal
+          auctionItem={selectedItemForDetail}
+          isOpen={!!selectedItemForDetail}
+          onClose={() => setSelectedItemForDetail(null)}
+          currentHighestBid={
+            selectedItemForDetail.bids?.[0]
+              ? Number(selectedItemForDetail.bids[0].offered_price)
+              : Number(selectedItemForDetail.startingBid || 0)
+          }
+          bidIncrement={Number(auction.bidIncrement || 50000)}
+          isUserView={false}
+          showBidHistory={true}
+        />
       )}
     </div>
   );

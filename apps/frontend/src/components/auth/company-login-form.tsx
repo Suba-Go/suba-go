@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { signIn } from 'next-auth/react';
 import { Button } from '@suba-go/shared-components/components/ui/button';
 import { Input } from '@suba-go/shared-components/components/ui/input';
@@ -23,6 +24,7 @@ export default function CompanyLoginForm({
   prefilledEmail,
   onLoginSuccess,
 }: CompanyLoginFormProps) {
+  const router = useRouter();
   const [formData, setFormData] = useState({
     email: prefilledEmail || '',
     password: '',
@@ -158,6 +160,7 @@ export default function CompanyLoginForm({
       });
 
       if (result?.error) {
+        setIsLoading(false);
         toast({
           title: 'Error de autenticación',
           description: 'Email o contraseña incorrectos',
@@ -166,40 +169,44 @@ export default function CompanyLoginForm({
       } else if (result?.ok) {
         // Wait for session to be established
         await new Promise((resolve) => setTimeout(resolve, 500));
-        
+
         // Fetch the session to check if profile is complete
         const sessionResponse = await fetch('/api/auth/session');
         const session = await sessionResponse.json();
-        
+
         // Check if profile is complete
         const user = session?.user;
-        const isProfileComplete = user?.name && 
-          user.name.trim().length >= 3 && 
-          user.phone && 
-          user.phone.trim().length > 0 && 
-          user.rut && 
+        const isProfileComplete =
+          user?.name &&
+          user.name.trim().length >= 3 &&
+          user.phone &&
+          user.phone.trim().length > 0 &&
+          user.rut &&
           user.rut.trim().length > 0;
-        
+
+        // Keep loading state true during redirect to show clear feedback
         if (onLoginSuccess) {
           onLoginSuccess();
+          // Don't set isLoading to false - let it stay loading during redirect
         } else {
           // Redirect based on profile completion status
+          // Keep isLoading true to show loading state during redirect
           if (isProfileComplete) {
-            window.location.replace('/');
+            router.push('/');
           } else {
-            window.location.replace('/onboarding');
+            router.push('/onboarding');
           }
+          // Don't set isLoading to false - let it stay loading during redirect
         }
       }
     } catch (error) {
       console.error('Login error:', error);
+      setIsLoading(false);
       toast({
         title: 'Error',
         description: 'Ocurrió un error durante el inicio de sesión',
         variant: 'destructive',
       });
-    } finally {
-      setIsLoading(false);
     }
   };
 
@@ -232,6 +239,7 @@ export default function CompanyLoginForm({
             onChange={handleInputChange('email')}
             className={errors.email ? 'border-red-500' : ''}
             disabled={isLoading || !!prefilledEmail} // Disable if prefilled
+            autoFocus={!formData.email.trim()}
           />
           {errors.email && (
             <p className="text-sm text-red-500">{errors.email}</p>
@@ -249,6 +257,7 @@ export default function CompanyLoginForm({
               onChange={handleInputChange('password')}
               className={errors.password ? 'border-red-500 pr-10' : 'pr-10'}
               disabled={isLoading}
+              autoFocus={!!formData.email.trim()}
             />
             <button
               type="button"

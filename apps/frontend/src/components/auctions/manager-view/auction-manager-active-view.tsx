@@ -1,7 +1,7 @@
 'use client';
 
-import { useState, useEffect, useCallback, useMemo } from 'react';
-import { useRouter } from 'next-nprogress-bar';
+import { useState, useCallback, useMemo, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { ArrowLeft, Clock, Wifi, WifiOff, Trophy } from 'lucide-react';
 import { Button } from '@suba-go/shared-components/components/ui/button';
 import { useToast } from '@suba-go/shared-components/components/ui/toaster';
@@ -38,6 +38,7 @@ import {
 import { ParticipantsList } from '../participants-list';
 import { ItemBidHistory } from '../user-view/item-bid-history';
 import { AuctionItemDetailModal } from '../auction-item-detail-modal';
+import { ItemCreateModal } from '@/components/items/item-create-modal';
 
 interface BidHistoryItem {
   id: string;
@@ -57,8 +58,8 @@ interface AuctionManagerActiveViewProps {
   accessToken: string;
   tenantId: string;
   onRealtimeSnapshot?: () => void;
-  userRole?: string;
-  userId?: string;
+
+  primaryColor?: string;
 }
 
 export function AuctionManagerActiveView({
@@ -67,14 +68,14 @@ export function AuctionManagerActiveView({
   accessToken,
   tenantId,
   onRealtimeSnapshot,
-  userRole,
-  userId,
+  primaryColor,
 }: AuctionManagerActiveViewProps) {
   const router = useRouter();
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState('items');
   const [selectedItemForDetail, setSelectedItemForDetail] =
     useState<AuctionItemWithItmeAndBidsDto | null>(null);
+  const [isCreateItemModalOpen, setIsCreateItemModalOpen] = useState(false);
 
   // Local state for bids to handle real-time updates
   const [bidHistory, setBidHistory] = useState<ItemBidData>({});
@@ -363,13 +364,29 @@ export function AuctionManagerActiveView({
         <TabsList className="grid w-full grid-cols-2 bg-gray-100 p-1 rounded-lg">
           <TabsTrigger
             value="items"
-            className="data-[state=active]:bg-blue-600 data-[state=active]:text-white data-[state=active]:shadow-sm font-medium transition-all"
+            className="data-[state=active]:text-black data-[state=active]:shadow-sm font-medium transition-all"
+            style={
+              activeTab === 'items' && primaryColor
+                ? {
+                    backgroundColor: primaryColor,
+                    color: '#000000',
+                  }
+                : undefined
+            }
           >
             📦 Items de Subasta
           </TabsTrigger>
           <TabsTrigger
             value="participants"
-            className="data-[state=active]:bg-green-600 data-[state=active]:text-white data-[state=active]:shadow-sm font-medium transition-all"
+            className="data-[state=active]:text-black data-[state=active]:shadow-sm font-medium transition-all"
+            style={
+              activeTab === 'participants' && primaryColor
+                ? {
+                    backgroundColor: primaryColor,
+                    color: '#000000',
+                  }
+                : undefined
+            }
           >
             👥 Participantes
           </TabsTrigger>
@@ -500,6 +517,7 @@ export function AuctionManagerActiveView({
             participants={participants || []}
             isManager={true}
             onRefresh={refetchParticipants}
+            primaryColor={primaryColor}
           />
         </TabsContent>
       </Tabs>
@@ -522,6 +540,16 @@ export function AuctionManagerActiveView({
           bidHistory={bidHistory[selectedItemForDetail.id] || []}
         />
       )}
+
+      {/* Create Item Modal */}
+      <ItemCreateModal
+        isOpen={isCreateItemModalOpen}
+        onClose={() => setIsCreateItemModalOpen(false)}
+        onSuccess={() => {
+          setIsCreateItemModalOpen(false);
+          router.refresh();
+        }}
+      />
     </div>
   );
 }

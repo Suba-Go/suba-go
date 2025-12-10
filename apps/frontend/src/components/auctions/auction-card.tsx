@@ -3,6 +3,8 @@
 import Link from 'next/link';
 import { Clock, Users, Car, MoreVertical, Edit, Trash2 } from 'lucide-react';
 import { useState } from 'react';
+import { useCompanyContextOptional } from '@/contexts/company-context';
+import { darkenColor } from '@/utils/color-utils';
 import {
   Card,
   CardContent,
@@ -48,6 +50,8 @@ interface AuctionCardProps {
 }
 
 export function AuctionCard({ auction, onUpdate, onEdit }: AuctionCardProps) {
+  const companyContext = useCompanyContextOptional();
+  const primaryColor = companyContext?.company?.principal_color;
   const startTime = new Date(auction.startTime);
   const endTime = new Date(auction.endTime);
   const [showCompletedDialog, setShowCompletedDialog] = useState(false);
@@ -210,7 +214,7 @@ export function AuctionCard({ auction, onUpdate, onEdit }: AuctionCardProps) {
         </div>
 
         {/* Schedule */}
-        <div className="text-xs text-gray-500 space-y-1">
+        <div className="text-xs text-gray-500 space-y-1 pb-4">
           <div>
             Inicio: {format(startTime, 'dd/mm/yyyy HH:mm', { locale: es })}
           </div>
@@ -220,8 +224,29 @@ export function AuctionCard({ auction, onUpdate, onEdit }: AuctionCardProps) {
         {/* Action Button */}
         <Link href={`/subastas/${auction.id}`}>
           <Button
-            className="w-full"
+            className={`w-full ${auctionStatus.isActive ? 'text-black' : ''}`}
             variant={auctionStatus.isActive ? 'default' : 'outline'}
+            style={
+              auctionStatus.isActive && primaryColor
+                ? {
+                    backgroundColor: primaryColor,
+                    borderColor: primaryColor,
+                  }
+                : undefined
+            }
+            onMouseEnter={(e) => {
+              if (auctionStatus.isActive && primaryColor) {
+                e.currentTarget.style.backgroundColor = darkenColor(
+                  primaryColor,
+                  10
+                );
+              }
+            }}
+            onMouseLeave={(e) => {
+              if (auctionStatus.isActive && primaryColor) {
+                e.currentTarget.style.backgroundColor = primaryColor;
+              }
+            }}
           >
             {auctionStatus.isActive ? 'Ver Subasta Activa' : 'Ver Detalles'}
           </Button>
@@ -239,7 +264,31 @@ export function AuctionCard({ auction, onUpdate, onEdit }: AuctionCardProps) {
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
-            <Button onClick={() => setShowCompletedDialog(false)}>
+            <Button
+              onClick={() => setShowCompletedDialog(false)}
+              className="text-white"
+              style={
+                primaryColor
+                  ? {
+                      backgroundColor: primaryColor,
+                      borderColor: primaryColor,
+                    }
+                  : undefined
+              }
+              onMouseEnter={(e) => {
+                if (primaryColor) {
+                  e.currentTarget.style.backgroundColor = darkenColor(
+                    primaryColor,
+                    10
+                  );
+                }
+              }}
+              onMouseLeave={(e) => {
+                if (primaryColor) {
+                  e.currentTarget.style.backgroundColor = primaryColor;
+                }
+              }}
+            >
               Entendido
             </Button>
           </DialogFooter>

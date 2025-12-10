@@ -2,7 +2,58 @@
 @tailwind components;
 @tailwind utilities;
 
-: root {
+/* Ensure progress bar is above navbar and other elements */
+#nprogress {
+  pointer-events: none;
+  z-index: 99999 !important;
+  position: relative;
+}
+
+#nprogress .bar {
+  background: var(--nprogress-color, #343434) !important;
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  width: 100% !important;
+  height: 5px !important;
+  z-index: 99999 !important;
+  box-shadow: 0 0 10px var(--nprogress-color, #343434),
+    0 0 5px var(--nprogress-color, #343434) !important;
+  transition: width 0.4s ease !important;
+  opacity: 1 !important;
+  visibility: visible !important;
+  display: block !important;
+}
+
+#nprogress .peg {
+  display: block !important;
+  position: absolute !important;
+  right: 0px !important;
+  width: 100px !important;
+  height: 100% !important;
+  box-shadow: 0 0 10px var(--nprogress-color, #343434),
+    0 0 5px var(--nprogress-color, #343434) !important;
+  opacity: 1 !important;
+  transform: rotate(3deg) translate(0px, -4px) !important;
+  z-index: 99999 !important;
+  visibility: visible !important;
+}
+
+/* Ensure progress bar is visible during navigation */
+#nprogress .bar[style*="width"] {
+  opacity: 1 !important;
+  visibility: visible !important;
+  display: block !important;
+}
+
+/* Force visibility when progress bar is active */
+#nprogress.busy .bar {
+  opacity: 1 !important;
+  visibility: visible !important;
+  display: block !important;
+}
+
+:root {
   --primary: hsl(222.2 47.4% 11.2%);
   --yellow-500: hsl(45 93% 47%);
   --orange-500: hsl(24 95% 53%);

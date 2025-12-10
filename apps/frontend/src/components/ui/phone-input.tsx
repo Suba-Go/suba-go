@@ -2,7 +2,13 @@
 
 import type React from 'react';
 import { useMemo } from 'react';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@suba-go/shared-components/components/ui/select';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@suba-go/shared-components/components/ui/select';
 import { FormattedInput } from '@/components/ui/formatted-input';
 import { useAutoFormat } from '@/hooks/use-auto-format';
 
@@ -16,15 +22,20 @@ interface PhoneInputProps {
   onChange: (value: string) => void;
   className?: string;
   placeholder?: string;
+  style?: React.CSSProperties;
 }
 
-export function PhoneInput({ value, onChange, className, placeholder = '+56 9 1234 5678' }: PhoneInputProps) {
+export function PhoneInput({
+  value,
+  onChange,
+  className,
+  placeholder = '+56 9 1234 5678',
+  style,
+}: PhoneInputProps) {
   const { composeIntlPhone, formatPhoneChile } = useAutoFormat();
 
   const countries: CountryOption[] = useMemo(
-    () => [
-      { code: '+56', label: 'Chile (+56)' },
-    ],
+    () => [{ code: '+56', label: 'Chile (+56)' }],
     []
   );
 
@@ -53,9 +64,9 @@ export function PhoneInput({ value, onChange, className, placeholder = '+56 9 12
   };
 
   return (
-    <div className={`flex items-center gap-2 ${className ?? ''}`}>
+    <div className={`flex items-center gap-2 ${className ?? ''}`} style={style}>
       <Select value={currentPrefix} onValueChange={handlePrefixChange}>
-        <SelectTrigger className="w-[140px]">
+        <SelectTrigger className="w-[140px]" style={style}>
           <SelectValue placeholder="+56" />
         </SelectTrigger>
         <SelectContent>
@@ -72,9 +83,8 @@ export function PhoneInput({ value, onChange, className, placeholder = '+56 9 12
         onChange={handleNationalChange}
         placeholder={placeholder}
         className="flex-1"
+        style={style}
       />
     </div>
   );
 }
-
-

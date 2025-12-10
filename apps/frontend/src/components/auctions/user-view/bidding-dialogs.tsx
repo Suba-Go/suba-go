@@ -14,6 +14,8 @@ import {
 } from '@suba-go/shared-components/components/ui/dialog';
 import { Button } from '@suba-go/shared-components/components/ui/button';
 import { AlertCircle, Zap } from 'lucide-react';
+import { useCompanyContextOptional } from '@/contexts/company-context';
+import { darkenColor } from '@/utils/color-utils';
 
 interface SelfBidWarningDialogProps {
   isOpen: boolean;
@@ -26,12 +28,20 @@ export function SelfBidWarningDialog({
   onConfirm,
   onCancel,
 }: SelfBidWarningDialogProps) {
+  const companyContext = useCompanyContextOptional();
+  const primaryColor = companyContext?.company?.principal_color;
+
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onCancel()}>
       <DialogContent>
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <AlertCircle className="h-5 w-5 text-yellow-600" />
+            <AlertCircle
+              className="h-5 w-5"
+              style={
+                primaryColor ? { color: primaryColor } : { color: '#D97706' }
+              }
+            />
             Advertencia: Puja Propia
           </DialogTitle>
           <DialogDescription>
@@ -43,7 +53,33 @@ export function SelfBidWarningDialog({
           <Button variant="outline" onClick={onCancel}>
             Cancelar
           </Button>
-          <Button onClick={onConfirm}>Continuar de todas formas</Button>
+          <Button
+            onClick={onConfirm}
+            className="text-white"
+            style={
+              primaryColor
+                ? {
+                    backgroundColor: primaryColor,
+                    borderColor: primaryColor,
+                  }
+                : undefined
+            }
+            onMouseEnter={(e) => {
+              if (primaryColor) {
+                e.currentTarget.style.backgroundColor = darkenColor(
+                  primaryColor,
+                  10
+                );
+              }
+            }}
+            onMouseLeave={(e) => {
+              if (primaryColor) {
+                e.currentTarget.style.backgroundColor = primaryColor;
+              }
+            }}
+          >
+            Continuar de todas formas
+          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
@@ -71,12 +107,20 @@ export function AutoBidConfirmDialog({
   onConfirm,
   onCancel,
 }: AutoBidConfirmDialogProps) {
+  const companyContext = useCompanyContextOptional();
+  const primaryColor = companyContext?.company?.principal_color;
+
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onCancel()}>
       <DialogContent>
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <Zap className="h-5 w-5 text-purple-600" />
+            <Zap
+              className="h-5 w-5"
+              style={
+                primaryColor ? { color: primaryColor } : { color: '#9333EA' }
+              }
+            />
             Confirmar Puja Automática
           </DialogTitle>
           <DialogDescription>
@@ -96,7 +140,31 @@ export function AutoBidConfirmDialog({
           <Button variant="outline" onClick={onCancel}>
             Cancelar
           </Button>
-          <Button onClick={onConfirm} className="bg-purple-600 hover:bg-purple-700">
+          <Button
+            onClick={onConfirm}
+            className="text-white"
+            style={
+              primaryColor
+                ? {
+                    backgroundColor: primaryColor,
+                    borderColor: primaryColor,
+                  }
+                : undefined
+            }
+            onMouseEnter={(e) => {
+              if (primaryColor) {
+                e.currentTarget.style.backgroundColor = darkenColor(
+                  primaryColor,
+                  10
+                );
+              }
+            }}
+            onMouseLeave={(e) => {
+              if (primaryColor) {
+                e.currentTarget.style.backgroundColor = primaryColor;
+              }
+            }}
+          >
             Activar Puja Automática
           </Button>
         </DialogFooter>
@@ -104,4 +172,3 @@ export function AutoBidConfirmDialog({
     </Dialog>
   );
 }
-
