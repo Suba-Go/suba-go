@@ -13,9 +13,11 @@ import {
   CalendarIcon,
   ShieldIcon,
   IdCardIcon,
+  BarChartIcon,
 } from 'lucide-react';
 import { UsersTableSkeleton } from './users-table-skeleton';
 import { UsersSearchBar } from './users-search-bar';
+import { UserStatisticsDialog } from './user-statistics-dialog';
 
 interface UsersTableProps {
   className?: string;
@@ -25,6 +27,18 @@ export function UsersTable({ className }: UsersTableProps) {
   const { users, allUsers, loading, error, refetch, filterByEmail } = useUsers();
   const [sortField, setSortField] = useState<keyof User>('createdAt');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
+  const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
+  const [selectedUserName, setSelectedUserName] = useState<string>('');
+  const [isStatsOpen, setIsStatsOpen] = useState(false);
+
+  const handleOpenStats = (user: User) => {
+    setSelectedUserId(user.id);
+    const displayName = user.public_name 
+      ? `${user.name || user.email} | ${user.public_name}`
+      : (user.name || user.email);
+    setSelectedUserName(displayName);
+    setIsStatsOpen(true);
+  };
 
   const handleSort = (field: keyof User) => {
     if (sortField === field) {
@@ -156,7 +170,7 @@ export function UsersTable({ className }: UsersTableProps) {
         className="max-w-md"
       />
 
-      <div className="border rounded-lg overflow-hidden">
+      <div className="border rounded-lg overflow-x-auto">
         <table className="w-full">
           <thead className="bg-gray-50">
             <tr>
@@ -202,6 +216,9 @@ export function UsersTable({ className }: UsersTableProps) {
                   Fecha de Registro
                 </SortButton>
               </th>
+              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Acciones
+              </th>
             </tr>
           </thead>
           <tbody className="bg-white divide-y divide-gray-200">
@@ -243,12 +260,30 @@ export function UsersTable({ className }: UsersTableProps) {
                   <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-600">
                     {formatDate(user.createdAt)}
                   </td>
+                  <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-600">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="rounded-full"
+                      onClick={() => handleOpenStats(user)}
+                    >
+                      <BarChartIcon className="h-4 w-4 mr-2" />
+                      Estadísticas
+                    </Button>
+                  </td>
                 </tr>
               ))
             )}
           </tbody>
         </table>
       </div>
+      
+      <UserStatisticsDialog
+        userId={selectedUserId}
+        userName={selectedUserName}
+        open={isStatsOpen}
+        onOpenChange={setIsStatsOpen}
+      />
     </div>
   );
 }
