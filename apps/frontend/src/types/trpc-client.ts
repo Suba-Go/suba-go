@@ -32,6 +32,31 @@ export interface AppRouterClient {
         email: string;
       }) => Promise<ApiResponse<{ domain: string }>>;
     };
+    getStatistics: {
+      query: (input: { userId: string }) => Promise<
+        ApiResponse<{
+          participationCount: number;
+          participatedAuctions: {
+            id: string;
+            title: string;
+            status: string;
+            startTime: Date;
+            endTime: Date;
+            itemsWonCount: number;
+          }[];
+          averageBidsPerItem: number;
+          winRate: number;
+          secondPlaceRate: number;
+          wonItems: {
+            id: string;
+            name: string;
+            price: number | null;
+            auctionId?: string;
+          }[];
+          totalDebt: number;
+        }>
+      >;
+    };
   };
   company: {
     create: {

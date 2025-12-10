@@ -4,6 +4,7 @@ import { UserCreatorService } from './services/user-creator.service';
 import { UserGettersService } from './services/user-getter.service';
 import { UserUpdaterService } from './services/user-updater.service';
 import { UserCompanyGetterService } from './services/user-company-getter.service';
+import { UserStatisticsService } from './services/user-statistics.service';
 import { UserPrismaRepository } from './services/user-prisma-repository.service';
 import { UserLookupService } from './services/user-lookup.service';
 import { UserLookupController } from './controllers/user-lookup.controller';
@@ -18,6 +19,7 @@ import { CompanyPrismaRepository } from '../companies/services/company-prisma-re
     UserGettersService,
     UserUpdaterService,
     UserCompanyGetterService,
+    UserStatisticsService,
     UserLookupService,
     UserPrismaRepository,
     TenantPrismaRepository,
@@ -28,6 +30,7 @@ import { CompanyPrismaRepository } from '../companies/services/company-prisma-re
     UserGettersService,
     UserUpdaterService,
     UserCompanyGetterService,
+    UserStatisticsService,
     UserPrismaRepository,
     TenantPrismaRepository,
     CompanyPrismaRepository,

@@ -3,6 +3,7 @@ import { TrpcService } from './trpc.service';
 import { z } from 'zod';
 import { UserCreatorService } from '../modules/app-modules/users/services/user-creator.service';
 import { UserCompanyGetterService } from '../modules/app-modules/users/services/user-company-getter.service';
+import { UserStatisticsService } from '../modules/app-modules/users/services/user-statistics.service';
 import { CompanyCreatorService } from '../modules/app-modules/companies/services/company-creator.service';
 import { TenantCreatorService } from '../modules/app-modules/tenants/services/tenant-creator.service';
 import { MultiStepFormCreatorService } from '../modules/app-modules/multi-step-form/services/multi-step-form-creator.service';
@@ -20,6 +21,7 @@ export class TrpcRouter {
     private readonly trpc: TrpcService,
     private readonly userCreatorService: UserCreatorService,
     private readonly userCompanyGetterService: UserCompanyGetterService,
+    private readonly userStatisticsService: UserStatisticsService,
     private readonly companyCreatorService: CompanyCreatorService,
     private readonly tenantCreatorService: TenantCreatorService,
     private readonly multiStepFormCreatorService: MultiStepFormCreatorService
@@ -87,6 +89,27 @@ export class TrpcRouter {
               success: false,
               error: (error as Error).message,
               statusCode: 404,
+            };
+          }
+        }),
+
+      getStatistics: this.trpc.procedure
+        .input(z.object({ userId: z.string() }))
+        .query(async ({ input }) => {
+          try {
+            const stats = await this.userStatisticsService.getUserStatistics(
+              input.userId
+            );
+            return {
+              success: true,
+              data: stats,
+              statusCode: 200,
+            };
+          } catch (error) {
+            return {
+              success: false,
+              error: (error as Error).message,
+              statusCode: 400,
             };
           }
         }),
