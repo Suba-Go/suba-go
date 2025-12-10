@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { useRouter } from 'next-nprogress-bar';
+import { useRouter } from 'next/navigation';
 import { ArrowLeft, Trophy } from 'lucide-react';
 import { Button } from '@suba-go/shared-components/components/ui/button';
 import {
@@ -26,7 +26,6 @@ import Image from 'next/image';
 import {
   AuctionDto,
   AuctionItemWithItmeAndBidsDto,
-  AuctionStatusEnum,
   BidWithUserDto,
   ItemStateEnum,
   UserSafeDto,
@@ -38,11 +37,13 @@ import { ItemBidHistory } from '../user-view/item-bid-history';
 interface AuctionManagerCompletedViewProps {
   auction: AuctionDto;
   auctionItems: AuctionItemWithItmeAndBidsDto[];
+  primaryColor?: string;
 }
 
 export function AuctionManagerCompletedView({
   auction,
   auctionItems,
+  primaryColor,
 }: AuctionManagerCompletedViewProps) {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState('items');
@@ -142,13 +143,29 @@ export function AuctionManagerCompletedView({
         <TabsList className="grid w-full grid-cols-2 bg-gray-100 p-1 rounded-lg">
           <TabsTrigger
             value="items"
-            className="data-[state=active]:bg-blue-600 data-[state=active]:text-white data-[state=active]:shadow-sm font-medium transition-all"
+            className="data-[state=active]:text-black data-[state=active]:shadow-sm font-medium transition-all"
+            style={
+              activeTab === 'items' && primaryColor
+                ? {
+                    backgroundColor: primaryColor,
+                    color: '#000000',
+                  }
+                : undefined
+            }
           >
             📦 Items de Subasta
           </TabsTrigger>
           <TabsTrigger
             value="participants"
-            className="data-[state=active]:bg-green-600 data-[state=active]:text-white data-[state=active]:shadow-sm font-medium transition-all"
+            className="data-[state=active]:text-black data-[state=active]:shadow-sm font-medium transition-all"
+            style={
+              activeTab === 'participants' && primaryColor
+                ? {
+                    backgroundColor: primaryColor,
+                    color: '#000000',
+                  }
+                : undefined
+            }
           >
             👥 Participantes
           </TabsTrigger>
@@ -318,6 +335,7 @@ export function AuctionManagerCompletedView({
             participants={participants || []}
             isManager={true}
             onRefresh={refetchParticipants}
+            primaryColor={primaryColor}
           />
         </TabsContent>
       </Tabs>

@@ -14,6 +14,7 @@ import { useToast } from '@suba-go/shared-components/components/ui/toaster';
 import { UserPlus } from 'lucide-react';
 import { ParticipantSelector } from './participant-selector';
 import { AuctionDto } from '@suba-go/shared-validation';
+import { darkenColor } from '@/utils/color-utils';
 
 interface AddParticipantModalProps {
   auction: AuctionDto;
@@ -21,6 +22,7 @@ interface AddParticipantModalProps {
   onClose: () => void;
   onSuccess: () => void;
   existingParticipantIds: string[];
+  primaryColor?: string;
 }
 
 export function AddParticipantModal({
@@ -29,6 +31,7 @@ export function AddParticipantModal({
   onClose,
   onSuccess,
   existingParticipantIds,
+  primaryColor,
 }: AddParticipantModalProps) {
   const { toast } = useToast();
   const [selectedParticipants, setSelectedParticipants] = useState<string[]>(
@@ -122,6 +125,7 @@ export function AddParticipantModal({
             selectedParticipants={selectedParticipants}
             onParticipantsChange={setSelectedParticipants}
             existingParticipantIds={existingParticipantIds}
+            primaryColor={primaryColor}
           />
 
           <DialogFooter>
@@ -133,7 +137,35 @@ export function AddParticipantModal({
             >
               Cancelar
             </Button>
-            <Button type="submit" disabled={isSubmitting}>
+            <Button
+              type="submit"
+              disabled={isSubmitting}
+              className=""
+              style={
+                primaryColor
+                  ? {
+                      backgroundColor: primaryColor,
+                      borderColor: primaryColor,
+                      color: '#000000',
+                    }
+                  : undefined
+              }
+              onMouseEnter={(e) => {
+                if (primaryColor) {
+                  e.currentTarget.style.backgroundColor = darkenColor(
+                    primaryColor,
+                    10
+                  );
+                  e.currentTarget.style.color = '#000000';
+                }
+              }}
+              onMouseLeave={(e) => {
+                if (primaryColor) {
+                  e.currentTarget.style.backgroundColor = primaryColor;
+                  e.currentTarget.style.color = '#000000';
+                }
+              }}
+            >
               {isSubmitting
                 ? 'Registrando...'
                 : `Registrar ${

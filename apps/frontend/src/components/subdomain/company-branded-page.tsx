@@ -4,7 +4,7 @@ import { useEffect } from 'react';
 import { CompanyDto } from '@suba-go/shared-validation';
 import { useSession } from 'next-auth/react';
 import { UserHomePage } from './user-home-page';
-import { useRouter } from 'next-nprogress-bar';
+import { useRouter } from 'next/navigation';
 
 interface CompanyBrandedPageProps {
   company: CompanyDto;

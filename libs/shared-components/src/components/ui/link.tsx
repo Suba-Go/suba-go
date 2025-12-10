@@ -1,5 +1,5 @@
 'use client';
-import { useRouter } from 'next-nprogress-bar';
+import { useRouter } from 'next/navigation';
 import Link, { LinkProps } from 'next/link';
 import { ReactNode, MouseEvent } from 'react';
 

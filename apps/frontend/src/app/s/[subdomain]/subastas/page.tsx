@@ -5,6 +5,7 @@ import { AuctionDashboardSkeleton } from '@/components/auctions/auction-dashboar
 import { AuctionWithItemsAndBidsDto } from '@suba-go/shared-validation';
 import { useFetchData } from '@/hooks/use-fetch-data';
 import { Spinner } from '@suba-go/shared-components/components/ui/spinner';
+import { useCompanyContextOptional } from '@/contexts/company-context';
 
 export default function SubastasPage({
   params,
@@ -23,6 +24,9 @@ export default function SubastasPage({
     revalidateOnMount: true,
     refreshInterval: 3,
   });
+  // Use company from context (loaded once in conditional-layout)
+  const companyContext = useCompanyContextOptional();
+  const primaryColor = companyContext?.company?.principal_color;
 
   if (!auctions || error) return;
 
@@ -30,7 +34,7 @@ export default function SubastasPage({
     return (
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-gray-50">
         <div className="text-center">
-          <Spinner className="size-8" />
+          <Spinner className="size-4" />
         </div>
       </div>
     );
@@ -51,6 +55,7 @@ export default function SubastasPage({
       <Suspense fallback={<AuctionDashboardSkeleton />}>
         <AuctionDashboard
           auctions={auctions}
+          primaryColor={primaryColor}
           isLoading={isLoading}
           error={error}
           subdomain={subdomain}

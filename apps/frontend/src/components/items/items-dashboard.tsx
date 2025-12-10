@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { useRouter } from 'next-nprogress-bar';
+import { useRouter } from 'next/navigation';
 import { Plus, Search, Edit, Trash2, Eye, Package } from 'lucide-react';
 import {
   ItemDto,
@@ -23,6 +23,8 @@ import { ItemEditModal } from './item-edit-modal';
 import { Spinner } from '@suba-go/shared-components/components/ui/spinner';
 import { useAutoFormat } from '@/hooks/use-auto-format';
 import Image from 'next/image';
+import { useCompanyContextOptional } from '@/contexts/company-context';
+import { darkenColor } from '@/utils/color-utils';
 
 interface ItemsDashboardProps {
   subdomain: string;
@@ -30,6 +32,8 @@ interface ItemsDashboardProps {
 
 export function ItemsDashboard({ subdomain }: ItemsDashboardProps) {
   const router = useRouter();
+  const companyContext = useCompanyContextOptional();
+  const primaryColor = companyContext?.company?.principal_color;
   const [items, setItems] = useState<ItemDto[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -102,16 +106,38 @@ export function ItemsDashboard({ subdomain }: ItemsDashboardProps) {
     }
   };
 
-  const filteredItems = items.filter((item) => {
-    const matchesSearch =
-      item.plate?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      item.brand?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      item.model?.toLowerCase().includes(searchTerm.toLowerCase());
+  const filteredItems = items
+    .filter((item) => {
+      const matchesSearch =
+        item.plate?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        item.brand?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        item.model?.toLowerCase().includes(searchTerm.toLowerCase());
 
-    const matchesFilter = filterState === 'all' || item.state === filterState;
+      const matchesFilter = filterState === 'all' || item.state === filterState;
 
-    return matchesSearch && matchesFilter;
-  });
+      return matchesSearch && matchesFilter;
+    })
+    .sort((a, b) => {
+      // Primero ordenar por estado: EN_SUBASTA > DISPONIBLE > VENDIDO > otros
+      const stateOrder = {
+        [ItemStateEnum.EN_SUBASTA]: 1,
+        [ItemStateEnum.DISPONIBLE]: 2,
+        [ItemStateEnum.VENDIDO]: 3,
+      };
+
+      const aStateOrder = stateOrder[a.state as keyof typeof stateOrder] || 4;
+      const bStateOrder = stateOrder[b.state as keyof typeof stateOrder] || 4;
+
+      if (aStateOrder !== bStateOrder) {
+        return aStateOrder - bStateOrder;
+      }
+
+      // Si tienen el mismo estado, ordenar por fecha de creación (más nuevos primero)
+      return (
+        new Date(b.createdAt || '').getTime() -
+        new Date(a.createdAt || '').getTime()
+      );
+    });
 
   const getStateColor = (state: string) => {
     switch (state) {
@@ -132,7 +158,7 @@ export function ItemsDashboard({ subdomain }: ItemsDashboardProps) {
     return (
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-gray-50">
         <div className="text-center">
-          <Spinner className="size-8" />
+          <Spinner className="size-4" />
         </div>
       </div>
     );
@@ -165,13 +191,40 @@ export function ItemsDashboard({ subdomain }: ItemsDashboardProps) {
             ))}
           </select>
         </div>
-        <Button
-          onClick={() => setIsCreateModalOpen(true)}
-          className="flex items-center gap-2"
-        >
-          <Plus className="h-4 w-4" />
-          Crear Producto
-        </Button>
+        {!primaryColor ? (
+          <div className="flex items-center gap-2">
+            <Spinner className="size-4" />
+            <span className="text-sm text-gray-500">Cargando...</span>
+          </div>
+        ) : (
+          <Button
+            onClick={() => setIsCreateModalOpen(true)}
+            className="flex items-center gap-2"
+            style={{
+              backgroundColor: primaryColor,
+              borderColor: primaryColor,
+              color: '#000000',
+            }}
+            onMouseEnter={(e) => {
+              if (primaryColor) {
+                e.currentTarget.style.backgroundColor = darkenColor(
+                  primaryColor,
+                  10
+                );
+                e.currentTarget.style.color = '#000000';
+              }
+            }}
+            onMouseLeave={(e) => {
+              if (primaryColor) {
+                e.currentTarget.style.backgroundColor = primaryColor;
+                e.currentTarget.style.color = '#000000';
+              }
+            }}
+          >
+            <Plus className="h-4 w-4" />
+            Crear Producto
+          </Button>
+        )}
       </div>
 
       {/* Products Grid */}
@@ -303,10 +356,39 @@ export function ItemsDashboard({ subdomain }: ItemsDashboardProps) {
           </p>
           {!searchTerm && filterState === 'all' && (
             <div className="mt-6">
-              <Button onClick={() => setIsCreateModalOpen(true)}>
-                <Plus className="h-4 w-4 mr-2" />
-                Crear Producto
-              </Button>
+              {primaryColor ? (
+                <Button
+                  onClick={() => setIsCreateModalOpen(true)}
+                  style={{
+                    backgroundColor: primaryColor,
+                    borderColor: primaryColor,
+                    color: '#000000',
+                  }}
+                  onMouseEnter={(e) => {
+                    if (primaryColor) {
+                      e.currentTarget.style.backgroundColor = darkenColor(
+                        primaryColor,
+                        10
+                      );
+                      e.currentTarget.style.color = '#000000';
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    if (primaryColor) {
+                      e.currentTarget.style.backgroundColor = primaryColor;
+                      e.currentTarget.style.color = '#000000';
+                    }
+                  }}
+                >
+                  <Plus className="h-4 w-4 mr-2" />
+                  Crear Producto
+                </Button>
+              ) : (
+                <Button onClick={() => setIsCreateModalOpen(true)}>
+                  <Plus className="h-4 w-4 mr-2" />
+                  Crear Producto
+                </Button>
+              )}
             </div>
           )}
         </div>

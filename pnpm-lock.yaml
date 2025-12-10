@@ -92,6 +92,9 @@ importers:
       '@types/bcrypt':
         specifier: ^6.0.0
         version: 6.0.0
+      '@types/nprogress':
+        specifier: ^0.2.3
+        version: 0.2.3
       '@vercel/analytics':
         specifier: ^1.5.0
         version: 1.5.0(next@15.2.5(@babel/core@7.27.4)(babel-plugin-macros@3.1.0)(react-dom@19.0.0(react@19.0.0))(react@19.0.0)(sass@1.89.2))(react@19.0.0)
@@ -143,9 +146,9 @@ importers:
       next-auth:
         specifier: ^5.0.0-beta.19
         version: 5.0.0-beta.28(next@15.2.5(@babel/core@7.27.4)(babel-plugin-macros@3.1.0)(react-dom@19.0.0(react@19.0.0))(react@19.0.0)(sass@1.89.2))(react@19.0.0)
-      next-nprogress-bar:
-        specifier: ^2.4.7
-        version: 2.4.7
+      nprogress:
+        specifier: ^0.2.0
+        version: 0.2.0
       nuqs:
         specifier: ^2.4.3
         version: 2.4.3(next@15.2.5(@babel/core@7.27.4)(babel-plugin-macros@3.1.0)(react-dom@19.0.0(react@19.0.0))(react@19.0.0)(sass@1.89.2))(react@19.0.0)
@@ -3146,6 +3149,9 @@ packages:
 
   '@types/node@18.16.20':
     resolution: {integrity: sha512-nL54VfDjThdP2UXJXZao5wp76CDiDw4zSRO8d4Tk7UgDqNKGKVEQB0/t3ti63NS+YNNkIQDvwEAF04BO+WYu7Q==}
+
+  '@types/nprogress@0.2.3':
+    resolution: {integrity: sha512-k7kRA033QNtC+gLc4VPlfnue58CM1iQLgn1IMAU8VPHGOj7oIHPp9UlhedEnD/Gl8evoCjwkZjlBORtZ3JByUA==}
 
   '@types/parse-json@4.0.2':
     resolution: {integrity: sha512-dISoDXWWQwUquiKsyZ4Ng+HX2KsPL7LyHKHQwgGFEA3IaKac4Obd+h2a/a6waisAoepJlBcx9paWqjA8/HVjCw==}
@@ -6466,9 +6472,6 @@ packages:
       nodemailer:
         optional: true
 
-  next-nprogress-bar@2.4.7:
-    resolution: {integrity: sha512-OeveNQYFBhQhZ+RgrDnvHNUEQfHCmipymmD4AfAVE9pFV4jeWi7/nNK5f0lIk7ODRrtjyyr/n2YpkRbs5kUoMg==}
-
   next@15.2.5:
     resolution: {integrity: sha512-LlqS8ljc7RWR3riUwxB5+14v7ULAa5EuLUyarD/sFgXPd6Hmmscg8DXcu9hDdh5atybrIDVBrFhjDpRIQo/4pQ==}
     engines: {node: ^18.18.0 || ^19.8.0 || >= 20.0.0}
@@ -6575,8 +6578,8 @@ packages:
     resolution: {integrity: sha512-ppwTtiJZq0O/ai0z7yfudtBpWIoxM8yE6nHi1X47eFR2EWORqfbu6CnPlNsjeN683eT0qG6H/Pyf9fCcvjnnnQ==}
     engines: {node: ^12.20.0 || ^14.13.1 || >=16.0.0}
 
-  nprogress-v2@1.1.10:
-    resolution: {integrity: sha512-MypWLNIPIM07SS0bAc/oac0vhVFz9vAHm7d1sj//Pnf3J03LQ3CuWrlDteIu6exq0fIvkDJ6tUDRWLaifsIt5w==}
+  nprogress@0.2.0:
+    resolution: {integrity: sha512-I19aIingLgR1fmhftnbWWO3dXc0hSxqHQHQb3H8m+K3TnEn/iSeTZZOyvKXWqQESMwuUVnatlCnZdLBZZt2VSA==}
 
   nth-check@2.1.1:
     resolution: {integrity: sha512-lqjrjmaOoAnWfMmBPL+XNnynZh2+swxiX3WUE0s4yEHI6m+AwrK2UZOimIRl3X/4QctVqS8AiZjFqyOGrMXb/w==}
@@ -12149,6 +12152,8 @@ snapshots:
 
   '@types/node@18.16.20': {}
 
+  '@types/nprogress@0.2.3': {}
+
   '@types/parse-json@4.0.2': {}
 
   '@types/passport-jwt@4.0.1':
@@ -15965,10 +15970,6 @@ snapshots:
       next: 15.2.5(@babel/core@7.27.4)(babel-plugin-macros@3.1.0)(react-dom@19.0.0(react@19.0.0))(react@19.0.0)(sass@1.89.2)
       react: 19.0.0
 
-  next-nprogress-bar@2.4.7:
-    dependencies:
-      nprogress-v2: 1.1.10
-
   next@15.2.5(@babel/core@7.27.4)(babel-plugin-macros@3.1.0)(react-dom@19.0.0(react@19.0.0))(react@19.0.0)(sass@1.89.2):
     dependencies:
       '@next/env': 15.2.5
@@ -16073,7 +16074,7 @@ snapshots:
     dependencies:
       path-key: 4.0.0
 
-  nprogress-v2@1.1.10: {}
+  nprogress@0.2.0: {}
 
   nth-check@2.1.1:
     dependencies:
