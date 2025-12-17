@@ -8,6 +8,8 @@
 import { useState } from 'react';
 import { useAuctionWebSocket } from '@/hooks/use-auction-websocket';
 import { Button } from '@suba-go/shared-components/components/ui/button';
+import { useCompanyContextOptional } from '@/contexts/company-context';
+import { darkenColor } from '@/utils/color-utils';
 import {
   Card,
   CardContent,
@@ -36,6 +38,8 @@ export function AuctionLiveBids({
   currentHighestBid,
   bidIncrement,
 }: AuctionLiveBidsProps) {
+  const companyContext = useCompanyContextOptional();
+  const primaryColor = companyContext?.company?.principal_color;
   const [bidAmount, setBidAmount] = useState(currentHighestBid + bidIncrement);
 
   const {
@@ -150,6 +154,28 @@ export function AuctionLiveBids({
               <Button
                 onClick={handlePlaceBid}
                 disabled={!isAuthenticated || bidAmount < currentHighestBid + bidIncrement}
+                className="text-white"
+                style={
+                  primaryColor
+                    ? {
+                        backgroundColor: primaryColor,
+                        borderColor: primaryColor,
+                      }
+                    : undefined
+                }
+                onMouseEnter={(e) => {
+                  if (primaryColor) {
+                    e.currentTarget.style.backgroundColor = darkenColor(
+                      primaryColor,
+                      10
+                    );
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (primaryColor) {
+                    e.currentTarget.style.backgroundColor = primaryColor;
+                  }
+                }}
               >
                 Pujar
               </Button>

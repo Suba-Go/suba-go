@@ -17,10 +17,12 @@ import {
   AuctionDto,
   AuctionWithItemsAndBidsDto,
 } from '@suba-go/shared-validation';
-import { useRouter } from 'next-nprogress-bar';
+import { useRouter } from 'next/navigation';
+import { darkenColor } from '@/utils/color-utils';
 
 interface AuctionDashboardProps {
   auctions: AuctionWithItemsAndBidsDto[];
+  primaryColor?: string;
   isLoading: boolean;
   error: Error;
   subdomain: string;
@@ -29,6 +31,7 @@ interface AuctionDashboardProps {
 export function AuctionDashboard({
   auctions,
   isLoading,
+  primaryColor,
   error,
   subdomain,
 }: AuctionDashboardProps) {
@@ -132,7 +135,28 @@ export function AuctionDashboard({
         </div>
         <Button
           onClick={() => setIsCreateModalOpen(true)}
-          className="flex items-center gap-2"
+          className="flex items-center gap-2 text-white"
+          style={
+            primaryColor
+              ? {
+                  backgroundColor: primaryColor,
+                  borderColor: primaryColor,
+                }
+              : undefined
+          }
+          onMouseEnter={(e) => {
+            if (primaryColor) {
+              e.currentTarget.style.backgroundColor = darkenColor(
+                primaryColor,
+                10
+              );
+            }
+          }}
+          onMouseLeave={(e) => {
+            if (primaryColor) {
+              e.currentTarget.style.backgroundColor = primaryColor;
+            }
+          }}
         >
           <Plus className="h-4 w-4" />
           Nueva Subasta
@@ -182,7 +206,31 @@ export function AuctionDashboard({
               Comienza creando tu primera subasta para gestionar los items de tu
               empresa
             </p>
-            <Button onClick={() => setIsCreateModalOpen(true)}>
+            <Button
+              onClick={() => setIsCreateModalOpen(true)}
+              className="text-white"
+              style={
+                primaryColor
+                  ? {
+                      backgroundColor: primaryColor,
+                      borderColor: primaryColor,
+                    }
+                  : undefined
+              }
+              onMouseEnter={(e) => {
+                if (primaryColor) {
+                  e.currentTarget.style.backgroundColor = darkenColor(
+                    primaryColor,
+                    10
+                  );
+                }
+              }}
+              onMouseLeave={(e) => {
+                if (primaryColor) {
+                  e.currentTarget.style.backgroundColor = primaryColor;
+                }
+              }}
+            >
               Crear Primera Subasta
             </Button>
           </CardContent>

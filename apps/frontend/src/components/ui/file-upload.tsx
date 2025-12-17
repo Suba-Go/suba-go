@@ -1,10 +1,10 @@
 'use client';
 
 import React, { useRef, useState } from 'react';
-import { Upload, X, FileText, Image as ImageIcon, Loader2 } from 'lucide-react';
+import { Upload, X, FileText, Loader2 } from 'lucide-react';
 import { Button } from '@suba-go/shared-components/components/ui/button';
 import { useFileUpload } from '@/hooks/use-file-upload';
-
+import Image from 'next/image';
 interface FileUploadProps {
   onFilesChange: (urls: string[]) => void;
   onUploadStatusChange?: (isUploading: boolean) => void;
@@ -155,103 +155,114 @@ export function FileUpload({
       {files.length > 0 && (
         <div className="space-y-3">
           <h4 className="text-sm font-medium">Archivos seleccionados:</h4>
-          
+
           {/* Grid layout for images */}
-          {acceptedTypes.some(t => t.includes('image')) && files.some(f => f.file.type.startsWith('image/')) && (
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-              {files
-                .filter(f => f.file.type.startsWith('image/'))
-                .map((uploadedFile, index) => {
-                  const previewUrl = uploadedFile.url || URL.createObjectURL(uploadedFile.file);
-                  return (
-                    <div key={index} className="relative group">
-                      <div className="aspect-video bg-gray-100 rounded-lg overflow-hidden border">
-                        <img
-                          src={previewUrl}
-                          alt={uploadedFile.file.name}
-                          className="w-full h-full object-cover"
-                          onLoad={() => {
-                            if (!uploadedFile.url) URL.revokeObjectURL(previewUrl);
+          {acceptedTypes.some((t) => t.includes('image')) &&
+            files.some((f) => f.file.type.startsWith('image/')) && (
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                {files
+                  .filter((f) => f.file.type.startsWith('image/'))
+                  .map((uploadedFile, index) => {
+                    const previewUrl =
+                      uploadedFile.url ||
+                      URL.createObjectURL(uploadedFile.file);
+                    return (
+                      <div key={index} className="relative group">
+                        <div className="aspect-video bg-gray-100 rounded-lg overflow-hidden border">
+                          <Image
+                            src={previewUrl}
+                            alt={uploadedFile.file.name}
+                            className="w-full h-full object-cover"
+                            width={100}
+                            height={100}
+                            onLoad={() => {
+                              if (!uploadedFile.url)
+                                URL.revokeObjectURL(previewUrl);
+                            }}
+                          />
+                          {uploadedFile.uploading && (
+                            <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
+                              <Loader2 className="h-6 w-6 animate-spin text-white" />
+                            </div>
+                          )}
+                          {uploadedFile.error && (
+                            <div className="absolute inset-0 bg-red-500/20 flex items-center justify-center border-2 border-red-500">
+                              <span className="text-white bg-red-500 px-2 py-1 text-xs rounded">
+                                Error
+                              </span>
+                            </div>
+                          )}
+                        </div>
+                        <Button
+                          type="button"
+                          variant="destructive"
+                          size="sm"
+                          className="absolute top-1 right-1 h-6 w-6 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            removeFile(uploadedFile.file);
                           }}
-                        />
-                        {uploadedFile.uploading && (
-                          <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
-                             <Loader2 className="h-6 w-6 animate-spin text-white" />
-                          </div>
-                        )}
-                        {uploadedFile.error && (
-                          <div className="absolute inset-0 bg-red-500/20 flex items-center justify-center border-2 border-red-500">
-                             <span className="text-white bg-red-500 px-2 py-1 text-xs rounded">Error</span>
-                          </div>
-                        )}
+                        >
+                          <X className="h-3 w-3" />
+                        </Button>
+                        <p
+                          className="text-xs text-gray-500 mt-1 truncate"
+                          title={uploadedFile.file.name}
+                        >
+                          {uploadedFile.file.name}
+                        </p>
                       </div>
-                      <Button
-                        type="button"
-                        variant="destructive"
-                        size="sm"
-                        className="absolute top-1 right-1 h-6 w-6 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          removeFile(uploadedFile.file);
-                        }}
-                      >
-                        <X className="h-3 w-3" />
-                      </Button>
-                      <p className="text-xs text-gray-500 mt-1 truncate" title={uploadedFile.file.name}>
-                        {uploadedFile.file.name}
-                      </p>
-                    </div>
-                  );
-                })}
-            </div>
-          )}
+                    );
+                  })}
+              </div>
+            )}
 
           {/* List layout for non-image files */}
           <div className="space-y-2">
             {files
-              .filter(f => !f.file.type.startsWith('image/'))
+              .filter((f) => !f.file.type.startsWith('image/'))
               .map((uploadedFile, index) => (
-              <div
-                key={index}
-                className="flex items-center justify-between p-2 bg-gray-50 rounded border"
-              >
-                <div className="flex items-center space-x-3 flex-1 min-w-0">
-                  <FileText className="h-8 w-8 text-gray-400" />
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium truncate">
-                      {uploadedFile.file.name}
-                    </p>
-                    <p className="text-xs text-gray-500">
-                      {formatFileSize(uploadedFile.file.size)}
-                    </p>
+                <div
+                  key={index}
+                  className="flex items-center justify-between p-2 bg-gray-50 rounded border"
+                >
+                  <div className="flex items-center space-x-3 flex-1 min-w-0">
+                    <FileText className="h-8 w-8 text-gray-400" />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium truncate">
+                        {uploadedFile.file.name}
+                      </p>
+                      <p className="text-xs text-gray-500">
+                        {formatFileSize(uploadedFile.file.size)}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center space-x-2">
+                    {uploadedFile.uploading && (
+                      <Loader2 className="h-4 w-4 animate-spin text-blue-500" />
+                    )}
+                    {uploadedFile.error && (
+                      <span className="text-xs text-red-500">Error</span>
+                    )}
+                    {!uploadedFile.uploading && !uploadedFile.error && (
+                      <span className="text-xs text-green-500">✓</span>
+                    )}
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        removeFile(uploadedFile.file);
+                      }}
+                      className="h-6 w-6 p-0"
+                    >
+                      <X className="h-3 w-3" />
+                    </Button>
                   </div>
                 </div>
-
-                <div className="flex items-center space-x-2">
-                  {uploadedFile.uploading && (
-                    <Loader2 className="h-4 w-4 animate-spin text-blue-500" />
-                  )}
-                  {uploadedFile.error && (
-                    <span className="text-xs text-red-500">Error</span>
-                  )}
-                  {!uploadedFile.uploading && !uploadedFile.error && (
-                    <span className="text-xs text-green-500">✓</span>
-                  )}
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      removeFile(uploadedFile.file);
-                    }}
-                    className="h-6 w-6 p-0"
-                  >
-                    <X className="h-3 w-3" />
-                  </Button>
-                </div>
-              </div>
-            ))}
+              ))}
           </div>
 
           {isUploading && (

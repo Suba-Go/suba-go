@@ -7,6 +7,7 @@
 
 import { useCallback } from 'react';
 import { useFetchData } from '@/hooks/use-fetch-data';
+import { useCompany } from '@/hooks/use-company';
 import { AuctionDetail } from './auction-detail';
 import { AuctionActiveBiddingView } from './user-view/auction-active-bidding-view';
 import { AuctionPendingView } from './user-view/auction-pending-view';
@@ -42,6 +43,10 @@ export function AuctionViewRouter({
   accessToken,
   tenantId,
 }: AuctionViewRouterProps) {
+  // Get company primary color once
+  const { company } = useCompany();
+  const primaryColor = company?.principal_color;
+
   // Fetch auction data
   const {
     data: auction,
@@ -119,8 +124,7 @@ export function AuctionViewRouter({
             accessToken={accessToken}
             tenantId={tenantId}
             onRealtimeSnapshot={handleRealtimeSnapshot}
-            userRole={userRole}
-            userId={userId}
+            primaryColor={primaryColor}
           />
         );
       case AuctionStatusEnum.PENDIENTE:
@@ -128,6 +132,7 @@ export function AuctionViewRouter({
           <AuctionManagerPendingView
             auction={auction}
             auctionItems={auctionItems}
+            primaryColor={primaryColor}
           />
         );
       case AuctionStatusEnum.COMPLETADA:
@@ -135,6 +140,7 @@ export function AuctionViewRouter({
           <AuctionManagerCompletedView
             auction={auction}
             auctionItems={auctionItems}
+            primaryColor={primaryColor}
           />
         );
       case AuctionStatusEnum.CANCELADA:
@@ -142,6 +148,7 @@ export function AuctionViewRouter({
           <AuctionManagerPendingView
             auction={auction}
             auctionItems={auctionItems}
+            primaryColor={primaryColor}
           />
         );
       default:
@@ -149,6 +156,7 @@ export function AuctionViewRouter({
           <AuctionManagerPendingView
             auction={auction}
             auctionItems={auctionItems}
+            primaryColor={primaryColor}
           />
         );
     }
@@ -223,6 +231,7 @@ export function AuctionViewRouter({
             accessToken={accessToken}
             tenantId={tenantId}
             onRealtimeSnapshot={handleRealtimeSnapshot}
+            primaryColor={primaryColor}
           />
         );
     }
@@ -238,6 +247,7 @@ export function AuctionViewRouter({
       accessToken={accessToken}
       tenantId={tenantId}
       onRealtimeSnapshot={handleRealtimeSnapshot}
+      primaryColor={primaryColor}
     />
   );
 }

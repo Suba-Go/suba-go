@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useSession } from 'next-auth/react';
+import { useCompanyContextOptional } from '@/contexts/company-context';
 
 interface Company {
   id: string;
@@ -17,11 +18,19 @@ interface Company {
 
 export function useCompany() {
   const { data: session } = useSession();
+  const contextCompany = useCompanyContextOptional();
   const [company, setCompany] = useState<Company | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  // If context is available (in subdomain), use it and skip fetching
   useEffect(() => {
+    if (contextCompany !== undefined) {
+      // Context is available, no need to fetch
+      return;
+    }
+
+    // Otherwise, fetch company data (for root domain or when context is not available)
     const fetchCompany = async () => {
       if (!session?.user?.company?.id) {
         setIsLoading(false);
@@ -32,8 +41,10 @@ export function useCompany() {
         setIsLoading(true);
         setError(null);
 
-        const response = await fetch(`/api/companies/${session.user.company.id}`);
-        
+        const response = await fetch(
+          `/api/companies/${session.user.company.id}`
+        );
+
         if (!response.ok) {
           throw new Error('Error al cargar la empresa');
         }
@@ -48,7 +59,12 @@ export function useCompany() {
     };
 
     fetchCompany();
-  }, [session?.user?.company?.id]);
+  }, [contextCompany, session?.user?.company?.id]);
+
+  // Return context if available, otherwise return local state
+  if (contextCompany !== undefined) {
+    return contextCompany;
+  }
 
   return {
     company,

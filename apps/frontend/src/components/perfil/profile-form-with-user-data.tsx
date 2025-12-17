@@ -1,17 +1,17 @@
 'use client';
 
 import { useSession } from 'next-auth/react';
-import { useRouter } from 'next-nprogress-bar';
+import { useRouter } from 'next/navigation';
 import { useState, useEffect } from 'react';
 import { updateUserProfileAction } from '@/domain/server-actions/user/update-profile';
 import { useToast } from '@suba-go/shared-components/components/ui/toaster';
 import { Button } from '@suba-go/shared-components/components/ui/button';
-import { darkenColor } from '@/utils/color-utils';
 import { Spinner } from '@suba-go/shared-components/components/ui/spinner';
 import { validateRUT as validateRUTUtil } from '@suba-go/shared-validation';
 import { FormattedInput } from '@/components/ui/formatted-input';
 import { PhoneInput } from '@/components/ui/phone-input';
 import { useAutoFormat } from '@/hooks/use-auto-format';
+import { useCompany, lightenColor } from '@/hooks/use-company';
 
 // functions to validate the form fields
 // TODO: validaciones rtaspasar a helper reutilizable
@@ -57,7 +57,7 @@ const validateRUT = (rut: string): string | null => {
 };
 
 interface ProfileFormWithUserDataProps {
-  company: {
+  company?: {
     id: string;
     name: string;
     principal_color?: string;
@@ -66,15 +66,43 @@ interface ProfileFormWithUserDataProps {
 }
 
 export default function ProfileFormWithUserData({
-  company,
+  company: companyProp,
   hideBackButton,
 }: ProfileFormWithUserDataProps) {
+  const { company: companyFromHook } = useCompany();
+  // Use company from hook if available (more up-to-date), otherwise fallback to prop
+  const company = companyFromHook || companyProp;
+  const primaryColor = company?.principal_color;
   const { data: session, status, update } = useSession();
   const router = useRouter();
   const { toast } = useToast();
   const { formatRut } = useAutoFormat();
   const [isEditing, setIsEditing] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+
+  // Generate styles for inputs based on primary color
+  const getInputStyles = () => {
+    if (!primaryColor) {
+      return {
+        className: 'bg-gray-50 border-gray-300 focus:ring-gray-500',
+        style: {} as React.CSSProperties,
+      };
+    }
+    // Create a very light version of the primary color (95% lighter) for background
+    const lightBgColor = lightenColor(primaryColor, 95);
+    // Create a lighter version of the primary color (70% lighter) for border
+    const lightBorderColor = lightenColor(primaryColor, 70);
+    return {
+      className: '',
+      style: {
+        backgroundColor: lightBgColor,
+        borderColor: lightBorderColor,
+        '--tw-ring-color': primaryColor,
+      } as React.CSSProperties,
+    };
+  };
+
+  const inputStyles = getInputStyles();
   const [userData, setUserData] = useState({
     name: '',
     email: '',
@@ -281,7 +309,7 @@ export default function ProfileFormWithUserData({
         </h2>
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-gray-50">
           <div className="text-center">
-            <Spinner className="size-8" />
+            <Spinner className="size-4" />
           </div>
         </div>
       </div>
@@ -337,11 +365,12 @@ export default function ProfileFormWithUserData({
                 type="text"
                 value={userData.name}
                 onChange={handleInputChange('name')}
-                className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 bg-blue-50 ${
+                className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 ${
                   validationErrors.name
                     ? 'border-red-500 focus:ring-red-500'
-                    : 'border-blue-300 focus:ring-blue-500'
+                    : inputStyles.className
                 }`}
+                style={validationErrors.name ? {} : inputStyles.style}
                 placeholder="Tu nombre"
               />
               {validationErrors.name && (
@@ -383,11 +412,12 @@ export default function ProfileFormWithUserData({
                     }));
                   }
                 }}
-                className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 bg-blue-50 ${
+                className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 ${
                   validationErrors.email
                     ? 'border-red-500 focus:ring-red-500'
-                    : 'border-blue-300 focus:ring-blue-500'
+                    : inputStyles.className
                 }`}
+                style={validationErrors.email ? {} : inputStyles.style}
                 placeholder="tu@email.com"
               />
               {validationErrors.email && (
@@ -428,9 +458,10 @@ export default function ProfileFormWithUserData({
                 }}
                 className={`w-full ${
                   validationErrors.phone
-                    ? 'border-red-500 focus-within:ring-red-500'
-                    : 'border-blue-300 focus-within:ring-blue-500'
+                    ? 'border-red-500 focus:ring-red-500'
+                    : inputStyles.className
                 }`}
+                style={validationErrors.phone ? {} : inputStyles.style}
                 placeholder="9 1234 5678"
               />
               {validationErrors.phone && (
@@ -471,11 +502,12 @@ export default function ProfileFormWithUserData({
                     }));
                   }
                 }}
-                className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 bg-blue-50 ${
+                className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 ${
                   validationErrors.rut
                     ? 'border-red-500 focus:ring-red-500'
-                    : 'border-blue-300 focus:ring-blue-500'
+                    : inputStyles.className
                 }`}
+                style={validationErrors.rut ? {} : inputStyles.style}
                 placeholder="12.345.678-9"
               />
               {validationErrors.rut && (
@@ -497,24 +529,7 @@ export default function ProfileFormWithUserData({
         {!hideBackButton && (
           <Button
             onClick={handleGoBack}
-            className="px-4 py-2 text-white rounded-md transition-colors"
-            style={{
-              backgroundColor: company.principal_color,
-              borderColor: company.principal_color,
-            }}
-            onMouseEnter={(e) => {
-              if (company.principal_color) {
-                e.currentTarget.style.backgroundColor = darkenColor(
-                  company.principal_color,
-                  10
-                );
-              }
-            }}
-            onMouseLeave={(e) => {
-              if (company.principal_color) {
-                e.currentTarget.style.backgroundColor = company.principal_color;
-              }
-            }}
+            className="px-4 py-2 bg-gray-200 text-black rounded-md hover:bg-gray-300 transition-colors"
           >
             Volver
           </Button>
@@ -539,7 +554,8 @@ export default function ProfileFormWithUserData({
         ) : (
           <Button
             onClick={handleEdit}
-            className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+            className={`px-4 py-2 text-white rounded-md hover:bg-${primaryColor}/90 transition-colors`}
+            style={primaryColor ? { backgroundColor: primaryColor } : {}}
           >
             Editar
           </Button>
