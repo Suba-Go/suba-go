@@ -71,15 +71,36 @@ export class UserStatisticsService {
     const secondPlaceRate =
       totalUniqueItems > 0 ? (itemsLost / totalUniqueItems) * 100 : 0;
 
-    // 4. Debt (Sum of soldPrice)
-    const debtStats = await this.prisma.item.aggregate({
-      where: {
-        soldToUserId: userId,
-      },
-      _sum: {
-        soldPrice: true,
-      },
+    // 5. Bidding Trend (Days of Week)
+    const biddingTrendRaw = await this.prisma.client.$queryRaw<{ day: number; count: bigint }[]>`
+      SELECT EXTRACT(DOW FROM "createdAt") as day, COUNT(*) as count
+      FROM "bid"
+      WHERE "userId" = ${userId}
+      GROUP BY day
+      ORDER BY day ASC
+    `;
+
+    // Initialize counts for all days (0=Sunday to 6=Saturday)
+    const daysMap = new Map<number, number>();
+    biddingTrendRaw.forEach((row) => {
+      daysMap.set(Number(row.day), Number(row.count));
     });
+
+    // Format for frontend: Start from Monday (1) to Sunday (0)
+    const daysOfWeek = [
+      { id: 1, label: 'Lun' },
+      { id: 2, label: 'Mar' },
+      { id: 3, label: 'Mié' },
+      { id: 4, label: 'Jue' },
+      { id: 5, label: 'Vie' },
+      { id: 6, label: 'Sáb' },
+      { id: 0, label: 'Dom' },
+    ];
+
+    const biddingTrend = daysOfWeek.map((day) => ({
+      day: day.label,
+      count: daysMap.get(day.id) || 0,
+    }));
 
     return {
       participationCount,
@@ -107,7 +128,7 @@ export class UserStatisticsService {
         price: item.soldPrice,
         auctionId: item.auctionItems[0]?.auctionId,
       })),
-      totalDebt: debtStats._sum.soldPrice || 0,
+      biddingTrend,
     };
   }
 }

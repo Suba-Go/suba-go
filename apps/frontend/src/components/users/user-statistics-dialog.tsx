@@ -40,7 +40,10 @@ interface UserStats {
     price: number | null;
     auctionId?: string;
   }[];
-  totalDebt: number;
+  biddingTrend: {
+    day: string;
+    count: number;
+  }[];
 }
 
 export function UserStatisticsDialog({
@@ -61,7 +64,7 @@ export function UserStatisticsDialog({
         .query({ userId })
         .then((response) => {
           if (response.success && response.data) {
-            setStats(response.data);
+            setStats(response.data as unknown as UserStats);
           } else {
             setError(response.error || 'Error al cargar estadísticas');
           }
@@ -152,11 +155,43 @@ export function UserStatisticsDialog({
                   </p>
                 </div>
               </div>
-              <div className="bg-slate-50 p-4 rounded-lg text-center col-span-2">
-                <p className="text-sm text-gray-500">Total Deuda</p>
-                <p className="text-3xl font-bold text-red-600">
-                  {formatCurrency(stats.totalDebt)}
+              <div className="bg-slate-50 p-4 rounded-lg col-span-2">
+                <p className="text-sm text-gray-500 mb-4 text-center">
+                  Tendencia de Pujas por Día
                 </p>
+                <div className="flex justify-between h-40 px-4 gap-2">
+                  {stats.biddingTrend.map((day) => {
+                    const maxBids = Math.max(
+                      ...stats.biddingTrend.map((d) => d.count),
+                      1
+                    );
+                    // Scale from 10% (for 0 bids) to 100% (for max bids)
+                    const heightPercentage = (day.count / maxBids) * 90 + 10;
+                    
+                    return (
+                      <div
+                        key={day.day}
+                        className="flex flex-col items-center flex-1 group relative justify-end"
+                      >
+                        <div className="w-full flex-1 flex items-end relative px-1">
+                          <div
+                            className="w-full bg-blue-600 rounded-t-sm hover:bg-blue-700 transition-all relative"
+                            style={{
+                              height: `${heightPercentage}%`,
+                            }}
+                          >
+                            <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 hidden group-hover:block bg-black text-white text-xs px-2 py-1 rounded whitespace-nowrap z-10 pointer-events-none">
+                              {day.count} pujas
+                            </div>
+                          </div>
+                        </div>
+                        <p className="text-xs text-gray-500 mt-2 font-medium">
+                          {day.day}
+                        </p>
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
             </div>
 
@@ -165,7 +200,7 @@ export function UserStatisticsDialog({
                 Items Adjudicados ({stats.wonItems.length})
               </h3>
               {stats.wonItems.length > 0 ? (
-                <div className="max-h-[200px] overflow-y-auto space-y-2 border rounded-md p-2">
+                <div className="space-y-2 border rounded-md p-2">
                   {stats.wonItems.map((item) => (
                     <div
                       key={item.id}
@@ -204,7 +239,7 @@ export function UserStatisticsDialog({
                 Subastas Participadas ({stats.participatedAuctions.length})
               </h3>
               {stats.participatedAuctions.length > 0 ? (
-                <div className="max-h-[200px] overflow-y-auto space-y-2 border rounded-md p-2">
+                <div className="space-y-2 border rounded-md p-2">
                   {stats.participatedAuctions.map((auction) => (
                     <div
                       key={auction.id}
@@ -226,7 +261,7 @@ export function UserStatisticsDialog({
                         <p className="text-xs text-gray-500">
                           {new Date(auction.startTime).toLocaleDateString()}
                         </p>
-                        {auction.itemsWonCount > 0 && (
+                        {auction.itemsWonCount >= 0 && (
                           <p className="text-xs text-green-600 font-medium mt-1">
                             {auction.itemsWonCount} items adjudicados por el usuario
                           </p>
