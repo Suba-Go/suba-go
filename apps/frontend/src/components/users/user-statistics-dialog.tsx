@@ -10,9 +10,13 @@ import { useEffect, useState } from 'react';
 import { Loader2 } from 'lucide-react';
 import { Button } from '@suba-go/shared-components/components/ui/button';
 import Link from 'next/link';
-import { getAuctionBadgeColor, getAuctionStatusLabel } from '@/lib/auction-badge-colors';
+import {
+  getAuctionBadgeColor,
+  getAuctionStatusLabel,
+} from '@/lib/auction-badge-colors';
 import { Badge } from '@suba-go/shared-components/components/ui/badge';
 import { Progress } from '@suba-go/shared-components/components/ui/progress';
+import { useCompany, darkenColor } from '@/hooks/use-company';
 
 interface UserStatisticsDialogProps {
   userId: string | null;
@@ -55,6 +59,7 @@ export function UserStatisticsDialog({
   const [stats, setStats] = useState<UserStats | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const { company } = useCompany();
 
   useEffect(() => {
     if (open && userId) {
@@ -118,14 +123,16 @@ export function UserStatisticsDialog({
           <div className="grid gap-4 py-4">
             <div className="grid grid-cols-2 gap-4">
               <div className="bg-slate-50 p-4 rounded-lg text-center">
-                <p className="text-sm text-gray-500">Participaciones en subastas</p>
+                <p className="text-sm text-gray-500">
+                  Participaciones en subastas
+                </p>
                 <p className="text-2xl font-bold">{stats.participationCount}</p>
               </div>
               <div className="bg-slate-50 p-4 rounded-lg text-center">
-                <p className="text-sm text-gray-500">Promedio de pujas por auto</p>
-                <p className="text-2xl font-bold">
-                  {stats.averageBidsPerItem}
+                <p className="text-sm text-gray-500">
+                  Promedio de pujas por auto
                 </p>
+                <p className="text-2xl font-bold">{stats.averageBidsPerItem}</p>
               </div>
               <div className="bg-slate-50 p-4 rounded-lg text-center flex flex-col justify-center items-center">
                 <p className="text-sm text-gray-500 mb-2">Win Rate</p>
@@ -142,12 +149,16 @@ export function UserStatisticsDialog({
                 </div>
               </div>
               <div className="bg-slate-50 p-4 rounded-lg text-center flex flex-col justify-center items-center">
-                <p className="text-sm text-gray-500 mb-2">Tasa Autos Perdidos</p>
+                <p className="text-sm text-gray-500 mb-2">
+                  Tasa Autos Perdidos
+                </p>
                 <div className="w-[80%] space-y-1">
                   <Progress
                     value={stats.secondPlaceRate}
                     className="h-2 bg-gray-200"
-                    indicatorClassName={getLostRateColorClass(stats.secondPlaceRate)}
+                    indicatorClassName={getLostRateColorClass(
+                      stats.secondPlaceRate
+                    )}
                     showValuePoint
                   />
                   <p className="text-xs font-medium text-gray-900">
@@ -167,7 +178,14 @@ export function UserStatisticsDialog({
                     );
                     // Scale from 10% (for 0 bids) to 100% (for max bids)
                     const heightPercentage = (day.count / maxBids) * 90 + 10;
-                    
+
+                    // Get company colors or fallback to blue
+                    const primaryColor =
+                      company?.principal_color ||
+                      company?.principal_color2 ||
+                      '#2563eb';
+                    const hoverColor = darkenColor(primaryColor, 10);
+
                     return (
                       <div
                         key={day.day}
@@ -175,9 +193,18 @@ export function UserStatisticsDialog({
                       >
                         <div className="w-full flex-1 flex items-end relative px-1">
                           <div
-                            className="w-full bg-blue-600 rounded-t-sm hover:bg-blue-700 transition-all relative"
+                            className="w-full rounded-t-sm transition-all relative"
                             style={{
                               height: `${heightPercentage}%`,
+                              backgroundColor: primaryColor,
+                            }}
+                            onMouseEnter={(e) => {
+                              e.currentTarget.style.backgroundColor =
+                                hoverColor;
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.style.backgroundColor =
+                                primaryColor;
                             }}
                           >
                             <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 hidden group-hover:block bg-black text-white text-xs px-2 py-1 rounded whitespace-nowrap z-10 pointer-events-none">
@@ -209,13 +236,12 @@ export function UserStatisticsDialog({
                       <div>
                         <p className="font-medium text-sm">{item.name}</p>
                         <p className="text-xs text-gray-500">
-                          {item.price ? formatCurrency(item.price) : 'Sin precio'}
+                          {item.price
+                            ? formatCurrency(item.price)
+                            : 'Sin precio'}
                         </p>
                       </div>
-                      <Link
-                        href={`/items/${item.id}`}
-                        target="_blank"
-                      >
+                      <Link href={`/items/${item.id}`} target="_blank">
                         <Button
                           size="sm"
                           variant="outline"
@@ -263,14 +289,12 @@ export function UserStatisticsDialog({
                         </p>
                         {auction.itemsWonCount >= 0 && (
                           <p className="text-xs text-green-600 font-medium mt-1">
-                            {auction.itemsWonCount} items adjudicados por el usuario
+                            {auction.itemsWonCount} items adjudicados por el
+                            usuario
                           </p>
                         )}
                       </div>
-                      <Link
-                        href={`/subastas/${auction.id}`}
-                        target="_blank"
-                      >
+                      <Link href={`/subastas/${auction.id}`} target="_blank">
                         <Button
                           size="sm"
                           variant="outline"
@@ -294,4 +318,3 @@ export function UserStatisticsDialog({
     </Dialog>
   );
 }
-
