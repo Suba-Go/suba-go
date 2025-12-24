@@ -28,9 +28,9 @@ export const password = z
   .string()
   .min(8, { message: 'Contraseña debe tener largo de 8' })
   .max(100, { message: 'Largo máximo de 100' })
-  .regex(/^(?=.*[a-z])(?=.*[A-Z])(?=.*[\W_])[A-Za-z\d\W_]{8,100}$/, {
+  .regex(/^(?=.*[a-z])(?=.*[A-Z])[A-Za-z\d\W_]{8,100}$/, {
     message:
-      'Contraseña debe tener al menos una mayúscula, una minúscula, un caracter especial',
+      'Contraseña debe tener al menos una mayúscula y una minúscula',
   });
 
 export const confirmation_password = z.string();

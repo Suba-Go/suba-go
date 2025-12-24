@@ -9,6 +9,8 @@ import { Button } from '@suba-go/shared-components/components/ui/button';
 import { Input } from '@suba-go/shared-components/components/ui/input';
 import { FormattedInput } from '@/components/ui/formatted-input';
 import { Label } from '@suba-go/shared-components/components/ui/label';
+import { PasswordChecklist } from '@/components/auth/password-checklist';
+import { PasswordMatchChecklist } from '@/components/auth/password-match-checklist';
 import {
   UserCreateDto,
   userCreateSchema,
@@ -87,6 +89,7 @@ export default function UserForm({
   });
 
   const passwordValue = watch('password');
+  const confirmPasswordValue = watch('confirmPassword');
   const nameValue = watch('name');
   const emailValue = watch('email');
 
@@ -160,9 +163,7 @@ export default function UserForm({
             errors.password ? 'border-red-500 focus:border-red-500' : ''
           }`}
         />
-        {errors.password && (
-          <p className="text-sm text-red-600 mt-1">{errors.password.message}</p>
-        )}
+        <PasswordChecklist password={passwordValue} />
       </div>
 
       {showConfirmPassword && (
@@ -178,11 +179,10 @@ export default function UserForm({
                 : ''
             }`}
           />
-          {errors.confirmPassword && (
-            <p className="text-sm text-red-600 mt-1">
-              {errors.confirmPassword.message}
-            </p>
-          )}
+          <PasswordMatchChecklist
+            password={passwordValue}
+            confirmPassword={confirmPasswordValue}
+          />
         </div>
       )}
 
