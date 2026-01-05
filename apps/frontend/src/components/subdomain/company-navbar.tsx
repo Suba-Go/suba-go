@@ -7,7 +7,18 @@ import { getNodeEnv } from '@suba-go/shared-components';
 import { Button } from '@suba-go/shared-components/components/ui/button';
 import { useSession, signOut } from 'next-auth/react';
 import { useEffect, useState } from 'react';
-import { User, LogOut, ChevronDown, Gavel, Package, Users, MessageSquare, UserPlus, Building2, BarChart3 } from 'lucide-react';
+import {
+  User,
+  LogOut,
+  ChevronDown,
+  Gavel,
+  Package,
+  Users,
+  MessageSquare,
+  UserPlus,
+  Building2,
+  BarChart3,
+} from 'lucide-react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { Spinner } from '@suba-go/shared-components/components/ui/spinner';
@@ -15,12 +26,26 @@ import {
   isUserProfileComplete,
   isUserAdminOrManager,
 } from '@/utils/subdomain-profile-validation';
+import { useCompany } from '@/hooks/use-company';
 
 interface CompanyNavbarProps {
   company: CompanyDto;
 }
 
-export default function CompanyNavbar({ company }: CompanyNavbarProps) {
+export default function CompanyNavbar({
+  company: companyProp,
+}: CompanyNavbarProps) {
+  const { company: companyFromHook } = useCompany();
+  // Use company from hook if available (more up-to-date), otherwise fallback to prop
+  // The hook returns a Company type which has the same structure for the fields we need
+  const company = companyFromHook
+    ? {
+        ...companyProp,
+        name: companyFromHook.name,
+        logo: companyFromHook.logo,
+        principal_color: companyFromHook.principal_color,
+      }
+    : companyProp;
   const primaryColor = company.principal_color || '#3B82F6';
   const { data: session, status } = useSession();
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
@@ -66,7 +91,7 @@ export default function CompanyNavbar({ company }: CompanyNavbarProps) {
   };
 
   return (
-    <header className="bg-white shadow-sm border-b">
+    <header className="bg-white shadow-sm border-b relative z-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center py-4">
           {/* Company Logo/Name */}
@@ -93,115 +118,23 @@ export default function CompanyNavbar({ company }: CompanyNavbarProps) {
           {/* Navigation Menu */}
           {/* check if the profile is complete */}
           {isUserProfileComplete(session) && (
-<<<<<<< HEAD
-          <nav className="hidden md:flex flex-wrap items-center gap-3">
-            <Link href="/subastas">
-              <Button
-                variant="ghost"
-                size="sm"
-                className="text-gray-600 hover:text-gray-900 flex items-center gap-2"
-              >
-                <Gavel className="h-4 w-4" />
-                Subastas
-              </Button>
-            </Link>
-            {/* Products - Only for AUCTION_MANAGER and ADMIN */}
-            {isUserAdminOrManager(session) && (
-              <Link href="/items">
+            <nav className="hidden md:flex flex-wrap items-center gap-3">
+              <Link href="/subastas">
                 <Button
                   variant="ghost"
                   size="sm"
                   className="text-gray-600 hover:text-gray-900 flex items-center gap-2"
                 >
-                  <Package className="h-4 w-4" />
-                  Productos
+                  <Gavel className="h-4 w-4" />
+                  Subastas
                 </Button>
               </Link>
-            )}
-            {/* Users - Only for AUCTION_MANAGER and ADMIN */}
-            {isUserAdminOrManager(session) && (
-              <Link href="/usuarios">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="text-gray-600 hover:text-gray-900 flex items-center gap-2"
-                >
-                  <Users className="h-4 w-4" />
-                  Usuarios
-                </Button>
-              </Link>
-            )}
-            {/* Invite - Only for AUCTION_MANAGER */}
-            {session?.user?.role === 'AUCTION_MANAGER' && (
-              <Link href="/users/invite">
-                <Button
-                  variant="default"
-                  size="sm"
-                  className="flex items-center gap-2"
-                >
-                  <UserPlus className="h-4 w-4" />
-                  Invitar usuario
-                </Button>
-              </Link>
-            )}
-            {/* Company Invite - Only for AUCTION_MANAGER */}
-            {session?.user?.role === 'AUCTION_MANAGER' && (
-              <Link href="/companies/invite">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="flex items-center gap-2"
-                >
-                  <Building2 className="h-4 w-4" />
-                  Invitar empresa
-                </Button>
-              </Link>
-            )}
-            {/* Stats - Only for AUCTION_MANAGER */}
-            {session?.user?.role === 'AUCTION_MANAGER' && (
-              <Link href="/estadisticas">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="text-gray-600 hover:text-gray-900 flex items-center gap-2"
-                >
-                  <BarChart3 className="h-4 w-4" />
-                  Estadísticas
-                </Button>
-              </Link>
-            )}
-            {/* Feedback - Only for AUCTION_MANAGER */}
-            {session?.user?.role === 'AUCTION_MANAGER' && (
-              <Link href="/feedback">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="text-gray-600 hover:text-gray-900 flex items-center gap-2"
-                >
-                  <MessageSquare className="h-4 w-4" />
-                  Feedback
-                </Button>
-              </Link>
-            )}
-          </nav>
-=======
-            <nav className="hidden md:flex items-center space-x-6">
-              {isUserAdminOrManager(session) && (
-                <Link href="/subastas">
-                  <Button
-                    variant="ghost"
-                    className="text-gray-600 hover:text-gray-900 flex items-center gap-2"
-                  >
-                    <Gavel className="h-4 w-4" />
-                    Subastas
-                  </Button>
-                </Link>
-              )}
               {/* Products - Only for AUCTION_MANAGER and ADMIN */}
               {isUserAdminOrManager(session) && (
                 <Link href="/items">
                   <Button
                     variant="ghost"
+                    size="sm"
                     className="text-gray-600 hover:text-gray-900 flex items-center gap-2"
                   >
                     <Package className="h-4 w-4" />
@@ -214,6 +147,7 @@ export default function CompanyNavbar({ company }: CompanyNavbarProps) {
                 <Link href="/usuarios">
                   <Button
                     variant="ghost"
+                    size="sm"
                     className="text-gray-600 hover:text-gray-900 flex items-center gap-2"
                   >
                     <Users className="h-4 w-4" />
@@ -221,8 +155,59 @@ export default function CompanyNavbar({ company }: CompanyNavbarProps) {
                   </Button>
                 </Link>
               )}
+              {/* Invite - Only for AUCTION_MANAGER */}
+              {session?.user?.role === 'AUCTION_MANAGER' && (
+                <Link href="/users/invite">
+                  <Button
+                    variant="default"
+                    size="sm"
+                    className="flex items-center gap-2"
+                  >
+                    <UserPlus className="h-4 w-4" />
+                    Invitar usuario
+                  </Button>
+                </Link>
+              )}
+              {/* Company Invite - Only for AUCTION_MANAGER */}
+              {session?.user?.role === 'AUCTION_MANAGER' && (
+                <Link href="/companies/invite">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="flex items-center gap-2"
+                  >
+                    <Building2 className="h-4 w-4" />
+                    Invitar empresa
+                  </Button>
+                </Link>
+              )}
+              {/* Stats - Only for AUCTION_MANAGER */}
+              {session?.user?.role === 'AUCTION_MANAGER' && (
+                <Link href="/estadisticas">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="text-gray-600 hover:text-gray-900 flex items-center gap-2"
+                  >
+                    <BarChart3 className="h-4 w-4" />
+                    Estadísticas
+                  </Button>
+                </Link>
+              )}
+              {/* Feedback - Only for AUCTION_MANAGER */}
+              {session?.user?.role === 'AUCTION_MANAGER' && (
+                <Link href="/feedback">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="text-gray-600 hover:text-gray-900 flex items-center gap-2"
+                  >
+                    <MessageSquare className="h-4 w-4" />
+                    Feedback
+                  </Button>
+                </Link>
+              )}
             </nav>
->>>>>>> development
           )}
 
           {/* Right side actions */}

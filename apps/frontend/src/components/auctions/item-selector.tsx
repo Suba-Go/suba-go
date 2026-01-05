@@ -16,7 +16,8 @@ import { Input } from '@suba-go/shared-components/components/ui/input';
 import { useAvailableItems } from '@/hooks/use-items';
 import { ItemCreateModal } from '@/components/items/item-create-modal';
 import { Spinner } from '@suba-go/shared-components/components/ui/spinner';
-import { useCompany } from '@/hooks/use-company';
+import { useCompanyContextOptional } from '@/contexts/company-context';
+import { darkenColor } from '@/utils/color-utils';
 import {
   Dialog,
   DialogContent,
@@ -30,6 +31,7 @@ import {
   CarouselItem,
   CarouselNext,
   CarouselPrevious,
+  type CarouselApi,
 } from '@suba-go/shared-components/components/ui/carousel';
 import Image from 'next/image';
 
@@ -61,12 +63,58 @@ export function ItemSelector({
   onItemsChange,
 }: ItemSelectorProps) {
   const { items, isLoading, error, refreshItems } = useAvailableItems();
-  const { company } = useCompany();
-  const primaryColor = company?.principal_color || '#3B82F6';
+  const companyContext = useCompanyContextOptional();
+  const primaryColor = companyContext?.company?.principal_color || '#3B82F6';
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [previewItem, setPreviewItem] = useState<Item | null>(null);
   const [searchPlate, setSearchPlate] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
+  const [photoCarouselApi, setPhotoCarouselApi] = useState<CarouselApi>();
+  const [isMobile, setIsMobile] = useState(false);
+
+  // Detect mobile device
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.matchMedia('(max-width: 768px)').matches);
+    };
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
+
+  // Prevent horizontal scroll on desktop
+  useEffect(() => {
+    if (!photoCarouselApi || isMobile) return;
+
+    const carouselNode = photoCarouselApi.rootNode() as HTMLElement;
+    if (!carouselNode) return;
+
+    const viewport = photoCarouselApi.containerNode() as HTMLElement;
+
+    if (!viewport) return;
+
+    const preventHorizontalScroll = (e: WheelEvent) => {
+      if (Math.abs(e.deltaX) > Math.abs(e.deltaY) && Math.abs(e.deltaX) > 5) {
+        e.preventDefault();
+        e.stopPropagation();
+        return false;
+      }
+    };
+
+    if (window.matchMedia('(pointer: fine)').matches) {
+      carouselNode.addEventListener('wheel', preventHorizontalScroll, {
+        passive: false,
+      });
+      viewport.addEventListener('wheel', preventHorizontalScroll, {
+        passive: false,
+      });
+    }
+
+    return () => {
+      carouselNode.removeEventListener('wheel', preventHorizontalScroll);
+      viewport.removeEventListener('wheel', preventHorizontalScroll);
+    };
+  }, [photoCarouselApi, isMobile]);
 
   const handleItemToggle = (itemId: string) => {
     if (selectedItems.includes(itemId)) {
@@ -143,6 +191,15 @@ export function ItemSelector({
             size="sm"
             disabled
             className="flex items-center gap-2"
+            style={
+              primaryColor
+                ? {
+                    backgroundColor: primaryColor,
+                    borderColor: primaryColor,
+                    opacity: 0.5,
+                  }
+                : undefined
+            }
           >
             <Plus className="h-4 w-4" />
             Crear Nuevo Item
@@ -167,7 +224,28 @@ export function ItemSelector({
             variant="outline"
             size="sm"
             onClick={() => setIsCreateModalOpen(true)}
-            className="flex items-center gap-2"
+            className="flex items-center gap-2 text-black"
+            style={
+              primaryColor
+                ? {
+                    backgroundColor: primaryColor,
+                    borderColor: primaryColor,
+                  }
+                : undefined
+            }
+            onMouseEnter={(e) => {
+              if (primaryColor) {
+                e.currentTarget.style.backgroundColor = darkenColor(
+                  primaryColor,
+                  10
+                );
+              }
+            }}
+            onMouseLeave={(e) => {
+              if (primaryColor) {
+                e.currentTarget.style.backgroundColor = primaryColor;
+              }
+            }}
           >
             <Plus className="h-4 w-4" />
             Crear Nuevo Item
@@ -201,7 +279,28 @@ export function ItemSelector({
             variant="outline"
             size="sm"
             onClick={() => setIsCreateModalOpen(true)}
-            className="flex items-center gap-2"
+            className="flex items-center gap-2 text-black"
+            style={
+              primaryColor
+                ? {
+                    backgroundColor: primaryColor,
+                    borderColor: primaryColor,
+                  }
+                : undefined
+            }
+            onMouseEnter={(e) => {
+              if (primaryColor) {
+                e.currentTarget.style.backgroundColor = darkenColor(
+                  primaryColor,
+                  10
+                );
+              }
+            }}
+            onMouseLeave={(e) => {
+              if (primaryColor) {
+                e.currentTarget.style.backgroundColor = primaryColor;
+              }
+            }}
           >
             <Plus className="h-4 w-4" />
             Crear Nuevo Item
@@ -216,6 +315,19 @@ export function ItemSelector({
             value={searchPlate}
             onChange={(e) => setSearchPlate(e.target.value)}
             className="pl-10"
+            style={
+              primaryColor
+                ? ({
+                    borderColor: primaryColor,
+                  } as React.CSSProperties)
+                : undefined
+            }
+            onFocus={(e) => {
+              if (primaryColor) {
+                e.currentTarget.style.borderColor = primaryColor;
+                e.currentTarget.style.boxShadow = `0 0 0 1px ${primaryColor}`;
+              }
+            }}
           />
         </div>
 
@@ -283,6 +395,17 @@ export function ItemSelector({
                       </h4>
                       <Badge
                         className={`text-xs w-fit ${getStateColor(item.state)}`}
+                        style={
+                          item.state === 'EN_SUBASTA' && primaryColor
+                            ? {
+                                backgroundColor: `${primaryColor}15`,
+                                borderColor: primaryColor,
+                                color: primaryColor,
+                                borderWidth: '1px',
+                                borderStyle: 'solid',
+                              }
+                            : undefined
+                        }
                       >
                         {item.state}
                       </Badge>
@@ -363,16 +486,38 @@ export function ItemSelector({
               {photoUrls.length > 0 && (
                 <div className="space-y-2">
                   <h3 className="text-sm font-semibold">Fotos</h3>
-                  <Carousel className="w-full">
-                    <CarouselContent>
+                  <Carousel
+                    className="w-full"
+                    setApi={setPhotoCarouselApi}
+                    opts={{
+                      align: 'start',
+                      dragFree: false,
+                      containScroll: 'trimSnaps',
+                      // Enable drag only on mobile, disable on desktop
+                      watchDrag: isMobile,
+                      skipSnaps: false,
+                    }}
+                  >
+                    <CarouselContent
+                      className="-ml-0"
+                      style={{
+                        // Allow touch scroll on mobile, prevent on desktop
+                        touchAction: isMobile ? 'pan-x' : 'pan-y',
+                        overscrollBehaviorX: isMobile ? 'auto' : 'none',
+                      }}
+                    >
                       {photoUrls.map((url: string, index: number) => (
-                        <CarouselItem key={index}>
+                        <CarouselItem key={index} className="pl-0">
                           <div className="aspect-video relative bg-gray-100 rounded-lg overflow-hidden">
                             <Image
                               src={url}
                               alt={`Foto ${index + 1}`}
                               fill
-                              className="object-contain"
+                              className="object-contain select-none"
+                              draggable={false}
+                              style={{
+                                pointerEvents: isMobile ? 'auto' : 'none',
+                              }}
                               sizes="(max-width: 768px) 100vw, 50vw"
                             />
                           </div>
@@ -381,8 +526,8 @@ export function ItemSelector({
                     </CarouselContent>
                     {photoUrls.length > 1 && (
                       <>
-                        <CarouselPrevious />
-                        <CarouselNext />
+                        <CarouselPrevious className="left-2 md:left-4 z-20 hidden md:flex" />
+                        <CarouselNext className="right-2 md:right-4 z-20 hidden md:flex" />
                       </>
                     )}
                   </Carousel>

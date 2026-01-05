@@ -37,6 +37,8 @@ import {
   BidDto,
   BidWithUserDto,
 } from '@suba-go/shared-validation';
+import { useCompanyContextOptional } from '@/contexts/company-context';
+import { darkenColor } from '@/utils/color-utils';
 
 interface SimpleBidHistory {
   id: string;
@@ -72,6 +74,8 @@ export function AuctionItemDetailModal({
   showBidHistory = true,
 }: AuctionItemDetailModalProps) {
   const { formatPrice } = useAutoFormat();
+  const companyContext = useCompanyContextOptional();
+  const primaryColor = companyContext?.company?.principal_color;
   const [photoCarouselApi, setPhotoCarouselApi] = useState<CarouselApi>();
   const [currentPhotoIndex, setCurrentPhotoIndex] = useState(0);
   const [photoCount, setPhotoCount] = useState(0);
@@ -79,6 +83,44 @@ export function AuctionItemDetailModal({
   const [isMobile, setIsMobile] = useState(false);
 
   const item = auctionItem.item;
+
+  // Apply primary color to close button when modal opens
+  useEffect(() => {
+    if (!isOpen || !primaryColor) return;
+
+    let closeButton: HTMLElement | null = null;
+    const applyFocusRing = () => {
+      if (closeButton && primaryColor) {
+        closeButton.style.setProperty('--tw-ring-color', primaryColor);
+      }
+    };
+
+    const timer = setTimeout(() => {
+      // Find the close button in the dialog
+      const dialogContent = document.querySelector(
+        '[data-state="open"]'
+      ) as HTMLElement;
+      if (dialogContent) {
+        closeButton = dialogContent.querySelector(
+          'button[class*="absolute right-4 top-4"]'
+        ) as HTMLElement;
+        if (closeButton) {
+          // Apply primary color to focus ring
+          applyFocusRing();
+          closeButton.addEventListener('focus', applyFocusRing);
+          closeButton.addEventListener('mouseenter', applyFocusRing);
+        }
+      }
+    }, 100);
+
+    return () => {
+      clearTimeout(timer);
+      if (closeButton) {
+        closeButton.removeEventListener('focus', applyFocusRing);
+        closeButton.removeEventListener('mouseenter', applyFocusRing);
+      }
+    };
+  }, [isOpen, primaryColor]);
 
   // Detect mobile device
   useEffect(() => {
@@ -114,7 +156,7 @@ export function AuctionItemDetailModal({
     if (!carouselNode) return;
 
     const viewport = photoCarouselApi.containerNode() as HTMLElement;
-    
+
     if (!viewport) return;
 
     const preventHorizontalScroll = (e: WheelEvent) => {
@@ -126,8 +168,12 @@ export function AuctionItemDetailModal({
     };
 
     if (window.matchMedia('(pointer: fine)').matches) {
-      carouselNode.addEventListener('wheel', preventHorizontalScroll, { passive: false });
-      viewport.addEventListener('wheel', preventHorizontalScroll, { passive: false });
+      carouselNode.addEventListener('wheel', preventHorizontalScroll, {
+        passive: false,
+      });
+      viewport.addEventListener('wheel', preventHorizontalScroll, {
+        passive: false,
+      });
     }
 
     return () => {
@@ -214,7 +260,7 @@ export function AuctionItemDetailModal({
                     skipSnaps: false,
                   }}
                 >
-                  <CarouselContent 
+                  <CarouselContent
                     className="-ml-0"
                     style={{
                       // Allow touch scroll on mobile, prevent on desktop
@@ -231,7 +277,9 @@ export function AuctionItemDetailModal({
                             alt={`Foto ${index + 1}`}
                             className="object-contain select-none"
                             draggable={false}
-                            style={{ pointerEvents: isMobile ? 'auto' : 'none' }}
+                            style={{
+                              pointerEvents: isMobile ? 'auto' : 'none',
+                            }}
                           />
                         </div>
                       </CarouselItem>
@@ -393,11 +441,51 @@ export function AuctionItemDetailModal({
                   }}
                   className="text-lg"
                   placeholder={formatPrice(currentHighestBid + bidIncrement)}
+                  style={
+                    primaryColor
+                      ? {
+                          borderColor: primaryColor,
+                        }
+                      : undefined
+                  }
+                  onFocus={(e) => {
+                    if (primaryColor) {
+                      e.currentTarget.style.borderColor = primaryColor;
+                      e.currentTarget.style.boxShadow = `0 0 0 2px ${primaryColor}20`;
+                    }
+                  }}
+                  onBlur={(e) => {
+                    if (primaryColor) {
+                      e.currentTarget.style.borderColor = '';
+                      e.currentTarget.style.boxShadow = '';
+                    }
+                  }}
                 />
                 <Button
                   onClick={handlePlaceBid}
                   disabled={bidAmount < currentHighestBid + bidIncrement}
-                  className="whitespace-nowrap"
+                  className="whitespace-nowrap text-white"
+                  style={
+                    primaryColor
+                      ? {
+                          backgroundColor: primaryColor,
+                          borderColor: primaryColor,
+                        }
+                      : undefined
+                  }
+                  onMouseEnter={(e) => {
+                    if (primaryColor) {
+                      e.currentTarget.style.backgroundColor = darkenColor(
+                        primaryColor,
+                        10
+                      );
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    if (primaryColor) {
+                      e.currentTarget.style.backgroundColor = primaryColor;
+                    }
+                  }}
                 >
                   Pujar {formatPrice(bidAmount)}
                 </Button>
@@ -432,4 +520,3 @@ export function AuctionItemDetailModal({
     </Dialog>
   );
 }
-

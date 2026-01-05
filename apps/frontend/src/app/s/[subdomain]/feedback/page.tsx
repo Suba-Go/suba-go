@@ -5,13 +5,14 @@ import ClientFeedbackTabs from '@/components/feedback/feedback-tabs-wrapper';
 export default async function FeedbackPage({
   params,
 }: {
-  params: { subdomain: string };
+  params: Promise<{ subdomain: string }>;
 }) {
   const session = await auth();
+  const { subdomain } = await params;
 
   // Only AUCTION_MANAGER can access this page
   if (!session || session.user.role !== 'AUCTION_MANAGER') {
-    redirect(`/s/${params.subdomain}`);
+    redirect(`/s/${subdomain}`);
   }
 
   return (
@@ -21,8 +22,8 @@ export default async function FeedbackPage({
           Feedback para el equipo de Suba&Go
         </h1>
         <p className="text-gray-600">
-          Comparte tus comentarios, sugerencias, consejos o críticas con nuestro equipo.
-          Tu opinión nos ayuda a mejorar la plataforma.
+          Comparte tus comentarios, sugerencias, consejos o críticas con nuestro
+          equipo. Tu opinión nos ayuda a mejorar la plataforma.
         </p>
       </div>
 
@@ -36,13 +37,15 @@ export default async function FeedbackPage({
           <li className="flex items-start gap-2">
             <span className="text-blue-600 font-bold">•</span>
             <span>
-              <strong>Comentarios:</strong> Observaciones generales sobre la plataforma
+              <strong>Comentarios:</strong> Observaciones generales sobre la
+              plataforma
             </span>
           </li>
           <li className="flex items-start gap-2">
             <span className="text-blue-600 font-bold">•</span>
             <span>
-              <strong>Feedback:</strong> Opiniones sobre funcionalidades específicas
+              <strong>Feedback:</strong> Opiniones sobre funcionalidades
+              específicas
             </span>
           </li>
           <li className="flex items-start gap-2">
@@ -54,7 +57,8 @@ export default async function FeedbackPage({
           <li className="flex items-start gap-2">
             <span className="text-blue-600 font-bold">•</span>
             <span>
-              <strong>Críticas:</strong> Problemas o aspectos que necesitan atención
+              <strong>Críticas:</strong> Problemas o aspectos que necesitan
+              atención
             </span>
           </li>
         </ul>

@@ -22,9 +22,17 @@ export const FEEDBACK_CATEGORIES = [
 export const feedbackSchema = baseSchema
   .extend({
     category: z.string().min(1, 'La categoría es requerida'),
-    title: z.string().min(1, 'El título es requerido').max(200, 'El título es demasiado largo'),
-    message: z.string().min(1, 'El mensaje es requerido').max(5000, 'El mensaje es demasiado largo'),
-    status: z.nativeEnum(FeedbackStatusEnum).default(FeedbackStatusEnum.PENDING),
+    title: z
+      .string()
+      .min(1, 'El título es requerido')
+      .max(200, 'El título es demasiado largo'),
+    message: z
+      .string()
+      .min(1, 'El mensaje es requerido')
+      .max(5000, 'El mensaje es demasiado largo'),
+    status: z
+      .nativeEnum(FeedbackStatusEnum)
+      .default(FeedbackStatusEnum.PENDING),
     userId: z.string().uuid(),
     tenantId: z.string().uuid(),
   })
@@ -36,7 +44,7 @@ export const feedbackCreateSchema = feedbackSchema
     createdAt: true,
     updatedAt: true,
     deletedAt: true,
-    is_deleted: true,
+    isDeleted: true,
     status: true, // Status is set automatically to PENDING
     userId: true, // Set from session
     tenantId: true, // Set from session
@@ -49,7 +57,7 @@ export const feedbackUpdateSchema = feedbackSchema
     createdAt: true,
     updatedAt: true,
     deletedAt: true,
-    is_deleted: true,
+    isDeleted: true,
     userId: true,
     tenantId: true,
   })

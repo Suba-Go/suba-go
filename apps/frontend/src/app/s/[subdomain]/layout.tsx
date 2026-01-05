@@ -75,8 +75,7 @@ export default async function SubdomainLayout({
   }
 
   return (
-<<<<<<< HEAD
-    <div 
+    <div
       className="min-h-screen bg-gray-50 relative"
       style={
         company.background_logo_enabled && company.logo
@@ -94,16 +93,13 @@ export default async function SubdomainLayout({
       {company.background_logo_enabled && company.logo && (
         <div className="fixed inset-0 bg-gray-50/90 pointer-events-none z-0" />
       )}
-=======
-    <div className="min-h-screen bg-gray-50">
       {/* Company Navbar - Conditionally included (not in login) */}
       <ConditionalNavbar company={company} />
->>>>>>> development
 
       {/* Content wrapper with higher z-index */}
       <div className="relative z-10">
         {/* Company Navbar - Conditionally included (not in login) */}
-        <ConditionalNavbar company={company} subdomain={subdomain} />
+        <ConditionalNavbar company={company} />
 
         {/* Page content */}
         {children}

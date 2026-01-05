@@ -216,7 +216,7 @@ export default function ManagerStatsPage() {
       <Card>
         <CardHeader className="flex items-center justify-between">
           <CardTitle>Distribución por estado</CardTitle>
-          <Button onClick={() => downloadCanvas(activeVsTotalCanvasRef, 'distribucion_estado')}>Exportar PNG</Button>
+          <Button onClick={() => downloadCanvas(activeVsTotalCanvasRef as React.RefObject<HTMLCanvasElement>, 'distribucion_estado')}>Exportar PNG</Button>
         </CardHeader>
         <CardContent>
           <canvas ref={activeVsTotalCanvasRef} width={900} height={300} />
@@ -226,7 +226,7 @@ export default function ManagerStatsPage() {
       <Card>
         <CardHeader className="flex items-center justify-between">
           <CardTitle>Top ingresos por subasta</CardTitle>
-          <Button onClick={() => downloadCanvas(revenuePerAuctionCanvasRef, 'ingresos_por_subasta')}>Exportar PNG</Button>
+          <Button onClick={() => downloadCanvas(revenuePerAuctionCanvasRef as React.RefObject<HTMLCanvasElement>, 'ingresos_por_subasta')}>Exportar PNG</Button>
         </CardHeader>
         <CardContent>
           <canvas ref={revenuePerAuctionCanvasRef} width={900} height={300} />

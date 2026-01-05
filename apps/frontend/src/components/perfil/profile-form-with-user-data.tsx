@@ -1,18 +1,17 @@
 'use client';
 
 import { useSession } from 'next-auth/react';
-import { useRouter } from 'next-nprogress-bar';
+import { useRouter } from 'next/navigation';
 import { useState, useEffect } from 'react';
 import { updateUserProfileAction } from '@/domain/server-actions/user/update-profile';
 import { useToast } from '@suba-go/shared-components/components/ui/toaster';
 import { Button } from '@suba-go/shared-components/components/ui/button';
-import { darkenColor } from '@/utils/color-utils';
 import { Spinner } from '@suba-go/shared-components/components/ui/spinner';
 import { validateRUT as validateRUTUtil } from '@suba-go/shared-validation';
 import { FormattedInput } from '@/components/ui/formatted-input';
 import { PhoneInput } from '@/components/ui/phone-input';
 import { useAutoFormat } from '@/hooks/use-auto-format';
-import { FileUpload } from '@/components/ui/file-upload';
+import { useCompany, lightenColor } from '@/hooks/use-company';
 
 // functions to validate the form fields
 // TODO: validaciones rtaspasar a helper reutilizable
@@ -58,10 +57,9 @@ const validateRUT = (rut: string): string | null => {
 };
 
 interface ProfileFormWithUserDataProps {
-  company: {
+  company?: {
     id: string;
     name: string;
-    subtitle?: string;
     logo?: string;
     background_logo_enabled?: boolean;
     principal_color?: string;
@@ -74,17 +72,44 @@ interface ProfileFormWithUserDataProps {
   hideBackButton?: boolean;
 }
 
-
 export default function ProfileFormWithUserData({
-  company,
+  company: companyProp,
   hideBackButton,
 }: ProfileFormWithUserDataProps) {
+  const { company: companyFromHook } = useCompany();
+  // Use company from hook if available (more up-to-date), otherwise fallback to prop
+  const company = companyFromHook || companyProp;
+  const primaryColor = company?.principal_color;
   const { data: session, status, update } = useSession();
   const router = useRouter();
   const { toast } = useToast();
   const { formatRut } = useAutoFormat();
   const [isEditing, setIsEditing] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+
+  // Generate styles for inputs based on primary color
+  const getInputStyles = () => {
+    if (!primaryColor) {
+      return {
+        className: 'bg-gray-50 border-gray-300 focus:ring-gray-500',
+        style: {} as React.CSSProperties,
+      };
+    }
+    // Create a very light version of the primary color (95% lighter) for background
+    const lightBgColor = lightenColor(primaryColor, 95);
+    // Create a lighter version of the primary color (70% lighter) for border
+    const lightBorderColor = lightenColor(primaryColor, 70);
+    return {
+      className: '',
+      style: {
+        backgroundColor: lightBgColor,
+        borderColor: lightBorderColor,
+        '--tw-ring-color': primaryColor,
+      } as React.CSSProperties,
+    };
+  };
+
+  const inputStyles = getInputStyles();
   const [userData, setUserData] = useState({
     name: '',
     email: '',
@@ -98,27 +123,6 @@ export default function ProfileFormWithUserData({
     rut?: string;
   }>({});
 
-  const canEditCompany =
-    session?.user?.role === 'ADMIN' || session?.user?.role === 'AUCTION_MANAGER';
-
-  const [companyForm, setCompanyForm] = useState({
-    name: company.name ?? '',
-    subtitle: company.subtitle ?? '',
-    logo: company.logo ?? '',
-    background_logo_enabled: company.background_logo_enabled ?? false,
-    rut: company.rut ?? '',
-    principal_color: company.principal_color ?? '',
-    principal_color2: company.principal_color2 ?? '',
-    secondary_color: company.secondary_color ?? '',
-    secondary_color2: company.secondary_color2 ?? '',
-    secondary_color3: company.secondary_color3 ?? '',
-  });
-
-
-  const [brandingStatus, setBrandingStatus] = useState<
-    { type: 'idle' | 'saving' | 'error' | 'success'; message?: string }
-  >({ type: 'idle' });
-
   useEffect(() => {
     if (session?.user) {
       setUserData({
@@ -129,23 +133,6 @@ export default function ProfileFormWithUserData({
       });
     }
   }, [session]);
-
-  // Update company form when company prop changes (e.g., after page reload)
-  useEffect(() => {
-    setCompanyForm({
-      name: company.name ?? '',
-      subtitle: company.subtitle ?? '',
-      logo: company.logo ?? '',
-      background_logo_enabled: company.background_logo_enabled ?? false,
-      rut: company.rut ?? '',
-      principal_color: company.principal_color ?? '',
-      principal_color2: company.principal_color2 ?? '',
-      secondary_color: company.secondary_color ?? '',
-      secondary_color2: company.secondary_color2 ?? '',
-      secondary_color3: company.secondary_color3 ?? '',
-    });
-  }, [company]);
-
 
   const handleGoBack = () => {
     router.back();
@@ -329,7 +316,7 @@ export default function ProfileFormWithUserData({
         </h2>
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-gray-50">
           <div className="text-center">
-            <Spinner className="size-8" />
+            <Spinner className="size-4" />
           </div>
         </div>
       </div>
@@ -385,11 +372,12 @@ export default function ProfileFormWithUserData({
                 type="text"
                 value={userData.name}
                 onChange={handleInputChange('name')}
-                className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 bg-blue-50 ${
+                className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 ${
                   validationErrors.name
                     ? 'border-red-500 focus:ring-red-500'
-                    : 'border-blue-300 focus:ring-blue-500'
+                    : inputStyles.className
                 }`}
+                style={validationErrors.name ? {} : inputStyles.style}
                 placeholder="Tu nombre"
               />
               {validationErrors.name && (
@@ -431,11 +419,12 @@ export default function ProfileFormWithUserData({
                     }));
                   }
                 }}
-                className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 bg-blue-50 ${
+                className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 ${
                   validationErrors.email
                     ? 'border-red-500 focus:ring-red-500'
-                    : 'border-blue-300 focus:ring-blue-500'
+                    : inputStyles.className
                 }`}
+                style={validationErrors.email ? {} : inputStyles.style}
                 placeholder="tu@email.com"
               />
               {validationErrors.email && (
@@ -476,9 +465,10 @@ export default function ProfileFormWithUserData({
                 }}
                 className={`w-full ${
                   validationErrors.phone
-                    ? 'border-red-500 focus-within:ring-red-500'
-                    : 'border-blue-300 focus-within:ring-blue-500'
+                    ? 'border-red-500 focus:ring-red-500'
+                    : inputStyles.className
                 }`}
+                style={validationErrors.phone ? {} : inputStyles.style}
                 placeholder="9 1234 5678"
               />
               {validationErrors.phone && (
@@ -519,11 +509,12 @@ export default function ProfileFormWithUserData({
                     }));
                   }
                 }}
-                className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 bg-blue-50 ${
+                className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 ${
                   validationErrors.rut
                     ? 'border-red-500 focus:ring-red-500'
-                    : 'border-blue-300 focus:ring-blue-500'
+                    : inputStyles.className
                 }`}
+                style={validationErrors.rut ? {} : inputStyles.style}
                 placeholder="12.345.678-9"
               />
               {validationErrors.rut && (
@@ -545,24 +536,7 @@ export default function ProfileFormWithUserData({
         {!hideBackButton && (
           <Button
             onClick={handleGoBack}
-            className="px-4 py-2 text-white rounded-md transition-colors"
-            style={{
-              backgroundColor: company.principal_color,
-              borderColor: company.principal_color,
-            }}
-            onMouseEnter={(e) => {
-              if (company.principal_color) {
-                e.currentTarget.style.backgroundColor = darkenColor(
-                  company.principal_color,
-                  10
-                );
-              }
-            }}
-            onMouseLeave={(e) => {
-              if (company.principal_color) {
-                e.currentTarget.style.backgroundColor = company.principal_color;
-              }
-            }}
+            className="px-4 py-2 bg-gray-200 text-black rounded-md hover:bg-gray-300 transition-colors"
           >
             Volver
           </Button>
@@ -587,271 +561,12 @@ export default function ProfileFormWithUserData({
         ) : (
           <Button
             onClick={handleEdit}
-            className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+            className={`px-4 py-2 text-white rounded-md hover:bg-${primaryColor}/90 transition-colors`}
+            style={primaryColor ? { backgroundColor: primaryColor } : {}}
           >
             Editar
           </Button>
         )}
-      </div>
-
-      {/* Company Branding Section */}
-      <div className="pt-6 border-t border-gray-200">
-        <h2 className="text-xl font-semibold text-gray-900 mb-6 border-b border-gray-200 pb-4">
-          Branding de la Empresa
-        </h2>
-
-        {!canEditCompany && (
-          <div className="rounded-md border border-yellow-300 bg-yellow-50 px-4 py-3 text-yellow-900 mb-4">
-            Solo administradores o managers pueden editar el branding.
-          </div>
-        )}
-
-        <div className="space-y-6">
-          {/* Subtitle */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Subtítulo / Misión
-            </label>
-            <textarea
-              value={companyForm.subtitle}
-              onChange={(e) =>
-                setCompanyForm((prev) => ({ ...prev, subtitle: e.target.value }))
-              }
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-              disabled={!canEditCompany}
-              placeholder='Ej: "Como Wift, mi misión es..."'
-              rows={3}
-            />
-            <span className="text-xs text-gray-500 mt-1">
-              Este texto aparecerá debajo del nombre de tu empresa
-            </span>
-          </div>
-
-          {/* Logo Upload */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Logo de la empresa
-            </label>
-            <div className="flex items-center gap-4">
-              {companyForm.logo ? (
-                <img
-                  src={companyForm.logo}
-                  alt="Logo"
-                  className="h-12 w-12 object-contain border rounded"
-                />
-              ) : (
-                <div className="h-12 w-12 flex items-center justify-center border rounded text-gray-400">
-                  Sin logo
-                </div>
-              )}
-              <div className="flex-1">
-                <FileUpload
-                  onFilesChange={(urls) => {
-                    const url = urls[0];
-                    if (!url) return;
-                    setCompanyForm((prev) => ({ ...prev, logo: url }));
-                    toast({
-                      title: 'Logo cargado',
-                      description: 'Guarda cambios para aplicar el nuevo logo.',
-                    });
-                  }}
-                  acceptedTypes={['image/*']}
-                  maxFiles={1}
-                  maxSizeInMB={5}
-                  label="Subir logo"
-                  description="Arrastra o selecciona una imagen (máx 5MB)"
-                  className="max-w-xl"
-                />
-              </div>
-            </div>
-          </div>
-
-          {/* Background Logo Toggle */}
-          <div>
-            <label className="flex items-center gap-2">
-              <input
-                type="checkbox"
-                checked={companyForm.background_logo_enabled}
-                onChange={(e) =>
-                  setCompanyForm((prev) => ({
-                    ...prev,
-                    background_logo_enabled: e.target.checked,
-                  }))
-                }
-                className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
-                disabled={!canEditCompany}
-              />
-              <span className="text-sm font-medium text-gray-700">
-                Mostrar logo como fondo transparente
-              </span>
-            </label>
-          </div>
-
-          {/* Colors */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Color principal
-              </label>
-              <input
-                type="color"
-                value={companyForm.principal_color || '#3B82F6'}
-                onChange={(e) =>
-                  setCompanyForm((prev) => ({
-                    ...prev,
-                    principal_color: e.target.value,
-                  }))
-                }
-                className="w-16 h-10 border border-gray-300 rounded cursor-pointer"
-                disabled={!canEditCompany}
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Color secundario
-              </label>
-              <input
-                type="color"
-                value={companyForm.secondary_color || '#64748B'}
-                onChange={(e) =>
-                  setCompanyForm((prev) => ({
-                    ...prev,
-                    secondary_color: e.target.value,
-                  }))
-                }
-                className="w-16 h-10 border border-gray-300 rounded cursor-pointer"
-                disabled={!canEditCompany}
-              />
-            </div>
-          </div>
-
-          {/* Optional advanced colors */}
-          <details className="bg-gray-50 rounded border p-4">
-            <summary className="cursor-pointer text-sm text-gray-700">
-              Colores avanzados (opcional)
-            </summary>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Color principal 2
-                </label>
-                <input
-                  type="color"
-                  value={companyForm.principal_color2 || '#2563EB'}
-                  onChange={(e) =>
-                    setCompanyForm((prev) => ({
-                      ...prev,
-                      principal_color2: e.target.value,
-                    }))
-                  }
-                  className="w-16 h-10 border border-gray-300 rounded cursor-pointer"
-                  disabled={!canEditCompany}
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Color secundario 2
-                </label>
-                <input
-                  type="color"
-                  value={companyForm.secondary_color2 || '#0EA5E9'}
-                  onChange={(e) =>
-                    setCompanyForm((prev) => ({
-                      ...prev,
-                      secondary_color2: e.target.value,
-                    }))
-                  }
-                  className="w-16 h-10 border border-gray-300 rounded cursor-pointer"
-                  disabled={!canEditCompany}
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Color secundario 3
-                </label>
-                <input
-                  type="color"
-                  value={companyForm.secondary_color3 || '#14B8A6'}
-                  onChange={(e) =>
-                    setCompanyForm((prev) => ({
-                      ...prev,
-                      secondary_color3: e.target.value,
-                    }))
-                  }
-                  className="w-16 h-10 border border-gray-300 rounded cursor-pointer"
-                  disabled={!canEditCompany}
-                />
-              </div>
-            </div>
-          </details>
-
-          {/* Save branding */}
-          <div className="flex items-center gap-3">
-            <Button
-              onClick={async () => {
-                if (!canEditCompany) return;
-                setBrandingStatus({ type: 'saving' });
-                try {
-                  const res = await fetch('/api/company', {
-                    method: 'PATCH',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                      subtitle: companyForm.subtitle,
-                      logo: companyForm.logo,
-                      background_logo_enabled: companyForm.background_logo_enabled,
-                      principal_color: companyForm.principal_color,
-                      principal_color2: companyForm.principal_color2,
-                      secondary_color: companyForm.secondary_color,
-                      secondary_color2: companyForm.secondary_color2,
-                      secondary_color3: companyForm.secondary_color3,
-                    }),
-                  });
-                  if (!res.ok) {
-                    const err = await res.json().catch(() => ({}));
-                    throw new Error(
-                      err.error || 'Error al actualizar la empresa'
-                    );
-                  }
-                  const updated = await res.json();
-                  // Update local and button color context
-                  setBrandingStatus({
-                    type: 'success',
-                    message: 'Branding actualizado correctamente.',
-                  });
-                  toast({
-                    title: 'Listo',
-                    description: 'Branding actualizado correctamente.',
-                  });
-                  // Reload page after 1 second to show updated changes
-                  setTimeout(() => window.location.reload(), 1000);
-                } catch (error: any) {
-                  setBrandingStatus({
-                    type: 'error',
-                    message: error?.message || 'Ocurrió un error',
-                  });
-                  toast({
-                    title: 'Error',
-                    description:
-                      error?.message || 'Error al actualizar la empresa',
-                    variant: 'destructive',
-                  });
-                }
-              }}
-              className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors disabled:opacity-50"
-              disabled={!canEditCompany || brandingStatus.type === 'saving'}
-            >
-              {brandingStatus.type === 'saving'
-                ? 'Guardando…'
-                : 'Guardar branding'}
-            </Button>
-            {brandingStatus.type === 'error' && (
-              <span className="text-sm text-red-600">{brandingStatus.message}</span>
-            )}
-            {brandingStatus.type === 'success' && (
-              <span className="text-sm text-green-700">{brandingStatus.message}</span>
-            )}
-          </div>
-        </div>
       </div>
     </div>
   );

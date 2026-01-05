@@ -1,25 +1,28 @@
-import { Controller, Post, Body, Param, Get, Patch, UseGuards, Query, Request } from '@nestjs/common';
+import {
+  Controller,
+  Post,
+  Body,
+  Param,
+  Get,
+  Patch,
+  UseGuards,
+  Query,
+  Request,
+} from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import { CompanyCreatorService } from './services/company-creator.service';
 import { CompanyGetterService } from './services/company-getter.service';
-<<<<<<< HEAD
+import {
+  CompanyCreateCompactDto,
+  CompanyCreateDto,
+  CompanyUpdateDto,
+  UserRolesEnum,
+} from '@suba-go/shared-validation';
+import { JwtAuthGuard } from '@/common/guards/jwt-auth.guard';
+import { RolesGuard } from '@/common/guards/roles.guard';
+import { Roles } from '@/common/decorators/roles.decorator';
 import { CompanyUpdaterService } from './services/company-updater.service';
-import { JwtAuthGuard } from '../../../common/guards/jwt-auth.guard';
-import { RolesGuard } from '../../../common/guards/roles.guard';
-import { Roles } from '../../../common/decorators/roles.decorator';
-import { CompanyCreateDto } from '@suba-go/shared-validation';
-import { CompanyUpdateDto } from '@suba-go/shared-validation';
-
-// Local enum definition to avoid import issues
-enum UserRolesEnum {
-  ADMIN = 'ADMIN',
-  USER = 'USER',
-  AUCTION_MANAGER = 'AUCTION_MANAGER',
-}
-=======
-import { CompanyCreateCompactDto } from '@suba-go/shared-validation';
->>>>>>> development
 
 @Controller('companies')
 export class CompaniesController {
@@ -80,7 +83,8 @@ export class CompaniesController {
     @Body() body: { tenantId?: string },
     @Request() req: any
   ) {
-    const expires = this.configService.get<string>('INVITE_EXPIRY_TIME') || '14d';
+    const expires =
+      this.configService.get<string>('INVITE_EXPIRY_TIME') || '14d';
     const token = this.jwtService.sign(
       {
         tenantId: body.tenantId || req.user?.tenantId,

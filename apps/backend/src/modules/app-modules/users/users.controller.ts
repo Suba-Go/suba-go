@@ -1,20 +1,18 @@
-<<<<<<< HEAD
-import { Controller, Post, Body, Param, Get, Patch, UseGuards, Request, Query } from '@nestjs/common';
+import {
+  Controller,
+  Post,
+  Body,
+  Param,
+  Get,
+  Patch,
+  UseGuards,
+  Request,
+  Query,
+} from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import * as bcrypt from 'bcrypt';
 import { UserRoleEnum } from '@prisma/client';
-=======
-import {
-  Body,
-  Controller,
-  Get,
-  Param,
-  Patch,
-  Post,
-  UseGuards,
-} from '@nestjs/common';
->>>>>>> development
 import { UserCreatorService } from './services/user-creator.service';
 import { UserGettersService } from './services/user-getter.service';
 import { UserUpdaterService } from './services/user-updater.service';
@@ -28,6 +26,7 @@ import { RolesGuard } from '../../../common/guards/roles.guard';
 import { Roles } from '../../../common/decorators/roles.decorator';
 import { PublicGuard } from '../../../common/guards/public.guard';
 import { UserPrismaRepository } from './services/user-prisma-repository.service';
+import { AuthenticatedRequest } from '@/common/types/auth.types';
 
 // Local enum definition to avoid import issues
 enum UserRolesEnum {
@@ -65,13 +64,15 @@ export class UsersController {
       throw new Error('Email inválido');
     }
 
-    const expires = this.configService.get<string>('INVITE_EXPIRY_TIME') || '7d';
+    const expires =
+      this.configService.get<string>('INVITE_EXPIRY_TIME') || '7d';
     const token = this.jwtService.sign(
       {
         email,
         role: role || UserRolesEnum.USER,
         tenantId: req.user.tenantId,
-        companyId: (await this.userGettersService.getUserById(req.user.userId)).companyId,
+        companyId: (await this.userGettersService.getUserById(req.user.userId))
+          .companyId,
       },
       {
         secret: this.configService.get<string>('JWT_SECRET'),
@@ -114,11 +115,16 @@ export class UsersController {
       email,
       password: hashed,
       role: role || UserRolesEnum.USER,
-      tenant: manager.tenantId ? { connect: { id: manager.tenantId } } : undefined,
-      company: manager.companyId ? { connect: { id: manager.companyId } } : undefined,
+      tenant: manager.tenantId
+        ? { connect: { id: manager.tenantId } }
+        : undefined,
+      company: manager.companyId
+        ? { connect: { id: manager.companyId } }
+        : undefined,
     } as any);
 
-    const expires = this.configService.get<string>('INVITE_EXPIRY_TIME') || '7d';
+    const expires =
+      this.configService.get<string>('INVITE_EXPIRY_TIME') || '7d';
     const token = this.jwtService.sign(
       {
         email,

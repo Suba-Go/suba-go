@@ -4,7 +4,7 @@ import { useEffect } from 'react';
 import { CompanyDto } from '@suba-go/shared-validation';
 import { useSession } from 'next-auth/react';
 import { UserHomePage } from './user-home-page';
-import { useRouter } from 'next-nprogress-bar';
+import { useRouter } from 'next/navigation';
 
 interface CompanyBrandedPageProps {
   company: CompanyDto;
@@ -37,15 +37,14 @@ export default function CompanyBrandedPage({
     return <UserHomePage company={company} />;
   }
 
-<<<<<<< HEAD
   // For AUCTION_MANAGER or not logged in, show "under development" page
   return (
     <div
       className="min-h-screen relative"
       style={
         {
-          '--primary-color': primaryColor,
-          '--primary-color-rgb': hexToRgb(primaryColor),
+          '--primary-color': company.principal_color,
+          '--primary-color-rgb': hexToRgb(company.principal_color ?? '#3B82F6'),
         } as React.CSSProperties
       }
     >
@@ -64,9 +63,15 @@ export default function CompanyBrandedPage({
       {/* Custom CSS variables for the company colors */}
       <style jsx>{`
         :root {
-          --company-primary: ${primaryColor};
-          --company-primary-light: ${lightenColor(primaryColor, 20)};
-          --company-primary-dark: ${darkenColor(primaryColor, 20)};
+          --company-primary: ${company.principal_color};
+          --company-primary-light: ${lightenColor(
+            company.principal_color ?? '#3B82F6',
+            20
+          )};
+          --company-primary-dark: ${darkenColor(
+            company.principal_color ?? '#3B82F6',
+            20
+          )};
         }
       `}</style>
 
@@ -85,17 +90,10 @@ export default function CompanyBrandedPage({
 
           <h2
             className="text-4xl font-bold mb-4"
-            style={{ color: primaryColor }}
+            style={{ color: company.principal_color ?? '#3B82F6' }}
           >
             Bienvenido a {company.name}
           </h2>
-
-          {/* Subtitle/Mission */}
-          {company.subtitle && (
-            <p className="text-xl text-gray-700 mb-4 italic max-w-2xl mx-auto">
-              {company.subtitle}
-            </p>
-          )}
 
           <p className="text-xl text-gray-600 mb-8">
             {userRole === 'AUCTION_MANAGER'
@@ -107,7 +105,7 @@ export default function CompanyBrandedPage({
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mt-12">
             <div
               className="p-6 rounded-lg border-2"
-              style={{ borderColor: primaryColor }}
+              style={{ borderColor: company.principal_color ?? '#3B82F6' }}
             >
               <h3 className="text-lg font-semibold mb-2">Nuestros Servicios</h3>
               <p className="text-gray-600">
@@ -117,7 +115,9 @@ export default function CompanyBrandedPage({
 
             <div
               className="p-6 rounded-lg"
-              style={{ backgroundColor: `${primaryColor}15` }}
+              style={{
+                backgroundColor: `${company.principal_color ?? '#3B82F6'}15`,
+              }}
             >
               <h3 className="text-lg font-semibold mb-2">Sobre Nosotros</h3>
               <p className="text-gray-600">
@@ -127,7 +127,7 @@ export default function CompanyBrandedPage({
 
             <div
               className="p-6 rounded-lg border-2"
-              style={{ borderColor: primaryColor }}
+              style={{ borderColor: company.principal_color ?? '#3B82F6' }}
             >
               <h3 className="text-lg font-semibold mb-2">Contacto</h3>
               <p className="text-gray-600">
@@ -191,7 +191,4 @@ function darkenColor(hex: string, percent: number): string {
       .toString(16)
       .slice(1)
   );
-=======
-  return;
->>>>>>> development
 }

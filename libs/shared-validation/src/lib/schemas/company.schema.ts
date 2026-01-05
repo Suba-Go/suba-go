@@ -5,26 +5,16 @@ import { tenantSchema } from './tenant.schema';
 
 export const companySchema = baseSchema
   .extend({
-<<<<<<< HEAD
     name: name,
-    nameLowercase: z.string(), // Lowercase version for case-insensitive subdomain lookup
-    subtitle: z.string().nullable().optional(),
-=======
-    name,
     nameLowercase: z.string(),
->>>>>>> development
     logo: z.string().nullable().optional(),
-    background_logo_enabled: z.boolean().optional().default(false),
+    background_logo_enabled: z.boolean().optional().nullable(),
     principal_color: z.string().nullable().optional(),
     principal_color2: z.string().nullable().optional(),
     secondary_color: z.string().nullable().optional(),
     secondary_color2: z.string().nullable().optional(),
     secondary_color3: z.string().nullable().optional(),
-<<<<<<< HEAD
-    rut: z.string().nullable().optional(),
-=======
     tenantId: z.uuid().nullable(),
->>>>>>> development
   })
   .strict();
 
@@ -79,7 +69,7 @@ export const companyUpdateSchema = companySchema
     createdAt: true,
     updatedAt: true,
     deletedAt: true,
-    is_deleted: true,
+    isDeleted: true,
     nameLowercase: true,
   })
   .partial()

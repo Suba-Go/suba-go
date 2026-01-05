@@ -28,13 +28,19 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@suba-go/shared-components/components/ui/dialog';
-import { AuctionDto, UserSafeDto } from '@suba-go/shared-validation';
+import {
+  AuctionDto,
+  AuctionStatusEnum,
+  UserSafeDto,
+} from '@suba-go/shared-validation';
+import { darkenColor } from '@/utils/color-utils';
 
 interface ParticipantsListProps {
   auction: AuctionDto;
   participants: UserSafeDto[];
   isManager: boolean;
   onRefresh: () => void;
+  primaryColor?: string;
 }
 
 export function ParticipantsList({
@@ -42,6 +48,7 @@ export function ParticipantsList({
   participants,
   isManager,
   onRefresh,
+  primaryColor,
 }: ParticipantsListProps) {
   const { toast } = useToast();
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
@@ -80,7 +87,7 @@ export function ParticipantsList({
     fetchConnectedUsers();
 
     // Poll every 5 seconds
-    const interval = setInterval(fetchConnectedUsers, 5000);
+    const interval = setInterval(fetchConnectedUsers, 4000);
 
     return () => clearInterval(interval);
   }, [auction.id, isManager]);
@@ -157,6 +164,30 @@ export function ParticipantsList({
             onClick={() => setIsAddModalOpen(true)}
             className="gap-2"
             size="sm"
+            style={
+              primaryColor
+                ? {
+                    backgroundColor: primaryColor,
+                    borderColor: primaryColor,
+                    color: '#000000',
+                  }
+                : undefined
+            }
+            onMouseEnter={(e) => {
+              if (primaryColor) {
+                e.currentTarget.style.backgroundColor = darkenColor(
+                  primaryColor,
+                  10
+                );
+                e.currentTarget.style.color = '#000000';
+              }
+            }}
+            onMouseLeave={(e) => {
+              if (primaryColor) {
+                e.currentTarget.style.backgroundColor = primaryColor;
+                e.currentTarget.style.color = '#000000';
+              }
+            }}
           >
             <UserPlus className="h-4 w-4" />
             Agregar Participante
@@ -174,8 +205,31 @@ export function ParticipantsList({
               </p>
               <Button
                 onClick={() => setIsAddModalOpen(true)}
-                variant="outline"
                 className="gap-2"
+                style={
+                  primaryColor
+                    ? {
+                        backgroundColor: primaryColor,
+                        borderColor: primaryColor,
+                        color: '#000000',
+                      }
+                    : undefined
+                }
+                onMouseEnter={(e) => {
+                  if (primaryColor) {
+                    e.currentTarget.style.backgroundColor = darkenColor(
+                      primaryColor,
+                      10
+                    );
+                    e.currentTarget.style.color = '#000000';
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (primaryColor) {
+                    e.currentTarget.style.backgroundColor = primaryColor;
+                    e.currentTarget.style.color = '#000000';
+                  }
+                }}
               >
                 <UserPlus className="h-4 w-4" />
                 Agregar Primer Participante
@@ -273,6 +327,7 @@ export function ParticipantsList({
           await onRefresh();
         }}
         existingParticipantIds={participantsList.map((p) => p.id)}
+        primaryColor={primaryColor}
       />
 
       {/* Remove Confirmation Dialog */}

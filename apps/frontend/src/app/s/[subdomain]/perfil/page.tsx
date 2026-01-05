@@ -1,9 +1,9 @@
 import { Metadata } from 'next';
-import { notFound} from 'next/navigation';
-import { auth } from '@/auth';
+import { notFound } from 'next/navigation';
 import { getCompanyBySubdomainServerAction } from '@/domain/server-actions/company/get-company-by-subdomain-server-action';
 import { normalizeCompanyName } from '@/utils/company-normalization';
 import ProfileFormWithUserData from '../../../../components/perfil/profile-form-with-user-data';
+import { CompanyInformation } from '../../../../components/perfil/company-information';
 
 // Force dynamic rendering to always fetch fresh company data
 export const dynamic = 'force-dynamic';
@@ -46,13 +46,11 @@ export async function generateMetadata({
 
 export default async function ProfilePage({ params }: ProfilePageProps) {
   let company;
-  let subdomain;
 
-  const session = await auth();
   try {
     const resolvedParams = await params;
-    subdomain = resolvedParams.subdomain;
-    
+    const subdomain = resolvedParams.subdomain;
+
     const normalizedSubdomain = normalizeCompanyName(subdomain);
     const companyResponse = await getCompanyBySubdomainServerAction(
       normalizedSubdomain
@@ -73,17 +71,19 @@ export default async function ProfilePage({ params }: ProfilePageProps) {
     <div className="min-h-screen bg-gray-50 py-12">
       <div className="max-w-7xl mx-auto px-4">
         <h1 className="text-3xl font-bold text-gray-900 mb-8">Mi Perfil</h1>
-        
+
         <div className="bg-white rounded-lg shadow p-6">
-          <ProfileFormWithUserData 
-            company={{
-              ...company,
-              principal_color: company.principal_color || undefined,
-              principal_color2: company.principal_color2 || undefined,
-              secondary_color: company.secondary_color || undefined,
-              secondary_color2: company.secondary_color2 || undefined,
-              secondary_color3: company.secondary_color3 || undefined,
-            } as any} 
+          <ProfileFormWithUserData
+            company={
+              {
+                ...company,
+                principal_color: company.principal_color || undefined,
+                principal_color2: company.principal_color2 || undefined,
+                secondary_color: company.secondary_color || undefined,
+                secondary_color2: company.secondary_color2 || undefined,
+                secondary_color3: company.secondary_color3 || undefined,
+              } as any
+            }
           />
         </div>
       </div>

@@ -79,12 +79,11 @@ export class BidsController {
     description: 'Lista de pujas del usuario',
   })
   async getMyBids(@Request() req: AuthenticatedRequest) {
-    const userId = req.user.userId;
-    const tenantId = req.user.tenantId;
+    //const userId = req.user.userId;
+    //const tenantId = req.user.tenantId;
     // This would need a new method in the service
     // For now, we can use the existing getUserAuctionBids if we have an auctionId
     // Or create a new method to get all user bids across all auctions
     return { message: 'Endpoint to be implemented' };
   }
 }
-

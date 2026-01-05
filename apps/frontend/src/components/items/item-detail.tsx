@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useRouter } from 'next-nprogress-bar';
+import { useRouter } from 'next/navigation';
 import {
   Car,
   Calendar,
@@ -42,6 +42,7 @@ import {
 import { ItemEditModal } from '@/components/items/item-edit-modal';
 import { useToast } from '@suba-go/shared-components/components/ui/toaster';
 import { useAutoFormat } from '@/hooks/use-auto-format';
+import { useCompanyContextOptional } from '@/contexts/company-context';
 
 interface ItemDetailProps {
   itemId: string;
@@ -49,6 +50,8 @@ interface ItemDetailProps {
 }
 
 export function ItemDetail({ itemId, userRole }: ItemDetailProps) {
+  const companyContext = useCompanyContextOptional();
+  const primaryColor = companyContext?.company?.principal_color;
   const router = useRouter();
   const { toast } = useToast();
   const { formatPrice } = useAutoFormat();
@@ -58,8 +61,19 @@ export function ItemDetail({ itemId, userRole }: ItemDetailProps) {
   const [photoCarouselApi, setPhotoCarouselApi] = useState<CarouselApi>();
   const [currentPhotoIndex, setCurrentPhotoIndex] = useState(0);
   const [photoCount, setPhotoCount] = useState(0);
+  const [isMobile, setIsMobile] = useState(false);
 
   const isAuctionManager = userRole === 'AUCTION_MANAGER';
+
+  // Detect mobile device
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.matchMedia('(max-width: 768px)').matches);
+    };
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
 
   // Function to download file
   const handleDownload = (url: string, filename: string) => {
@@ -117,6 +131,40 @@ export function ItemDetail({ itemId, userRole }: ItemDetailProps) {
       photoCarouselApi.off('select', updatePhotoIndex);
     };
   }, [photoCarouselApi]);
+
+  // Prevent horizontal scroll on desktop
+  useEffect(() => {
+    if (!photoCarouselApi || isMobile) return;
+
+    const carouselNode = photoCarouselApi.rootNode() as HTMLElement;
+    if (!carouselNode) return;
+
+    const viewport = photoCarouselApi.containerNode() as HTMLElement;
+
+    if (!viewport) return;
+
+    const preventHorizontalScroll = (e: WheelEvent) => {
+      if (Math.abs(e.deltaX) > Math.abs(e.deltaY) && Math.abs(e.deltaX) > 5) {
+        e.preventDefault();
+        e.stopPropagation();
+        return false;
+      }
+    };
+
+    if (window.matchMedia('(pointer: fine)').matches) {
+      carouselNode.addEventListener('wheel', preventHorizontalScroll, {
+        passive: false,
+      });
+      viewport.addEventListener('wheel', preventHorizontalScroll, {
+        passive: false,
+      });
+    }
+
+    return () => {
+      carouselNode.removeEventListener('wheel', preventHorizontalScroll);
+      viewport.removeEventListener('wheel', preventHorizontalScroll);
+    };
+  }, [photoCarouselApi, isMobile]);
 
   const handleDelete = async () => {
     if (!confirm('¿Estás seguro de que deseas eliminar este producto?')) {
@@ -251,6 +299,24 @@ export function ItemDetail({ itemId, userRole }: ItemDetailProps) {
               variant="outline"
               onClick={() => setIsEditModalOpen(true)}
               className="gap-2"
+              style={
+                primaryColor
+                  ? {
+                      borderColor: primaryColor,
+                      color: primaryColor,
+                    }
+                  : undefined
+              }
+              onMouseEnter={(e) => {
+                if (primaryColor) {
+                  e.currentTarget.style.backgroundColor = `${primaryColor}15`;
+                }
+              }}
+              onMouseLeave={(e) => {
+                if (primaryColor) {
+                  e.currentTarget.style.backgroundColor = 'transparent';
+                }
+              }}
             >
               <Edit className="h-4 w-4" />
               Editar
@@ -284,26 +350,48 @@ export function ItemDetail({ itemId, userRole }: ItemDetailProps) {
           </div>
           {photoUrls.length > 0 ? (
             <div className="relative">
-              <Carousel className="w-full" setApi={setPhotoCarouselApi}>
-                <CarouselContent>
+              <Carousel
+                className="w-full"
+                setApi={setPhotoCarouselApi}
+                opts={{
+                  align: 'start',
+                  dragFree: false,
+                  containScroll: 'trimSnaps',
+                  // Enable drag only on mobile, disable on desktop
+                  watchDrag: isMobile,
+                  skipSnaps: false,
+                }}
+              >
+                <CarouselContent
+                  className="-ml-0"
+                  style={{
+                    // Allow touch scroll on mobile, prevent on desktop
+                    touchAction: isMobile ? 'pan-x' : 'pan-y',
+                    overscrollBehaviorX: isMobile ? 'auto' : 'none',
+                  }}
+                >
                   {photoUrls.map((url: string, index: number) => (
-                    <CarouselItem key={index}>
+                    <CarouselItem key={index} className="pl-0">
                       <div className="aspect-video relative bg-gray-100 rounded-lg overflow-hidden">
                         <Image
                           src={url}
-                          width={100}
-                          height={100}
+                          fill
                           alt={`Foto ${index + 1}`}
-                          className="w-full h-full object-contain"
+                          className="object-contain select-none"
+                          draggable={false}
+                          style={{
+                            pointerEvents: isMobile ? 'auto' : 'none',
+                          }}
                         />
                       </div>
                     </CarouselItem>
                   ))}
                 </CarouselContent>
+                {/* Show arrows only on desktop/laptop, hide on mobile */}
                 {photoUrls.length > 1 && (
                   <>
-                    <CarouselPrevious />
-                    <CarouselNext />
+                    <CarouselPrevious className="left-2 md:left-4 z-20 hidden md:flex" />
+                    <CarouselNext className="right-2 md:right-4 z-20 hidden md:flex" />
                   </>
                 )}
               </Carousel>
@@ -514,7 +602,28 @@ export function ItemDetail({ itemId, userRole }: ItemDetailProps) {
                       </div>
                     </div>
 
-                    <Button variant="outline" className="w-full gap-2">
+                    <Button
+                      variant="outline"
+                      className="w-full gap-2"
+                      style={
+                        primaryColor
+                          ? {
+                              borderColor: primaryColor,
+                              color: primaryColor,
+                            }
+                          : undefined
+                      }
+                      onMouseEnter={(e) => {
+                        if (primaryColor) {
+                          e.currentTarget.style.backgroundColor = `${primaryColor}15`;
+                        }
+                      }}
+                      onMouseLeave={(e) => {
+                        if (primaryColor) {
+                          e.currentTarget.style.backgroundColor = 'transparent';
+                        }
+                      }}
+                    >
                       <Gavel className="h-4 w-4" />
                       Ver Subasta
                     </Button>

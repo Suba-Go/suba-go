@@ -30,7 +30,14 @@ export default auth(async function middleware(request: NextRequest) {
   }
 
   // rutas públicas (agrega estáticos si los sirves fuera del matcher)
-  const publicPrefixes = ['/api', '/_next', '/favicon.ico', '/login', '/invite', '/company-invite'];
+  const publicPrefixes = [
+    '/api',
+    '/_next',
+    '/favicon.ico',
+    '/login',
+    '/invite',
+    '/company-invite',
+  ];
 
   if (subdomain) {
     // Clean URL rewrites - transform user-facing URLs to internal s/{subdomain} structure
@@ -117,17 +124,13 @@ export default auth(async function middleware(request: NextRequest) {
         new URL(`/s/${subdomain}/subastas`, request.url)
       );
     }
-<<<<<<< HEAD
     // Stats page
     if (pathname === '/estadisticas') {
       return NextResponse.rewrite(
         new URL(`/s/${subdomain}/estadisticas`, request.url)
       );
     }
-    
-=======
 
->>>>>>> development
     // Onboarding page
     if (pathname === '/onboarding') {
       return NextResponse.rewrite(

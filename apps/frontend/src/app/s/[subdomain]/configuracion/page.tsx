@@ -4,7 +4,7 @@ import { getCompanyBySubdomainServerAction } from '@/domain/server-actions/compa
 import CompanySettingsForm from '@/components/subdomain/company-settings-form';
 
 type PageProps = {
-  params: { subdomain: string };
+  params: Promise<{ subdomain: string }>;
 };
 
 export const metadata: Metadata = {
@@ -12,7 +12,7 @@ export const metadata: Metadata = {
 };
 
 export default async function CompanyConfigPage({ params }: PageProps) {
-  const { subdomain } = params;
+  const { subdomain } = await params;
 
   const companyResult = await getCompanyBySubdomainServerAction(subdomain);
 
@@ -24,7 +24,8 @@ export default async function CompanyConfigPage({ params }: PageProps) {
     <div className="max-w-3xl mx-auto p-6">
       <h1 className="text-2xl font-semibold mb-4">Configuración de Empresa</h1>
       <p className="text-sm text-gray-600 mb-6">
-        Actualiza datos de branding y RUT. Solo administradores o managers pueden editar.
+        Actualiza datos de branding y RUT. Solo administradores o managers
+        pueden editar.
       </p>
       <CompanySettingsForm initialData={companyResult.data} />
     </div>

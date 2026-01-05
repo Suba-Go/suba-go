@@ -128,7 +128,6 @@ model Company {
   // Company-specific fields matching TypeORM entity
   name                    String  @unique
   nameLowercase           String  @unique // Lowercase version for case-insensitive subdomain lookup
-  subtitle                String? // Company mission/subtitle (e.g., "Como Wift, mi misión es...")
   logo                    String?
   background_logo_enabled Boolean @default(false) // Enable logo as transparent background
   principal_color         String?
@@ -136,7 +135,6 @@ model Company {
   secondary_color         String?
   secondary_color2        String?
   secondary_color3        String?
-  rut                     String?
 
   // Relations
   tenantId String
@@ -164,14 +162,6 @@ model Item {
   photos       String?
   docs         String?
   kilometraje  Int?
-<<<<<<< HEAD
-  legal_status LegalStatusEnum?
-  state        ItemStateEnum    @default(DISPONIBLE)
-  basePrice    Decimal?         @db.Decimal(10, 2)
-
-  // Sale tracking fields
-  soldPrice    Decimal?  @db.Decimal(10, 2)
-=======
   legal_status LegalStatusEnum @default(TRANSFERIBLE)
   state        ItemStateEnum @default(DISPONIBLE)
   basePrice    Int 
@@ -179,7 +169,6 @@ model Item {
 
   // Sale tracking fields
   soldPrice    Int?
->>>>>>> development
   soldAt       DateTime?
   soldToUserId String?
   soldToUser   User?     @relation("ItemSales", fields: [soldToUserId], references: [id], onDelete: SetNull)
@@ -231,11 +220,7 @@ model AuctionItem {
   isDeleted Boolean   @default(false)
   deletedAt DateTime?
 
-<<<<<<< HEAD
-  startingBid Decimal @db.Decimal(10, 2)
-=======
   startingBid Int
->>>>>>> development
 
   // Relations
   auctionId String
