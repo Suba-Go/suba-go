@@ -3,6 +3,7 @@ import { notFound } from 'next/navigation';
 import { getCompanyBySubdomainServerAction } from '@/domain/server-actions/company/get-company-by-subdomain-server-action';
 import { normalizeCompanyName } from '@/utils/company-normalization';
 import ConditionalNavbar from '@/components/subdomain/conditional-navbar';
+import { CompanyProvider } from '@/contexts/company-context';
 
 interface SubdomainLayoutProps {
   children: React.ReactNode;
@@ -89,21 +90,27 @@ export default async function SubdomainLayout({
           : undefined
       }
     >
-      {/* Overlay to make background logo more subtle */}
-      {company.background_logo_enabled && company.logo && (
-        <div className="fixed inset-0 bg-gray-50/90 pointer-events-none z-0" />
-      )}
-      {/* Company Navbar - Conditionally included (not in login) */}
-      <ConditionalNavbar company={company} />
+      <CompanyProvider
+        value={{
+          company,
+          isLoading: false,
+          error: null,
+        }}
+      >
+        {/* Overlay to make background logo more subtle */}
+        {company.background_logo_enabled && company.logo && (
+          <div className="fixed inset-0 bg-gray-50/90 pointer-events-none z-0" />
+        )}
 
-      {/* Content wrapper with higher z-index */}
-      <div className="relative z-10">
-        {/* Company Navbar - Conditionally included (not in login) */}
-        <ConditionalNavbar company={company} />
+        {/* Content wrapper with higher z-index */}
+        <div className="relative z-10">
+          {/* Company Navbar - Conditionally included (not in login) */}
+          <ConditionalNavbar company={company} />
 
-        {/* Page content */}
-        {children}
-      </div>
+          {/* Page content */}
+          {children}
+        </div>
+      </CompanyProvider>
     </div>
   );
 }

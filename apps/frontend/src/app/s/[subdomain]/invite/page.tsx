@@ -1,12 +1,15 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useSearchParams } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { Button } from '@suba-go/shared-components/components/ui/button';
 import { Input } from '@suba-go/shared-components/components/ui/input';
 import { Spinner } from '@suba-go/shared-components/components/ui/spinner';
 import { useToast } from '@suba-go/shared-components/components/ui/toaster';
-import { useRouter } from 'next/router';
+import { useCompany } from '@/hooks/use-company';
+import { PasswordChecklist } from '@/components/auth/password-checklist';
+
+import { Check, Circle, X } from 'lucide-react';
 
 export default function InviteAcceptPage() {
   const searchParams = useSearchParams();
@@ -17,6 +20,8 @@ export default function InviteAcceptPage() {
   const [loading, setLoading] = useState<boolean>(true);
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const { company } = useCompany();
+  const primaryColor = company?.principal_color || '#3B82F6';
 
   useEffect(() => {
     const t = searchParams.get('token');
@@ -30,10 +35,12 @@ export default function InviteAcceptPage() {
         const res = await fetch(
           `/api/users/invite/verify?token=${encodeURIComponent(t)}`
         );
+        console.log(res);
         const data = await res.json();
         if (!res.ok || !data.valid) {
           toast({
             title: 'Invitación inválida',
+            variant: 'destructive',
             description: 'El link puede haber expirado',
           });
         } else {
@@ -42,6 +49,7 @@ export default function InviteAcceptPage() {
       } catch {
         toast({
           title: 'Error',
+          variant: 'destructive',
           description: 'No se pudo verificar la invitación',
         });
       } finally {
@@ -53,13 +61,36 @@ export default function InviteAcceptPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!token) {
-      toast({ title: 'Invitación inválida' });
+      toast({ title: 'Invitación inválida', variant: 'destructive' });
       return;
     }
+    // Removed duplicate toast for mismatch
     if (password !== confirmPassword) {
-      toast({ title: 'Las contraseñas no coinciden' });
+      // toast({ title: 'Las contraseñas no coinciden', variant: 'destructive' }); // Deleted as requested
       return;
     }
+    if (password.length < 8) {
+      toast({
+        title: 'La contraseña debe tener al menos 8 caracteres',
+        variant: 'destructive',
+      });
+      return;
+    }
+    if (!/[A-Z]/.test(password)) {
+      toast({
+        title: 'La contraseña debe tener al menos una mayúscula',
+        variant: 'destructive',
+      });
+      return;
+    }
+    if (!/[a-z]/.test(password)) {
+      toast({
+        title: 'La contraseña debe tener al menos una minúscula',
+        variant: 'destructive',
+      });
+      return;
+    }
+
     setLoading(true);
     try {
       const res = await fetch('/api/users/invite/accept', {
@@ -71,17 +102,23 @@ export default function InviteAcceptPage() {
       if (!res.ok) {
         toast({
           title: 'Error',
+          variant: 'destructive',
           description: data?.error || 'No se pudo crear el usuario',
         });
       } else {
         toast({
           title: 'Usuario creado',
+          variant: 'default',
           description: 'Ahora puedes iniciar sesión',
         });
         router.push('/login');
       }
     } catch {
-      toast({ title: 'Error', description: 'Error al aceptar invitación' });
+      toast({
+        title: 'Error',
+        variant: 'destructive',
+        description: 'Error al aceptar invitación',
+      });
     } finally {
       setLoading(false);
     }
@@ -114,7 +151,22 @@ export default function InviteAcceptPage() {
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             className="mt-1"
+            style={
+              {
+                '--tw-ring-color': primaryColor,
+                borderColor: 'focus:' + primaryColor,
+              } as React.CSSProperties & { '--tw-ring-color': string }
+            }
+            onFocus={(e) => {
+              e.target.style.borderColor = primaryColor;
+              e.target.style.boxShadow = `0 0 0 1px ${primaryColor}`;
+            }}
+            onBlur={(e) => {
+              e.target.style.borderColor = '#d1d5db';
+              e.target.style.boxShadow = 'none';
+            }}
           />
+          <PasswordChecklist password={password} />
         </div>
         <div>
           <label className="text-sm text-gray-700">Confirmar contraseña</label>
@@ -123,10 +175,46 @@ export default function InviteAcceptPage() {
             value={confirmPassword}
             onChange={(e) => setConfirmPassword(e.target.value)}
             className="mt-1"
+            style={
+              {
+                '--tw-ring-color': primaryColor,
+                borderColor: 'focus:' + primaryColor,
+              } as React.CSSProperties & { '--tw-ring-color': string }
+            }
+            onFocus={(e) => {
+              e.target.style.borderColor = primaryColor;
+              e.target.style.boxShadow = `0 0 0 1px ${primaryColor}`;
+            }}
+            onBlur={(e) => {
+              e.target.style.borderColor = '#d1d5db';
+              e.target.style.boxShadow = 'none';
+            }}
           />
         </div>
-        <Button type="submit" className="w-full">
-          Crear cuenta
+
+        {/* Passwords match indicator */}
+        {confirmPassword && (
+          <div
+            className={`flex items-center text-sm mt-1 ${
+              password === confirmPassword ? 'text-green-600' : 'text-gray-500'
+            }`}
+          >
+            {password === confirmPassword ? (
+              <Check className="w-4 h-4 mr-2" />
+            ) : (
+              <Circle className="w-4 h-4 mr-2" />
+            )}
+            <span>Las contraseñas coinciden</span>
+          </div>
+        )}
+
+        <Button
+          type="submit"
+          className="w-full text-white"
+          style={{ backgroundColor: primaryColor }}
+          disabled={loading}
+        >
+          {loading ? 'Creando cuenta...' : 'Crear cuenta'}
         </Button>
       </form>
     </div>

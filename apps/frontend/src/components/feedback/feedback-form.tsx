@@ -3,7 +3,13 @@
 import { useState } from 'react';
 import { FEEDBACK_CATEGORIES } from '@suba-go/shared-validation';
 
-export default function FeedbackForm({ onSuccess }: { onSuccess?: () => void }) {
+export default function FeedbackForm({
+  onSuccess,
+  primaryColor = '#3B82F6',
+}: {
+  onSuccess?: () => void;
+  primaryColor?: string;
+}) {
   const [form, setForm] = useState({
     category: FEEDBACK_CATEGORIES[0],
     title: '',
@@ -63,8 +69,17 @@ export default function FeedbackForm({ onSuccess }: { onSuccess?: () => void }) 
         </label>
         <select
           value={form.category}
-          onChange={(e) => setForm({ ...form, category: e.target.value as any })}
-          className="w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+          onChange={(e) =>
+            setForm({ ...form, category: e.target.value as any })
+          }
+          className="w-full rounded-md px-3 py-2 focus:ring-2 outline-none"
+          style={
+            {
+              '--tw-ring-color': primaryColor,
+              borderColor:
+                'var(--tw-border-opacity) ? rgba(209, 213, 219, var(--tw-border-opacity)) : undefined',
+            } as React.CSSProperties
+          }
           required
         >
           {FEEDBACK_CATEGORIES.map((category) => (
@@ -86,7 +101,8 @@ export default function FeedbackForm({ onSuccess }: { onSuccess?: () => void }) 
           type="text"
           value={form.title}
           onChange={(e) => setForm({ ...form, title: e.target.value })}
-          className="w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+          className="w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-2 focus:border-transparent outline-none"
+          style={{ '--tw-ring-color': primaryColor } as React.CSSProperties}
           placeholder="Resumen breve de tu feedback"
           required
           maxLength={200}
@@ -100,7 +116,8 @@ export default function FeedbackForm({ onSuccess }: { onSuccess?: () => void }) 
         <textarea
           value={form.message}
           onChange={(e) => setForm({ ...form, message: e.target.value })}
-          className="w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+          className="w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-2 focus:border-transparent outline-none"
+          style={{ '--tw-ring-color': primaryColor } as React.CSSProperties}
           placeholder="Describe tu feedback en detalle..."
           rows={6}
           required
@@ -127,7 +144,8 @@ export default function FeedbackForm({ onSuccess }: { onSuccess?: () => void }) 
         <button
           type="submit"
           disabled={status.type === 'submitting'}
-          className="px-6 py-2 bg-blue-600 text-white rounded-md font-medium hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          className="px-6 py-2 text-white rounded-md font-medium disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          style={{ backgroundColor: primaryColor }}
         >
           {status.type === 'submitting' ? 'Enviando...' : 'Enviar Feedback'}
         </button>

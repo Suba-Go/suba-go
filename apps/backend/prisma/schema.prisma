@@ -7,7 +7,8 @@ generator client {
 
 datasource db {
   provider = "postgresql"
-  url      = env("DATABASE_URL")
+  url      = "postgresql://postgres:pasword@localhost:5433/local_subago"
+
 }
 
 // Enums matching TypeORM enums
@@ -92,6 +93,7 @@ model User {
   auditLogs            AuditLog[]
   itemsPurchased       Item[]                @relation("ItemSales")
   feedback             Feedback[]
+  sentInvitations      Invitation[]          @relation("SentInvitations")
 
   // Unique constraints matching TypeORM indexes
   @@unique([email], map: "IDX_user_email_unique")
@@ -114,6 +116,7 @@ model Tenant {
   bids         Bid[]
   observations Observation[]
   feedback     Feedback[]
+  invitations  Invitation[]
 
   @@map("tenant")
 }
@@ -140,6 +143,7 @@ model Company {
   tenantId String
   tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   users    User[]
+  invitations Invitation[]
 
   // Unique constraint matching TypeORM index
   @@unique([name, tenantId], map: "IDX_company_name_tenant_unique")
@@ -345,4 +349,31 @@ model Feedback {
   @@index([status])
   @@index([category])
   @@map("feedback")
+}
+
+model Invitation {
+  id        String   @id @default(uuid())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  email     String
+  token     String   @unique
+  expiresAt DateTime
+  role      UserRoleEnum @default(USER)
+  
+  // Relations
+  invitedByUserId String
+  invitedByUser   User   @relation("SentInvitations", fields: [invitedByUserId], references: [id])
+  
+  tenantId  String?
+  tenant    Tenant?  @relation(fields: [tenantId], references: [id])
+  companyId String?
+  company   Company? @relation(fields: [companyId], references: [id])
+
+  isUsed    Boolean  @default(false)
+  usedAt    DateTime?
+
+  @@index([email])
+  @@index([token])
+  @@map("invitation")
 }

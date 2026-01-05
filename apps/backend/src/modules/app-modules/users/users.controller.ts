@@ -24,9 +24,9 @@ import {
 import { JwtAuthGuard } from '../../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../../common/guards/roles.guard';
 import { Roles } from '../../../common/decorators/roles.decorator';
-import { PublicGuard } from '../../../common/guards/public.guard';
 import { UserPrismaRepository } from './services/user-prisma-repository.service';
 import { AuthenticatedRequest } from '@/common/types/auth.types';
+import { Public } from '@/common/decorators/public.decorator';
 
 // Local enum definition to avoid import issues
 enum UserRolesEnum {
@@ -64,30 +64,57 @@ export class UsersController {
       throw new Error('Email inválido');
     }
 
-    const expires =
-      this.configService.get<string>('INVITE_EXPIRY_TIME') || '7d';
+    if (!req.user || !req.user.userId) {
+      throw new Error('Usuario no autenticado o ID de usuario no disponible');
+    }
+
+    const currentUser = await this.userGettersService.getUserById(
+      req.user.userId
+    );
+    if (!currentUser) {
+      throw new Error('Usuario actual no encontrado');
+    }
+
+    // 7 days expiration
+    const expiryDate = new Date();
+    expiryDate.setDate(expiryDate.getDate() + 7);
+
+    // Invalidate previous pending invitations for this email
+    await this.userRepository.invalidatePendingInvitations(email);
+
+    // Create unique token
     const token = this.jwtService.sign(
       {
         email,
         role: role || UserRolesEnum.USER,
         tenantId: req.user.tenantId,
-        companyId: (await this.userGettersService.getUserById(req.user.userId))
-          .companyId,
+        companyId: currentUser.companyId,
+        timestamp: Date.now(),
       },
       {
         secret: this.configService.get<string>('JWT_SECRET'),
-        expiresIn: expires,
+        expiresIn: '7d',
       }
     );
 
-    const expiryDate = new Date();
-    // best-effort parse of expiry: assume days in format '<Nd>'
-    const daysMatch = /^([0-9]+)d$/.exec(expires);
-    if (daysMatch) {
-      expiryDate.setDate(expiryDate.getDate() + parseInt(daysMatch[1], 10));
-    }
+    // Store invitation in DB
+    await this.userRepository.createInvitation({
+      email,
+      token,
+      expiresAt: expiryDate,
+      role: role || UserRolesEnum.USER,
+      invitedByUser: { connect: { id: req.user.userId } },
+      tenant: req.user.tenantId
+        ? { connect: { id: req.user.tenantId } }
+        : undefined,
+      company: currentUser.companyId
+        ? { connect: { id: currentUser.companyId } }
+        : undefined,
+    });
 
-    return { token, expiresAt: expiryDate.toISOString() };
+    const response = { token, expiresAt: expiryDate.toISOString() };
+    console.log('Backend creating invite response:', response);
+    return response;
   }
 
   @Post('invite/direct-create')
@@ -143,21 +170,38 @@ export class UsersController {
     return { user: safe, token };
   }
 
-  @UseGuards(PublicGuard)
+  @Public()
   @Get('invite/verify')
   async verifyInvite(@Query('token') token: string) {
     try {
+      // 1. Verify JWT signature first
       const payload = this.jwtService.verify(token, {
         secret: this.configService.get<string>('JWT_SECRET'),
       });
+
+      // 2. Check if invitation exists in DB and is valid
+      const invitation = await this.userRepository.findInvitationByToken(token);
+
+      if (!invitation) {
+        return { valid: false, error: 'Invitación no encontrada' };
+      }
+
+      if (invitation.isUsed) {
+        return { valid: false, error: 'Esta invitación ya fue utilizada' };
+      }
+
+      if (new Date() > invitation.expiresAt) {
+        return { valid: false, error: 'La invitación ha expirado' };
+      }
+
       return {
         valid: true,
         data: {
-          email: payload.email,
-          tenantId: payload.tenantId,
-          companyId: payload.companyId,
-          role: payload.role,
-          exp: payload.exp,
+          email: invitation.email,
+          tenantId: invitation.tenantId,
+          companyId: invitation.companyId,
+          role: invitation.role,
+          exp: Math.floor(invitation.expiresAt.getTime() / 1000),
         },
       };
     } catch (error) {
@@ -165,29 +209,34 @@ export class UsersController {
     }
   }
 
-  @UseGuards(PublicGuard)
+  @Public()
   @Post('invite/accept')
   async acceptInvite(@Body() body: { token: string; password: string }) {
     const { token, password } = body;
     if (!token || !password || password.length < 8) {
       throw new Error('Datos inválidos');
     }
-    let payload: any;
+
+    // Verify token exists and is valid
+    const invitation = await this.userRepository.findInvitationByToken(token);
+    if (!invitation || invitation.isUsed || new Date() > invitation.expiresAt) {
+      throw new Error('Invitación inválida o expirada');
+    }
+
     try {
-      payload = this.jwtService.verify(token, {
+      this.jwtService.verify(token, {
         secret: this.configService.get<string>('JWT_SECRET'),
       });
     } catch {
-      throw new Error('Token inválido o expirado');
+      throw new Error('Token inválido');
     }
 
-    const email = payload.email as string;
-    const tenantId = payload.tenantId as string | undefined;
-    const companyId = payload.companyId as string | undefined;
-    const role = payload.role as UserRolesEnum | undefined;
+    const { email, tenantId, companyId, role } = invitation;
 
     const existing = await this.userGettersService.findByEmail(email);
     const hashed = await bcrypt.hash(password, 10);
+
+    let resultUser;
 
     if (existing) {
       // Update password and attach relations only if missing
@@ -202,21 +251,31 @@ export class UsersController {
         updateData.company = { connect: { id: companyId } };
       }
 
-      const updated = await this.userRepository.update(existing.id, updateData);
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
-      const { password: _, ...safe } = updated as any;
-      return { success: true, user: safe };
+      resultUser = await this.userRepository.update(existing.id, updateData);
+    } else {
+      // Generate automatic public_name
+      let publicName = `Usuario`;
+      if (companyId) {
+        const nextUserNumber =
+          await this.userRepository.getNextUserNumberForCompany(companyId);
+        publicName = `Usuario ${nextUserNumber}`;
+      }
+
+      resultUser = await this.userRepository.create({
+        email,
+        password: hashed,
+        public_name: publicName,
+        role: role || UserRolesEnum.USER,
+        tenant: tenantId ? { connect: { id: tenantId } } : undefined,
+        company: companyId ? { connect: { id: companyId } } : undefined,
+      } as any);
     }
 
-    const created = await this.userRepository.create({
-      email,
-      password: hashed,
-      role: role || UserRolesEnum.USER,
-      tenant: tenantId ? { connect: { id: tenantId } } : undefined,
-      company: companyId ? { connect: { id: companyId } } : undefined,
-    } as any);
+    // Mark invitation as used
+    await this.userRepository.markInvitationAsUsed(invitation.id);
+
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const { password: _, ...safe } = created as any;
+    const { password: _, ...safe } = resultUser as any;
     return { success: true, user: safe };
   }
 

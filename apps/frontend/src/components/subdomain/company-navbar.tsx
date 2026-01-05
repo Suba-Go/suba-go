@@ -90,6 +90,11 @@ export default function CompanyNavbar({
     window.location.href = `/perfil`;
   };
 
+  const handleConfigClick = () => {
+    setIsProfileMenuOpen(false);
+    window.location.href = `/configuracion`;
+  };
+
   return (
     <header className="bg-white shadow-sm border-b relative z-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -119,16 +124,18 @@ export default function CompanyNavbar({
           {/* check if the profile is complete */}
           {isUserProfileComplete(session) && (
             <nav className="hidden md:flex flex-wrap items-center gap-3">
-              <Link href="/subastas">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="text-gray-600 hover:text-gray-900 flex items-center gap-2"
-                >
-                  <Gavel className="h-4 w-4" />
-                  Subastas
-                </Button>
-              </Link>
+              {isUserAdminOrManager(session) && (
+                <Link href="/subastas">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="text-gray-600 hover:text-gray-900 flex items-center gap-2"
+                  >
+                    <Gavel className="h-4 w-4" />
+                    Subastas
+                  </Button>
+                </Link>
+              )}
               {/* Products - Only for AUCTION_MANAGER and ADMIN */}
               {isUserAdminOrManager(session) && (
                 <Link href="/items">
@@ -155,32 +162,7 @@ export default function CompanyNavbar({
                   </Button>
                 </Link>
               )}
-              {/* Invite - Only for AUCTION_MANAGER */}
-              {session?.user?.role === 'AUCTION_MANAGER' && (
-                <Link href="/users/invite">
-                  <Button
-                    variant="default"
-                    size="sm"
-                    className="flex items-center gap-2"
-                  >
-                    <UserPlus className="h-4 w-4" />
-                    Invitar usuario
-                  </Button>
-                </Link>
-              )}
-              {/* Company Invite - Only for AUCTION_MANAGER */}
-              {session?.user?.role === 'AUCTION_MANAGER' && (
-                <Link href="/companies/invite">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="flex items-center gap-2"
-                  >
-                    <Building2 className="h-4 w-4" />
-                    Invitar empresa
-                  </Button>
-                </Link>
-              )}
+
               {/* Stats - Only for AUCTION_MANAGER */}
               {session?.user?.role === 'AUCTION_MANAGER' && (
                 <Link href="/estadisticas">
@@ -204,6 +186,20 @@ export default function CompanyNavbar({
                   >
                     <MessageSquare className="h-4 w-4" />
                     Feedback
+                  </Button>
+                </Link>
+              )}
+
+              {/* Invite - Only for AUCTION_MANAGER */}
+              {session?.user?.role === 'AUCTION_MANAGER' && (
+                <Link href="/usuarios/invite">
+                  <Button
+                    size="sm"
+                    className="flex items-center gap-2 text-white"
+                    style={{ backgroundColor: primaryColor }}
+                  >
+                    <UserPlus className="h-4 w-4" />
+                    Invitar usuario
                   </Button>
                 </Link>
               )}
@@ -255,6 +251,15 @@ export default function CompanyNavbar({
                         <User className="w-4 h-4 mr-3" />
                         Perfil
                       </button>
+                      {isUserAdminOrManager(session) && (
+                        <button
+                          onClick={handleConfigClick}
+                          className="flex items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                        >
+                          <Users className="w-4 h-4 mr-3" />
+                          Configuración
+                        </button>
+                      )}
                       <hr className="border-gray-200" />
                       <button
                         onClick={handleSignOut}
@@ -322,25 +327,13 @@ export default function CompanyNavbar({
           )}
           {/* Invite - Only for AUCTION_MANAGER */}
           {session?.user?.role === 'AUCTION_MANAGER' && (
-            <Link href="/users/invite">
+            <Link href="/usuarios/invite">
               <Button
-                variant="default"
-                className="w-full text-left justify-start flex items-center gap-2"
+                className="w-full text-left justify-start flex items-center gap-2 text-white"
+                style={{ backgroundColor: primaryColor }}
               >
                 <UserPlus className="h-4 w-4" />
                 Invitar usuario
-              </Button>
-            </Link>
-          )}
-          {/* Company Invite - Only for AUCTION_MANAGER */}
-          {session?.user?.role === 'AUCTION_MANAGER' && (
-            <Link href="/companies/invite">
-              <Button
-                variant="outline"
-                className="w-full text-left justify-start flex items-center gap-2"
-              >
-                <Building2 className="h-4 w-4" />
-                Invitar empresa
               </Button>
             </Link>
           )}

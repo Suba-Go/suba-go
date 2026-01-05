@@ -1,8 +1,11 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { useSession } from 'next-auth/react';
 import type { CompanyDto } from '@suba-go/shared-validation';
+import { Button } from '@suba-go/shared-components/components/ui/button';
+import { useToast } from '@suba-go/shared-components/components/ui/toaster';
+import { Upload } from 'lucide-react';
 
 type Props = {
   initialData: CompanyDto;
@@ -10,6 +13,8 @@ type Props = {
 
 export default function CompanySettingsForm({ initialData }: Props) {
   const { data: session } = useSession();
+  const { toast } = useToast();
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const isAllowed =
     session?.user?.role === 'ADMIN' ||
     session?.user?.role === 'AUCTION_MANAGER';
@@ -18,17 +23,70 @@ export default function CompanySettingsForm({ initialData }: Props) {
     name: initialData.name ?? '',
     logo: initialData.logo ?? '',
     background_logo_enabled: initialData.background_logo_enabled ?? false,
-    principal_color: initialData.principal_color ?? '#3B82F6',
-    principal_color2: initialData.principal_color2 ?? '#60A5FA',
-    secondary_color: initialData.secondary_color ?? '#10B981',
-    secondary_color2: initialData.secondary_color2 ?? '#34D399',
-    secondary_color3: initialData.secondary_color3 ?? '#6366F1',
+    principal_color: initialData.principal_color ?? '',
+    principal_color2: initialData.principal_color2 ?? '',
+    secondary_color: initialData.secondary_color ?? '',
+    secondary_color2: initialData.secondary_color2 ?? '',
+    secondary_color3: initialData.secondary_color3 ?? '',
   });
 
+  const [isUploading, setIsUploading] = useState(false);
   const [status, setStatus] = useState<{
     type: 'idle' | 'saving' | 'error' | 'success';
     message?: string;
   }>({ type: 'idle' });
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!e.target.files || e.target.files.length === 0) {
+      return;
+    }
+
+    const file = e.target.files[0];
+    if (file.size > 5 * 1024 * 1024) {
+      // 5MB limit
+      toast({
+        title: 'Error',
+        description: 'El archivo es demasiado grande. Máximo 5MB.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    setIsUploading(true);
+    try {
+      const response = await fetch(
+        `/api/upload?filename=${encodeURIComponent(file.name)}`,
+        {
+          method: 'POST',
+          body: file,
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error('Error al subir la imagen');
+      }
+
+      const blob = await response.json();
+      updateField('logo', blob.url);
+      toast({
+        title: 'Éxito',
+        description: 'Logo subido correctamente',
+      });
+    } catch (error) {
+      console.error('Upload error:', error);
+      toast({
+        title: 'Error',
+        description: 'No se pudo subir la imagen',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsUploading(false);
+      // Reset input value to allow uploading same file again if needed
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    }
+  };
 
   const updateField = (key: keyof typeof form, value: string | boolean) => {
     setForm((prev) => ({ ...prev, [key]: value }));
@@ -96,26 +154,49 @@ export default function CompanySettingsForm({ initialData }: Props) {
           </label>
 
           <label className="block md:col-span-2">
-            <span className="text-sm font-medium text-gray-700">
-              Logo (URL)
-            </span>
-            <input
-              type="text"
-              value={form.logo}
-              onChange={(e) => updateField('logo', e.target.value)}
-              className="mt-1 w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-              disabled={!isAllowed}
-              placeholder="https://ejemplo.com/logo.png"
-            />
-            {form.logo && (
-              <div className="mt-2">
-                <img
-                  src={form.logo}
-                  alt="Logo preview"
-                  className="h-16 object-contain"
+            <span className="text-sm font-medium text-gray-700">Logo</span>
+            <div className="mt-1 flex flex-col gap-2">
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={form.logo}
+                  onChange={(e) => updateField('logo', e.target.value)}
+                  className="flex-1 border border-gray-300 rounded-md px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  disabled={!isAllowed}
+                  placeholder="URL del logo"
                 />
+                <div className="relative">
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/*"
+                    onChange={handleFileUpload}
+                    className="hidden"
+                    disabled={!isAllowed || isUploading}
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={!isAllowed || isUploading}
+                    className="flex items-center gap-2"
+                  >
+                    <Upload className="h-4 w-4" />
+                    {isUploading ? 'Subiendo...' : 'Subir'}
+                  </Button>
+                </div>
               </div>
-            )}
+
+              {form.logo && (
+                <div className="mt-2 p-2 border rounded-md bg-gray-50 inline-block">
+                  <img
+                    src={form.logo}
+                    alt="Logo preview"
+                    className="h-16 object-contain"
+                  />
+                </div>
+              )}
+            </div>
           </label>
 
           <label className="flex items-center gap-2 md:col-span-2">
@@ -298,7 +379,10 @@ export default function CompanySettingsForm({ initialData }: Props) {
       <div className="flex items-center gap-3 pt-4 border-t">
         <button
           type="submit"
-          className="px-6 py-2 rounded-md bg-blue-600 text-white font-medium hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          className="px-6 py-2 rounded-md text-white font-medium disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          style={{
+            backgroundColor: initialData.principal_color || '#3B82F6',
+          }}
           disabled={!isAllowed || status.type === 'saving'}
         >
           {status.type === 'saving' ? 'Guardando…' : 'Guardar cambios'}

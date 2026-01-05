@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { FeedbackDto, FEEDBACK_CATEGORIES } from '@suba-go/shared-validation';
 
-export default function FeedbackList() {
+export default function FeedbackList({ primaryColor = '#3B82F6' }: { primaryColor?: string }) {
   const [feedbackList, setFeedbackList] = useState<FeedbackDto[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -97,11 +97,11 @@ export default function FeedbackList() {
       <div className="flex gap-2 flex-wrap">
         <button
           onClick={() => setFilter('all')}
-          className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-            filter === 'all'
-              ? 'bg-blue-600 text-white'
-              : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-          }`}
+          className="px-4 py-2 rounded-md text-sm font-medium transition-colors"
+          style={{ 
+            backgroundColor: filter === 'all' ? primaryColor : '#f3f4f6',
+            color: filter === 'all' ? 'white' : '#374151'
+          }}
         >
           Todos ({feedbackList.length})
         </button>
@@ -111,11 +111,11 @@ export default function FeedbackList() {
             <button
               key={category}
               onClick={() => setFilter(category)}
-              className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-                filter === category
-                  ? 'bg-blue-600 text-white'
-                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-              }`}
+              className="px-4 py-2 rounded-md text-sm font-medium transition-colors"
+              style={{ 
+                backgroundColor: filter === category ? primaryColor : '#f3f4f6',
+                color: filter === category ? 'white' : '#374151'
+              }}
             >
               {getCategoryIcon(category)} {category} ({count})
             </button>

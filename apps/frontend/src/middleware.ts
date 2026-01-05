@@ -90,10 +90,17 @@ export default auth(async function middleware(request: NextRequest) {
       );
     }
 
-    // Invite user page
-    if (pathname === '/users/invite') {
+    // Invite accept page (Public)
+    if (pathname === '/invite') {
       return NextResponse.rewrite(
-        new URL(`/s/${subdomain}/users/invite`, request.url)
+        new URL(`/s/${subdomain}/invite`, request.url)
+      );
+    }
+
+    // Invite user page (Manager)
+    if (pathname === '/usuarios/invite') {
+      return NextResponse.rewrite(
+        new URL(`/s/${subdomain}/usuarios/invite`, request.url)
       );
     }
 
@@ -149,6 +156,11 @@ export default auth(async function middleware(request: NextRequest) {
     // Check if this is a public route before doing authentication
     const isPublic = publicPrefixes.some((p) => pathname.startsWith(p));
 
+    // If it's a public route in a subdomain, allow it without session check
+    if (isPublic) {
+      return NextResponse.next();
+    }
+
     // If it's not a public route and not already handled above,
     // it might be a dynamic route or future route - let it pass through
     // but still apply authentication logic
@@ -172,6 +184,29 @@ export default auth(async function middleware(request: NextRequest) {
       if (!isUserProfileComplete(session)) {
         // redirect to public onboarding route
         return NextResponse.redirect(new URL(`/onboarding`, request.url));
+      }
+
+      // Restrict access based on role
+      const userRole = session.user?.role;
+      const isManagerOrAdmin =
+        userRole === 'AUCTION_MANAGER' || userRole === 'ADMIN';
+
+      // Restricted paths for regular users
+      const restrictedPaths = [
+        '/subastas',
+        '/items',
+        '/usuarios',
+        '/estadisticas',
+        'feedback',
+        '/configuracion',
+      ];
+
+      // If user is NOT manager/admin and tries to access restricted paths, redirect to dashboard
+      if (
+        !isManagerOrAdmin &&
+        restrictedPaths.some((p) => pathname.startsWith(p))
+      ) {
+        return NextResponse.redirect(new URL('/', request.url));
       }
     }
 

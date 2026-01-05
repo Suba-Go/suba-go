@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/auth';
+import superjson from 'superjson';
 
 export async function POST(request: NextRequest) {
   try {
@@ -57,7 +58,10 @@ export async function GET() {
     }
 
     // Only AUCTION_MANAGER and ADMIN can view feedback
-    if (session.user.role !== 'AUCTION_MANAGER' && session.user.role !== 'ADMIN') {
+    if (
+      session.user.role !== 'AUCTION_MANAGER' &&
+      session.user.role !== 'ADMIN'
+    ) {
       return NextResponse.json(
         { error: 'Permisos insuficientes' },
         { status: 403 }
@@ -81,7 +85,7 @@ export async function GET() {
     let deserializedData = data;
     if (data && data.superjson) {
       try {
-        deserializedData = JSON.parse(JSON.stringify(data.superjson));
+        deserializedData = superjson.deserialize(data.superjson);
       } catch (error) {
         console.error('Failed to deserialize superjson response:', error);
         deserializedData = data;

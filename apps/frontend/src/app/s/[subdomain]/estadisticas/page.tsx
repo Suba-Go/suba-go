@@ -1,10 +1,17 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@suba-go/shared-components/components/ui/card';
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+} from '@suba-go/shared-components/components/ui/card';
 import { Button } from '@suba-go/shared-components/components/ui/button';
 import { Spinner } from '@suba-go/shared-components/components/ui/spinner';
 import { useToast } from '@suba-go/shared-components/components/ui/toaster';
+import { useSession } from 'next-auth/react';
+import { useRouter } from 'next/navigation';
 
 type AuctionItem = {
   id: string;
@@ -30,15 +37,31 @@ type Stats = {
 };
 
 export default function ManagerStatsPage() {
+  const { data: session, status } = useSession();
+  const router = useRouter();
   const { toast } = useToast();
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState<Stats | null>(null);
   const [auctions, setAuctions] = useState<Auction[]>([]);
 
+  useEffect(() => {
+    if (status === 'loading') return;
+
+    if (
+      !session ||
+      (session.user.role !== 'AUCTION_MANAGER' && session.user.role !== 'ADMIN')
+    ) {
+      router.push('/');
+      return;
+    }
+  }, [session, status, router]);
+
   const activeVsTotalCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const revenuePerAuctionCanvasRef = useRef<HTMLCanvasElement | null>(null);
 
   useEffect(() => {
+    if (status !== 'authenticated') return;
+
     (async () => {
       try {
         const [statsRes, auctionsRes] = await Promise.all([
@@ -48,14 +71,23 @@ export default function ManagerStatsPage() {
         const statsData = await statsRes.json();
         const auctionsData = await auctionsRes.json();
         if (!statsRes.ok) {
-          toast({ title: 'Error', description: statsData?.error || 'No se pudo obtener estadísticas' });
+          toast({
+            title: 'Error',
+            description: statsData?.error || 'No se pudo obtener estadísticas',
+          });
         } else {
           setStats(statsData as Stats);
         }
         if (!auctionsRes.ok) {
-          toast({ title: 'Error', description: auctionsData?.error || 'No se pudieron obtener las subastas' });
+          toast({
+            title: 'Error',
+            description:
+              auctionsData?.error || 'No se pudieron obtener las subastas',
+          });
         } else {
-          setAuctions(Array.isArray(auctionsData) ? auctionsData as Auction[] : []);
+          setAuctions(
+            Array.isArray(auctionsData) ? (auctionsData as Auction[]) : []
+          );
         }
       } catch {
         toast({ title: 'Error', description: 'Error al cargar datos' });
@@ -68,10 +100,15 @@ export default function ManagerStatsPage() {
   const computed = useMemo(() => {
     const completed = auctions.filter((a) => a.status === 'COMPLETADA');
     const revenueByAuction = completed.map((a) => {
-      const sum = (a.items || []).reduce((acc, it) => acc + (Number(it.item?.soldPrice) || 0), 0);
+      const sum = (a.items || []).reduce(
+        (acc, it) => acc + (Number(it.item?.soldPrice) || 0),
+        0
+      );
       return { id: a.id, title: a.title, revenue: sum };
     });
-    const topRevenue = [...revenueByAuction].sort((a, b) => b.revenue - a.revenue).slice(0, 10);
+    const topRevenue = [...revenueByAuction]
+      .sort((a, b) => b.revenue - a.revenue)
+      .slice(0, 10);
     const statusCounts = {
       PENDIENTE: auctions.filter((a) => a.status === 'PENDIENTE').length,
       ACTIVA: auctions.filter((a) => a.status === 'ACTIVA').length,
@@ -136,11 +173,18 @@ export default function ManagerStatsPage() {
       ctx.fillStyle = '#111827';
       const label = d.title.length > 10 ? d.title.slice(0, 10) + '…' : d.title;
       ctx.fillText(label, x, h - 20);
-      ctx.fillText(`$${Math.round(d.revenue).toLocaleString('es-CL')}`, x, y - 6);
+      ctx.fillText(
+        `$${Math.round(d.revenue).toLocaleString('es-CL')}`,
+        x,
+        y - 6
+      );
     });
   }, [computed]);
 
-  const downloadCanvas = (ref: React.RefObject<HTMLCanvasElement>, name: string) => {
+  const downloadCanvas = (
+    ref: React.RefObject<HTMLCanvasElement>,
+    name: string
+  ) => {
     const canvas = ref.current;
     if (!canvas) return;
     const url = canvas.toDataURL('image/png');
@@ -153,8 +197,17 @@ export default function ManagerStatsPage() {
   const downloadCSV = () => {
     const headers = ['auction_id', 'title', 'status', 'items_count', 'revenue'];
     const rows = auctions.map((a) => {
-      const revenue = (a.items || []).reduce((acc, it) => acc + (Number(it.item?.soldPrice) || 0), 0);
-      return [a.id, a.title, a.status, String(a.items?.length || 0), String(revenue)];
+      const revenue = (a.items || []).reduce(
+        (acc, it) => acc + (Number(it.item?.soldPrice) || 0),
+        0
+      );
+      return [
+        a.id,
+        a.title,
+        a.status,
+        String(a.items?.length || 0),
+        String(revenue),
+      ];
     });
     const csv = [headers.join(','), ...rows.map((r) => r.join(','))].join('\n');
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
@@ -200,7 +253,9 @@ export default function ManagerStatsPage() {
             <CardTitle>Participantes únicos</CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-3xl font-bold">{stats?.totalParticipants ?? 0}</p>
+            <p className="text-3xl font-bold">
+              {stats?.totalParticipants ?? 0}
+            </p>
           </CardContent>
         </Card>
         <Card>
@@ -208,7 +263,9 @@ export default function ManagerStatsPage() {
             <CardTitle>Ingresos totales</CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-3xl font-bold">${Math.round(stats?.totalRevenue || 0).toLocaleString('es-CL')}</p>
+            <p className="text-3xl font-bold">
+              ${Math.round(stats?.totalRevenue || 0).toLocaleString('es-CL')}
+            </p>
           </CardContent>
         </Card>
       </div>
@@ -216,7 +273,16 @@ export default function ManagerStatsPage() {
       <Card>
         <CardHeader className="flex items-center justify-between">
           <CardTitle>Distribución por estado</CardTitle>
-          <Button onClick={() => downloadCanvas(activeVsTotalCanvasRef as React.RefObject<HTMLCanvasElement>, 'distribucion_estado')}>Exportar PNG</Button>
+          <Button
+            onClick={() =>
+              downloadCanvas(
+                activeVsTotalCanvasRef as React.RefObject<HTMLCanvasElement>,
+                'distribucion_estado'
+              )
+            }
+          >
+            Exportar PNG
+          </Button>
         </CardHeader>
         <CardContent>
           <canvas ref={activeVsTotalCanvasRef} width={900} height={300} />
@@ -226,7 +292,16 @@ export default function ManagerStatsPage() {
       <Card>
         <CardHeader className="flex items-center justify-between">
           <CardTitle>Top ingresos por subasta</CardTitle>
-          <Button onClick={() => downloadCanvas(revenuePerAuctionCanvasRef as React.RefObject<HTMLCanvasElement>, 'ingresos_por_subasta')}>Exportar PNG</Button>
+          <Button
+            onClick={() =>
+              downloadCanvas(
+                revenuePerAuctionCanvasRef as React.RefObject<HTMLCanvasElement>,
+                'ingresos_por_subasta'
+              )
+            }
+          >
+            Exportar PNG
+          </Button>
         </CardHeader>
         <CardContent>
           <canvas ref={revenuePerAuctionCanvasRef} width={900} height={300} />
@@ -234,9 +309,10 @@ export default function ManagerStatsPage() {
       </Card>
 
       <div className="flex justify-end">
-        <Button variant="outline" onClick={downloadCSV}>Exportar CSV</Button>
+        <Button variant="outline" onClick={downloadCSV}>
+          Exportar CSV
+        </Button>
       </div>
     </div>
   );
 }
-

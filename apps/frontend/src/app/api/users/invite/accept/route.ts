@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import superjson from 'superjson';
 
 export async function POST(req: NextRequest) {
   try {
@@ -10,6 +11,17 @@ export async function POST(req: NextRequest) {
       body: JSON.stringify(body),
     });
     const data = await resp.json();
+
+    if (data && data.superjson) {
+      try {
+        const deserialized = superjson.deserialize(data.superjson);
+        return NextResponse.json(deserialized, { status: resp.status });
+      } catch (e) {
+        console.error('Failed to deserialize superjson', e);
+        return NextResponse.json(data, { status: resp.status });
+      }
+    }
+
     return NextResponse.json(data, { status: resp.status });
   } catch (error) {
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
