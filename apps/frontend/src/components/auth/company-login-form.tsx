@@ -165,6 +165,7 @@ export default function CompanyLoginForm({
           title: 'Error de autenticación',
           description: 'Email o contraseña incorrectos',
           variant: 'destructive',
+          duration: 3000,
         });
       } else if (result?.ok) {
         // Wait for session to be established

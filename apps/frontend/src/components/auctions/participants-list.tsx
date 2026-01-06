@@ -28,7 +28,11 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@suba-go/shared-components/components/ui/dialog';
-import { AuctionDto, UserSafeDto } from '@suba-go/shared-validation';
+import {
+  AuctionDto,
+  AuctionStatusEnum,
+  UserSafeDto,
+} from '@suba-go/shared-validation';
 import { darkenColor } from '@/utils/color-utils';
 
 interface ParticipantsListProps {
@@ -83,7 +87,7 @@ export function ParticipantsList({
     fetchConnectedUsers();
 
     // Poll every 5 seconds
-    const interval = setInterval(fetchConnectedUsers, 5000);
+    const interval = setInterval(fetchConnectedUsers, 4000);
 
     return () => clearInterval(interval);
   }, [auction.id, isManager]);

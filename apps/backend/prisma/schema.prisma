@@ -8,6 +8,7 @@ generator client {
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
+
 }
 
 // Enums matching TypeORM enums
@@ -34,6 +35,7 @@ enum AuctionStatusEnum {
   COMPLETADA
   CANCELADA
   ELIMINADA
+
   @@map("auction_status_enum")
 }
 
@@ -54,12 +56,20 @@ enum AuctionTypeEnum {
   @@map("auction_type_enum")
 }
 
+enum FeedbackStatusEnum {
+  PENDING
+  REVIEWED
+  RESOLVED
+
+  @@map("feedback_status_enum")
+}
+
 // Base model with common fields matching TypeORM BaseEntity
 model User {
-  id        String   @id @default(uuid())
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  isDeleted Boolean  @default(false)
+  id        String    @id @default(uuid())
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  isDeleted Boolean   @default(false)
   deletedAt DateTime?
 
   // User-specific fields matching TypeORM entity
@@ -81,7 +91,9 @@ model User {
   bids                 Bid[]
   auctionRegistrations AuctionRegistration[]
   auditLogs            AuditLog[]
-  itemsPurchased       Item[] @relation("ItemSales")
+  itemsPurchased       Item[]                @relation("ItemSales")
+  feedback             Feedback[]
+  sentInvitations      Invitation[]          @relation("SentInvitations")
 
   // Unique constraints matching TypeORM indexes
   @@unique([email], map: "IDX_user_email_unique")
@@ -90,10 +102,10 @@ model User {
 }
 
 model Tenant {
-  id        String   @id @default(uuid())
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  isDeleted Boolean  @default(false)
+  id        String    @id @default(uuid())
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  isDeleted Boolean   @default(false)
   deletedAt DateTime?
 
   // Relations
@@ -103,31 +115,35 @@ model Tenant {
   auctions     Auction[]
   bids         Bid[]
   observations Observation[]
+  feedback     Feedback[]
+  invitations  Invitation[]
 
   @@map("tenant")
 }
 
 model Company {
-  id        String   @id @default(uuid())
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  isDeleted Boolean  @default(false)
+  id        String    @id @default(uuid())
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  isDeleted Boolean   @default(false)
   deletedAt DateTime?
 
   // Company-specific fields matching TypeORM entity
-  name              String  @unique
-  nameLowercase     String  @unique // Lowercase version for case-insensitive subdomain lookup
-  logo              String?
-  principal_color   String?
-  principal_color2  String?
-  secondary_color   String?
-  secondary_color2  String?
-  secondary_color3  String?
+  name                    String  @unique
+  nameLowercase           String  @unique // Lowercase version for case-insensitive subdomain lookup
+  logo                    String?
+  background_logo_enabled Boolean @default(false) // Enable logo as transparent background
+  principal_color         String?
+  principal_color2        String?
+  secondary_color         String?
+  secondary_color2        String?
+  secondary_color3        String?
 
   // Relations
-  tenantId  String
-  tenant    Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  users     User[]
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  users    User[]
+  invitations Invitation[]
 
   // Unique constraint matching TypeORM index
   @@unique([name, tenantId], map: "IDX_company_name_tenant_unique")
@@ -135,11 +151,11 @@ model Company {
 }
 
 model Item {
-  id           String   @id @default(uuid())
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
-  isDeleted    Boolean  @default(false)
-  deletedAt    DateTime?
+  id        String    @id @default(uuid())
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  isDeleted Boolean   @default(false)
+  deletedAt DateTime?
 
   // Item-specific fields matching TypeORM entity
   plate        String
@@ -159,11 +175,11 @@ model Item {
   soldPrice    Int?
   soldAt       DateTime?
   soldToUserId String?
-  soldToUser   User? @relation("ItemSales", fields: [soldToUserId], references: [id], onDelete: SetNull)
+  soldToUser   User?     @relation("ItemSales", fields: [soldToUserId], references: [id], onDelete: SetNull)
 
   // Relations
   tenantId     String
-  tenant       Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenant       Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   auctionItems AuctionItem[]
 
   @@index([soldToUserId])
@@ -171,30 +187,30 @@ model Item {
 }
 
 model Auction {
-  id          String   @id @default(uuid())
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  isDeleted   Boolean  @default(false)
-  deletedAt   DateTime?
+  id        String    @id @default(uuid())
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  isDeleted Boolean   @default(false)
+  deletedAt DateTime?
 
   // Auction-specific fields (will be added when we have the TypeORM entity details)
   title       String
   description String?
   startTime   DateTime
   endTime     DateTime
-  status      AuctionStatusEnum   @default(PENDIENTE)
-  type        AuctionTypeEnum @default(REAL)
+  status      AuctionStatusEnum @default(PENDIENTE)
+  type        AuctionTypeEnum   @default(REAL)
 
   // Global per-auction bid increment (applies to all items in this auction)
   bidIncrement Int @default(50000)
   itemIds      String[] @default([])
 
   // Relations
-  tenantId             String
-  tenant               Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  items                AuctionItem[]
-  bids                 Bid[]
-  registeredUsers      AuctionRegistration[]
+  tenantId        String
+  tenant          Tenant                @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  items           AuctionItem[]
+  bids            Bid[]
+  registeredUsers AuctionRegistration[]
 
   @@index([tenantId, status])
   @@index([startTime, endTime])
@@ -202,20 +218,20 @@ model Auction {
 }
 
 model AuctionItem {
-  id          String   @id @default(uuid())
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  isDeleted   Boolean  @default(false)
-  deletedAt   DateTime?
+  id        String    @id @default(uuid())
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  isDeleted Boolean   @default(false)
+  deletedAt DateTime?
 
   startingBid Int
 
   // Relations
-  auctionId   String
-  auction     Auction @relation(fields: [auctionId], references: [id], onDelete: Cascade)
-  itemId      String
-  item        Item @relation(fields: [itemId], references: [id], onDelete: Cascade)
-  bids        Bid[]
+  auctionId String
+  auction   Auction @relation(fields: [auctionId], references: [id], onDelete: Cascade)
+  itemId    String
+  item      Item    @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  bids      Bid[]
 
   @@map("auction_item")
 }
@@ -228,7 +244,7 @@ model AuctionRegistration {
 
   // Relations
   userId    String
-  user      User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user      User    @relation(fields: [userId], references: [id], onDelete: Cascade)
   auctionId String
   auction   Auction @relation(fields: [auctionId], references: [id], onDelete: Cascade)
 
@@ -240,12 +256,12 @@ model AuctionRegistration {
 }
 
 model Bid {
-  id          String   @id @default(uuid())
-  requestId   String?  @unique @default(uuid())
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  isDeleted   Boolean  @default(false)
-  deletedAt   DateTime?
+  id        String    @id @default(uuid())
+  requestId String?   @unique @default(uuid())
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  isDeleted Boolean   @default(false)
+  deletedAt DateTime?
 
   // Bid-specific fields matching TypeORM entity
   offered_price Int
@@ -253,11 +269,11 @@ model Bid {
 
   // Relations
   tenantId      String
-  tenant        Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenant        Tenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   userId        String
-  user          User @relation(fields: [userId], references: [id])
+  user          User        @relation(fields: [userId], references: [id])
   auctionId     String
-  auction       Auction @relation(fields: [auctionId], references: [id])
+  auction       Auction     @relation(fields: [auctionId], references: [id])
   auctionItemId String
   auctionItem   AuctionItem @relation(fields: [auctionItemId], references: [id])
 
@@ -268,28 +284,28 @@ model Bid {
 }
 
 model Observation {
-  id          String   @id @default(uuid())
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  isDeleted   Boolean  @default(false)
-  deletedAt   DateTime?
+  id        String    @id @default(uuid())
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  isDeleted Boolean   @default(false)
+  deletedAt DateTime?
 
   // Observation-specific fields matching TypeORM entity
   title       String
   description String
 
   // Relations
-  tenantId    String
-  tenant      Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   @@map("observation")
 }
 
 model AuditLog {
-  id        String   @id @default(uuid())
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  isDeleted Boolean  @default(false)
+  id        String    @id @default(uuid())
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  isDeleted Boolean   @default(false)
   deletedAt DateTime?
 
   // AuditLog-specific fields
@@ -307,4 +323,57 @@ model AuditLog {
   @@index([tenantId])
   @@index([entityType, entityId])
   @@map("audit_log")
+}
+
+model Feedback {
+  id        String    @id @default(uuid())
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  isDeleted Boolean   @default(false)
+  deletedAt DateTime?
+
+  // Feedback-specific fields
+  category String // Categoría: Comentarios, Feedback, Consejos, Críticas (extensible)
+  title    String
+  message  String             @db.Text
+  status   FeedbackStatusEnum @default(PENDING)
+
+  // Relations
+  userId   String
+  user     User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([tenantId])
+  @@index([status])
+  @@index([category])
+  @@map("feedback")
+}
+
+model Invitation {
+  id        String   @id @default(uuid())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  email     String
+  token     String   @unique
+  expiresAt DateTime
+  role      UserRoleEnum @default(USER)
+  
+  // Relations
+  invitedByUserId String
+  invitedByUser   User   @relation("SentInvitations", fields: [invitedByUserId], references: [id])
+  
+  tenantId  String?
+  tenant    Tenant?  @relation(fields: [tenantId], references: [id])
+  companyId String?
+  company   Company? @relation(fields: [companyId], references: [id])
+
+  isUsed    Boolean  @default(false)
+  usedAt    DateTime?
+
+  @@index([email])
+  @@index([token])
+  @@map("invitation")
 }

@@ -3,6 +3,7 @@ import { notFound } from 'next/navigation';
 import { getCompanyBySubdomainServerAction } from '@/domain/server-actions/company/get-company-by-subdomain-server-action';
 import { normalizeCompanyName } from '@/utils/company-normalization';
 import ConditionalNavbar from '@/components/subdomain/conditional-navbar';
+import { CompanyProvider } from '@/contexts/company-context';
 
 interface SubdomainLayoutProps {
   children: React.ReactNode;
@@ -75,12 +76,50 @@ export default async function SubdomainLayout({
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Company Navbar - Conditionally included (not in login) */}
-      <ConditionalNavbar company={company} />
+    <div
+      className="min-h-screen bg-gray-50 relative"
+      style={
+        company.background_logo_enabled && company.logo
+          ? {
+              backgroundImage: `url(${company.logo})`,
+              backgroundRepeat: 'no-repeat',
+              backgroundPosition: 'center center',
+              backgroundSize: '40%',
+              backgroundAttachment: 'fixed',
+            }
+          : undefined
+      }
+    >
+      <CompanyProvider
+        value={{
+          company: {
+            ...company,
+            logo: company.logo ?? undefined,
+            principal_color: company.principal_color ?? undefined,
+            principal_color2: company.principal_color2 ?? undefined,
+            secondary_color: company.secondary_color ?? undefined,
+            secondary_color2: company.secondary_color2 ?? undefined,
+            secondary_color3: company.secondary_color3 ?? undefined,
+            tenantId: company.tenantId ?? '',
+          },
+          isLoading: false,
+          error: null,
+        }}
+      >
+        {/* Overlay to make background logo more subtle */}
+        {company.background_logo_enabled && company.logo && (
+          <div className="fixed inset-0 bg-gray-50/90 pointer-events-none z-0" />
+        )}
 
-      {/* Page content */}
-      {children}
+        {/* Content wrapper with higher z-index */}
+        <div className="relative z-10">
+          {/* Company Navbar - Conditionally included (not in login) */}
+          <ConditionalNavbar company={company} />
+
+          {/* Page content */}
+          {children}
+        </div>
+      </CompanyProvider>
     </div>
   );
 }

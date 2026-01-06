@@ -140,6 +140,7 @@ export function AuctionCreateModal({
         title: 'Error',
         description: 'No se pudo determinar el tenant actual.',
         variant: 'destructive',
+        duration: 3000,
       });
       return;
     }
@@ -150,6 +151,7 @@ export function AuctionCreateModal({
         title: 'Error',
         description: 'Debe seleccionar al menos un item para la subasta',
         variant: 'destructive',
+        duration: 3000,
       });
       return;
     }
@@ -165,6 +167,7 @@ export function AuctionCreateModal({
           ? 'La hora de inicio debe ser posterior a la hora actual'
           : 'La fecha y hora de inicio debe ser futura',
         variant: 'destructive',
+        duration: 3000,
       });
       return;
     }
@@ -196,6 +199,7 @@ export function AuctionCreateModal({
       toast({
         title: 'Exito',
         description: 'Subasta creada correctamente',
+        duration: 3000,
       });
 
       const resetStartDate = getDefaultStartDate();
@@ -224,6 +228,7 @@ export function AuctionCreateModal({
             ? error.message
             : 'No se pudo crear la subasta. Intentalo de nuevo.',
         variant: 'destructive',
+        duration: 3000,
       });
     } finally {
       setIsLoading(false);

@@ -95,6 +95,7 @@ export default function LoginForm() {
           title: 'Error de autenticación',
           description: 'Email o contraseña incorrectos',
           variant: 'destructive',
+          duration: 3000,
         });
       } else if (result?.ok) {
         toast({

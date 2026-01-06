@@ -7,7 +7,18 @@ import { getNodeEnv } from '@suba-go/shared-components';
 import { Button } from '@suba-go/shared-components/components/ui/button';
 import { useSession, signOut } from 'next-auth/react';
 import { useEffect, useState } from 'react';
-import { User, LogOut, ChevronDown, Gavel, Package, Users } from 'lucide-react';
+import {
+  User,
+  LogOut,
+  ChevronDown,
+  Gavel,
+  Package,
+  Users,
+  MessageSquare,
+  UserPlus,
+  Building2,
+  BarChart3,
+} from 'lucide-react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { Spinner } from '@suba-go/shared-components/components/ui/spinner';
@@ -79,6 +90,11 @@ export default function CompanyNavbar({
     window.location.href = `/perfil`;
   };
 
+  const handleConfigClick = () => {
+    setIsProfileMenuOpen(false);
+    window.location.href = `/configuracion`;
+  };
+
   return (
     <header className="bg-white shadow-sm border-b relative z-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -90,6 +106,8 @@ export default function CompanyNavbar({
                 <Image
                   src={company.logo}
                   alt={`${company.name} logo`}
+                  width={32}
+                  height={32}
                   className="h-8 w-8 object-contain hover:cursor-pointer"
                 />
               )}
@@ -105,11 +123,12 @@ export default function CompanyNavbar({
           {/* Navigation Menu */}
           {/* check if the profile is complete */}
           {isUserProfileComplete(session) && (
-            <nav className="hidden md:flex items-center space-x-6">
+            <nav className="hidden md:flex flex-wrap items-center gap-3">
               {isUserAdminOrManager(session) && (
                 <Link href="/subastas">
                   <Button
                     variant="ghost"
+                    size="sm"
                     className="text-gray-600 hover:text-gray-900 flex items-center gap-2"
                   >
                     <Gavel className="h-4 w-4" />
@@ -122,6 +141,7 @@ export default function CompanyNavbar({
                 <Link href="/items">
                   <Button
                     variant="ghost"
+                    size="sm"
                     className="text-gray-600 hover:text-gray-900 flex items-center gap-2"
                   >
                     <Package className="h-4 w-4" />
@@ -134,10 +154,52 @@ export default function CompanyNavbar({
                 <Link href="/usuarios">
                   <Button
                     variant="ghost"
+                    size="sm"
                     className="text-gray-600 hover:text-gray-900 flex items-center gap-2"
                   >
                     <Users className="h-4 w-4" />
                     Usuarios
+                  </Button>
+                </Link>
+              )}
+
+              {/* Stats - Only for AUCTION_MANAGER */}
+              {session?.user?.role === 'AUCTION_MANAGER' && (
+                <Link href="/estadisticas">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="text-gray-600 hover:text-gray-900 flex items-center gap-2"
+                  >
+                    <BarChart3 className="h-4 w-4" />
+                    Estadísticas
+                  </Button>
+                </Link>
+              )}
+              {/* Feedback - Only for AUCTION_MANAGER */}
+              {session?.user?.role === 'AUCTION_MANAGER' && (
+                <Link href="/feedback">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="text-gray-600 hover:text-gray-900 flex items-center gap-2"
+                  >
+                    <MessageSquare className="h-4 w-4" />
+                    Feedback
+                  </Button>
+                </Link>
+              )}
+
+              {/* Invite - Only for AUCTION_MANAGER */}
+              {session?.user?.role === 'AUCTION_MANAGER' && (
+                <Link href="/usuarios/invite">
+                  <Button
+                    size="sm"
+                    className="flex items-center gap-2 text-white"
+                    style={{ backgroundColor: primaryColor }}
+                  >
+                    <UserPlus className="h-4 w-4" />
+                    Invitar usuario
                   </Button>
                 </Link>
               )}
@@ -189,6 +251,15 @@ export default function CompanyNavbar({
                         <User className="w-4 h-4 mr-3" />
                         Perfil
                       </button>
+                      {isUserAdminOrManager(session) && (
+                        <button
+                          onClick={handleConfigClick}
+                          className="flex items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                        >
+                          <Users className="w-4 h-4 mr-3" />
+                          Configuración
+                        </button>
+                      )}
                       <hr className="border-gray-200" />
                       <button
                         onClick={handleSignOut}
@@ -251,6 +322,18 @@ export default function CompanyNavbar({
               >
                 <Users className="h-4 w-4" />
                 Usuarios
+              </Button>
+            </Link>
+          )}
+          {/* Invite - Only for AUCTION_MANAGER */}
+          {session?.user?.role === 'AUCTION_MANAGER' && (
+            <Link href="/usuarios/invite">
+              <Button
+                className="w-full text-left justify-start flex items-center gap-2 text-white"
+                style={{ backgroundColor: primaryColor }}
+              >
+                <UserPlus className="h-4 w-4" />
+                Invitar usuario
               </Button>
             </Link>
           )}

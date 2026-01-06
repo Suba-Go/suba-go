@@ -60,7 +60,14 @@ interface ProfileFormWithUserDataProps {
   company?: {
     id: string;
     name: string;
+    logo?: string;
+    background_logo_enabled?: boolean;
     principal_color?: string;
+    principal_color2?: string;
+    secondary_color?: string;
+    secondary_color2?: string;
+    secondary_color3?: string;
+    rut?: string;
   };
   hideBackButton?: boolean;
 }

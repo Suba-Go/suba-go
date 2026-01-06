@@ -12,7 +12,7 @@
     "lint": "pnpm eslint .",
     "postinstall": "prisma generate --no-engine --schema=apps/backend/prisma/schema.prisma",
     "db:push": "prisma db push --schema=apps/backend/prisma/schema.prisma",
-    "db:seed": "prisma db seed",
+    "db:seed": "prisma db seed --schema=apps/backend/prisma/schema.prisma",
     "db:migrate": "prisma migrate dev --schema=apps/backend/prisma/schema.prisma",
     "db:migrate:deploy": "prisma migrate deploy --schema=apps/backend/prisma/schema.prisma",
     "db:reset": "prisma migrate reset --force --schema=apps/backend/prisma/schema.prisma",
@@ -28,7 +28,7 @@
     "@eslint/eslintrc": "^2.1.4",
     "@eslint/js": "^9.8.0",
     "@nestjs/schematics": "^11.0.0",
-    "@next/eslint-plugin-next": "^15.2.4",
+    "@next/eslint-plugin-next": "^15.3.4",
     "@nx/devkit": "^21.2.1",
     "@nx/eslint": "21.2.1",
     "@nx/eslint-plugin": "21.2.1",
@@ -49,7 +49,7 @@
     "@types/ws": "^8.18.1",
     "autoprefixer": "10.4.13",
     "eslint": "^9.8.0",
-    "eslint-config-next": "^15.2.4",
+    "eslint-config-next": "^15.3.4",
     "eslint-config-prettier": "^10.0.0",
     "eslint-plugin-import": "2.31.0",
     "eslint-plugin-jsx-a11y": "6.10.1",
@@ -60,6 +60,7 @@
     "nx": "21.2.1",
     "postcss": "8.4.38",
     "prettier": "^2.6.2",
+    "prisma": "^6.17.1",
     "tailwindcss": "3.4.3",
     "ts-node": "^10.9.2",
     "tsc-alias": "^1.8.16",
@@ -112,7 +113,7 @@
     "helmet": "^8.1.0",
     "lucide-react": "^0.519.0",
     "module-alias": "^2.2.3",
-    "next": "~15.2.4",
+    "next": "~15.2.8",
     "next-auth": "^5.0.0-beta.19",
     "nprogress": "^0.2.0",
     "nuqs": "^2.4.3",
@@ -120,7 +121,6 @@
     "passport-local": "^1.0.0",
     "pg": "^8.16.2",
     "postgres": "^3.4.7",
-    "prisma": "^6.15.0",
     "react": "19.0.0",
     "react-day-picker": "^9.11.3",
     "react-dom": "19.0.0",
@@ -139,5 +139,8 @@
   },
   "optionalDependencies": {
     "bufferutil": "^4.0.9"
+  },
+  "prisma": {
+    "seed": "ts-node apps/backend/prisma/seed.ts"
   }
 }

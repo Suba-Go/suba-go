@@ -1,11 +1,13 @@
 'use client';
-import { Suspense, use } from 'react';
+import { Suspense, use, useEffect } from 'react';
 import { AuctionDashboard } from '@/components/auctions/auction-dashboard';
 import { AuctionDashboardSkeleton } from '@/components/auctions/auction-dashboard-skeleton';
 import { AuctionWithItemsAndBidsDto } from '@suba-go/shared-validation';
 import { useFetchData } from '@/hooks/use-fetch-data';
 import { Spinner } from '@suba-go/shared-components/components/ui/spinner';
 import { useCompanyContextOptional } from '@/contexts/company-context';
+import { useSession } from 'next-auth/react';
+import { useRouter } from 'next/navigation';
 
 export default function SubastasPage({
   params,
@@ -13,6 +15,19 @@ export default function SubastasPage({
   params: Promise<{ subdomain: string }>;
 }) {
   const { subdomain } = use(params);
+  const { data: session, status } = useSession();
+  const router = useRouter();
+
+  useEffect(() => {
+    if (status === 'loading') return;
+    if (
+      !session ||
+      (session.user.role !== 'AUCTION_MANAGER' && session.user.role !== 'ADMIN')
+    ) {
+      router.push('/');
+    }
+  }, [session, status, router]);
+
   // TODO: un refresh que se gatille despues de crear una subasta
   const {
     data: auctions,

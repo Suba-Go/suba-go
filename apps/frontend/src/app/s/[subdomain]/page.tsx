@@ -4,6 +4,9 @@ import { getCompanyBySubdomainServerAction } from '@/domain/server-actions/compa
 import { normalizeCompanyName } from '@/utils/company-normalization';
 import { notFound } from 'next/navigation';
 import CompanyBrandedPage from '@/components/subdomain/company-branded-page';
+import ManagerStatsPage from './estadisticas/page';
+import UserHomePage from '@/components/subdomain/user-home-page';
+import { auth } from '@/auth';
 
 export async function generateMetadata({
   params,
@@ -24,6 +27,7 @@ export default async function SubdomainPage({
   params: Promise<{ subdomain: string }>;
 }) {
   const { subdomain } = await params;
+  const session = await auth();
 
   // Get company data for this subdomain
   const normalizedSubdomain = normalizeCompanyName(subdomain);
@@ -35,7 +39,14 @@ export default async function SubdomainPage({
     notFound();
   }
 
-  const company = companyResult.data;
+  // If user is manager or admin, show stats page
+  if (
+    session?.user?.role === 'AUCTION_MANAGER' ||
+    session?.user?.role === 'ADMIN'
+  ) {
+    return <ManagerStatsPage />;
+  }
 
-  return <CompanyBrandedPage company={company} />;
+  // Otherwise (user or not logged in - though middleware redirects usually), show user home
+  return <UserHomePage />;
 }
