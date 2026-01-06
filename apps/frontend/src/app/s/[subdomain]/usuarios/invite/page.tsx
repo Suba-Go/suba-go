@@ -35,6 +35,7 @@ export default function ManagerInvitePage() {
       toast({
         title: 'Copiado',
         description: 'Link copiado al portapapeles',
+        duration: 3000,
       });
       setTimeout(() => setCopied(false), 2000);
     } catch (err) {
@@ -42,6 +43,7 @@ export default function ManagerInvitePage() {
         title: 'Error',
         variant: 'destructive',
         description: 'No se pudo copiar el link',
+        duration: 3000,
       });
     }
   };
@@ -65,6 +67,7 @@ export default function ManagerInvitePage() {
           title: 'Error',
           variant: 'destructive',
           description: data?.error || 'No se pudo generar el link',
+          duration: 3000,
         });
         return;
       }
@@ -81,12 +84,14 @@ export default function ManagerInvitePage() {
       toast({
         title: 'Link generado',
         description: 'Ahora puedes copiar y compartir el link',
+        duration: 3000,
       });
     } catch (err: any) {
       toast({
         title: 'Error',
         variant: 'destructive',
         description: err.message || 'Error al generar invitación',
+        duration: 3000,
       });
     } finally {
       setLoading(false);

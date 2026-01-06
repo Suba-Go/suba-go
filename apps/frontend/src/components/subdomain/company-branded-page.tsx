@@ -3,7 +3,7 @@
 import { useEffect } from 'react';
 import { CompanyDto } from '@suba-go/shared-validation';
 import { useSession } from 'next-auth/react';
-import { UserHomePage } from './user-home-page';
+import UserHomePage from './user-home-page';
 import { useRouter } from 'next/navigation';
 
 interface CompanyBrandedPageProps {
@@ -34,7 +34,7 @@ export default function CompanyBrandedPage({
 
   // If user is logged in and is a regular USER, show the user home page
   if (session && userRole === 'USER') {
-    return <UserHomePage company={company} />;
+    return <UserHomePage />;
   }
 
   // For AUCTION_MANAGER or not logged in, show "under development" page

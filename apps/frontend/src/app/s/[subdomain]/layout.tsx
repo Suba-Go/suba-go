@@ -92,7 +92,16 @@ export default async function SubdomainLayout({
     >
       <CompanyProvider
         value={{
-          company,
+          company: {
+            ...company,
+            logo: company.logo ?? undefined,
+            principal_color: company.principal_color ?? undefined,
+            principal_color2: company.principal_color2 ?? undefined,
+            secondary_color: company.secondary_color ?? undefined,
+            secondary_color2: company.secondary_color2 ?? undefined,
+            secondary_color3: company.secondary_color3 ?? undefined,
+            tenantId: company.tenantId ?? '',
+          },
           isLoading: false,
           error: null,
         }}

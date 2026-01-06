@@ -1,17 +1,35 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import Link from 'next/link';
+import { useEffect, useMemo, useState } from 'react';
 import {
   Card,
   CardContent,
   CardHeader,
   CardTitle,
 } from '@suba-go/shared-components/components/ui/card';
-import { Button } from '@suba-go/shared-components/components/ui/button';
 import { Spinner } from '@suba-go/shared-components/components/ui/spinner';
 import { useToast } from '@suba-go/shared-components/components/ui/toaster';
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
+import { UsersTable } from '@/components/users/users-table';
+import {
+  PercentIcon,
+  TrendingUpIcon,
+  DollarSignIcon,
+  GavelIcon,
+  ChevronLeftIcon,
+  ChevronRightIcon,
+} from 'lucide-react';
+import { useCompanyContextOptional } from '@/contexts/company-context';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@suba-go/shared-components/components/ui/select';
+import { Button } from '@suba-go/shared-components/components/ui/button';
 
 type AuctionItem = {
   id: string;
@@ -29,21 +47,24 @@ type Auction = {
   items?: AuctionItem[];
 };
 
-type Stats = {
-  totalAuctions: number;
-  activeAuctions: number;
-  totalParticipants: number;
-  totalRevenue: number;
-};
-
 export default function ManagerStatsPage() {
   const { data: session, status } = useSession();
   const router = useRouter();
   const { toast } = useToast();
   const [loading, setLoading] = useState(true);
-  const [stats, setStats] = useState<Stats | null>(null);
   const [auctions, setAuctions] = useState<Auction[]>([]);
 
+  // Filters and Pagination State
+  const [statusFilter, setStatusFilter] = useState<string>('ALL');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [timeFilter, setTimeFilter] = useState<string>('LAST_MONTH');
+  const itemsPerPage = 10;
+
+  // Get company context
+  const companyContext = useCompanyContextOptional();
+  const primaryColor = companyContext?.company?.principal_color || '#3B82F6';
+
+  // ... useEffects ...
   useEffect(() => {
     if (status === 'loading') return;
 
@@ -56,33 +77,20 @@ export default function ManagerStatsPage() {
     }
   }, [session, status, router]);
 
-  const activeVsTotalCanvasRef = useRef<HTMLCanvasElement | null>(null);
-  const revenuePerAuctionCanvasRef = useRef<HTMLCanvasElement | null>(null);
-
   useEffect(() => {
     if (status !== 'authenticated') return;
 
     (async () => {
       try {
-        const [statsRes, auctionsRes] = await Promise.all([
-          fetch('/api/auctions/stats'),
-          fetch('/api/auctions'),
-        ]);
-        const statsData = await statsRes.json();
+        const auctionsRes = await fetch('/api/auctions');
         const auctionsData = await auctionsRes.json();
-        if (!statsRes.ok) {
-          toast({
-            title: 'Error',
-            description: statsData?.error || 'No se pudo obtener estadísticas',
-          });
-        } else {
-          setStats(statsData as Stats);
-        }
+
         if (!auctionsRes.ok) {
           toast({
             title: 'Error',
             description:
               auctionsData?.error || 'No se pudieron obtener las subastas',
+            duration: 3000,
           });
         } else {
           setAuctions(
@@ -90,134 +98,149 @@ export default function ManagerStatsPage() {
           );
         }
       } catch {
-        toast({ title: 'Error', description: 'Error al cargar datos' });
+        toast({
+          title: 'Error',
+          description: 'Error al cargar datos',
+          duration: 3000,
+        });
       } finally {
         setLoading(false);
       }
     })();
-  }, [toast]);
+  }, [status, toast]);
+
+  // Reset page when filter changes
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [statusFilter, timeFilter]);
 
   const computed = useMemo(() => {
-    const completed = auctions.filter((a) => a.status === 'COMPLETADA');
-    const revenueByAuction = completed.map((a) => {
-      const sum = (a.items || []).reduce(
-        (acc, it) => acc + (Number(it.item?.soldPrice) || 0),
-        0
-      );
-      return { id: a.id, title: a.title, revenue: sum };
+    // 0. Filter Auctions first (Time & Status)
+    const filteredAuctions = auctions.filter((a) => {
+      // 1. Time Filter
+      const auctionDate = new Date(a.startTime); // Use startTime for filtering
+      const now = new Date();
+      let matchesTime = true;
+
+      if (timeFilter === 'LAST_MONTH') {
+        const oneMonthAgo = new Date();
+        oneMonthAgo.setMonth(now.getMonth() - 1);
+        matchesTime = auctionDate >= oneMonthAgo && auctionDate <= now;
+      } else if (timeFilter === 'LAST_3_MONTHS') {
+        const threeMonthsAgo = new Date();
+        threeMonthsAgo.setMonth(now.getMonth() - 3);
+        matchesTime = auctionDate >= threeMonthsAgo && auctionDate <= now;
+      } else if (timeFilter === 'LAST_6_MONTHS') {
+        const sixMonthsAgo = new Date();
+        sixMonthsAgo.setMonth(now.getMonth() - 6);
+        matchesTime = auctionDate >= sixMonthsAgo && auctionDate <= now;
+      } else if (timeFilter === 'LAST_YEAR') {
+        const oneYearAgo = new Date();
+        oneYearAgo.setFullYear(now.getFullYear() - 1);
+        matchesTime = auctionDate >= oneYearAgo && auctionDate <= now;
+      }
+      // 'ALL_TIME' matches everything by default
+
+      if (!matchesTime) return false;
+
+      // 2. Status Filter
+      if (statusFilter !== 'ALL' && a.status !== statusFilter) return false;
+
+      return true;
     });
-    const topRevenue = [...revenueByAuction]
-      .sort((a, b) => b.revenue - a.revenue)
-      .slice(0, 10);
-    const statusCounts = {
-      PENDIENTE: auctions.filter((a) => a.status === 'PENDIENTE').length,
-      ACTIVA: auctions.filter((a) => a.status === 'ACTIVA').length,
-      CANCELADA: auctions.filter((a) => a.status === 'CANCELADA').length,
-      COMPLETADA: auctions.filter((a) => a.status === 'COMPLETADA').length,
+
+    // 1. Auction Award Rate (per auction)
+    const auctionStats = filteredAuctions.map((a) => {
+      // Don't count awarded items for canceled auctions
+      if (a.status === 'CANCELADA') {
+        return {
+          ...a,
+          totalItems: a.items?.length || 0,
+          awardedItems: 0,
+          awardRate: 0,
+          avgMargin: 0,
+        };
+      }
+
+      const totalItems = a.items?.length || 0;
+      const awardedItems =
+        a.items?.filter(
+          (i) => i.item?.soldPrice !== null && i.item?.soldPrice !== undefined
+        ).length || 0;
+      const awardRate = totalItems > 0 ? (awardedItems / totalItems) * 100 : 0;
+
+      // Calculate margin per auction
+      let auctionMarginTotal = 0;
+      let auctionSoldCount = 0;
+      a.items?.forEach((i) => {
+        if (i.item?.soldPrice && i.startingBid) {
+          const sold = Number(i.item.soldPrice);
+          const start = Number(i.startingBid);
+          if (start > 0) {
+            auctionMarginTotal += sold / start - 1;
+            auctionSoldCount++;
+          }
+        }
+      });
+      const avgMargin =
+        auctionSoldCount > 0
+          ? (auctionMarginTotal / auctionSoldCount) * 100
+          : 0;
+
+      return { ...a, totalItems, awardedItems, awardRate, avgMargin };
+    });
+
+    // Pagination logic
+    const totalPages = Math.ceil(auctionStats.length / itemsPerPage);
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    const paginatedAuctions = auctionStats.slice(
+      startIndex,
+      startIndex + itemsPerPage
+    );
+
+    // 2. Global Item Stats
+    let totalDiff = 0;
+    let totalMargin = 0;
+    let soldItemsCount = 0;
+    let totalBids = 0;
+    let totalItemsGlobal = 0;
+
+    // Use filteredAuctions for global stats to respect the time/status filters
+    filteredAuctions.forEach((a) => {
+      if (a.status === 'CANCELADA') return;
+
+      (a.items || []).forEach((i) => {
+        totalItemsGlobal++;
+        totalBids += i.bids?.length || 0;
+
+        if (i.item?.soldPrice && i.startingBid) {
+          const sold = Number(i.item.soldPrice);
+          const start = Number(i.startingBid);
+
+          if (start > 0) {
+            totalDiff += sold - start;
+            totalMargin += sold / start - 1;
+            soldItemsCount++;
+          }
+        }
+      });
+    });
+
+    const avgPriceDiff = soldItemsCount > 0 ? totalDiff / soldItemsCount : 0;
+    const avgMargin =
+      soldItemsCount > 0 ? (totalMargin / soldItemsCount) * 100 : 0;
+    const avgBidsPerItem =
+      totalItemsGlobal > 0 ? totalBids / totalItemsGlobal : 0;
+
+    return {
+      paginatedAuctions, // Use this for table
+      totalPages,
+      totalCount: auctionStats.length,
+      avgPriceDiff,
+      avgMargin,
+      avgBidsPerItem,
     };
-    return { revenueByAuction, topRevenue, statusCounts };
-  }, [auctions]);
-
-  useEffect(() => {
-    const canvas = activeVsTotalCanvasRef.current;
-    if (!canvas || !stats) return;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-    const w = canvas.width;
-    const h = canvas.height;
-    ctx.clearRect(0, 0, w, h);
-    const total = stats.totalAuctions || 0;
-    const active = stats.activeAuctions || 0;
-    const pending = computed.statusCounts.PENDIENTE || 0;
-    const completed = computed.statusCounts.COMPLETADA || 0;
-    const canceled = computed.statusCounts.CANCELADA || 0;
-    const labels = ['Activas', 'Pendientes', 'Completadas', 'Canceladas'];
-    const values = [active, pending, completed, canceled];
-    const maxVal = Math.max(1, ...values);
-    const barW = Math.floor((w - 80) / values.length);
-    ctx.fillStyle = '#374151';
-    ctx.font = '12px sans-serif';
-    ctx.fillText(`Total: ${total}`, 10, 20);
-    values.forEach((v, i) => {
-      const barH = Math.round((h - 60) * (v / maxVal));
-      const x = 40 + i * barW;
-      const y = h - 40 - barH;
-      const color = ['#2563eb', '#6b7280', '#10b981', '#ef4444'][i];
-      ctx.fillStyle = color;
-      ctx.fillRect(x, y, barW - 12, barH);
-      ctx.fillStyle = '#111827';
-      ctx.fillText(labels[i], x, h - 20);
-      ctx.fillText(String(v), x, y - 6);
-    });
-  }, [stats, computed]);
-
-  useEffect(() => {
-    const canvas = revenuePerAuctionCanvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-    const w = canvas.width;
-    const h = canvas.height;
-    ctx.clearRect(0, 0, w, h);
-    const data = computed.topRevenue;
-    const maxVal = Math.max(1, ...data.map((d) => d.revenue));
-    const barW = Math.floor((w - 80) / Math.max(1, data.length));
-    ctx.fillStyle = '#374151';
-    ctx.font = '12px sans-serif';
-    data.forEach((d, i) => {
-      const barH = Math.round((h - 60) * (d.revenue / maxVal));
-      const x = 40 + i * barW;
-      const y = h - 40 - barH;
-      ctx.fillStyle = '#3b82f6';
-      ctx.fillRect(x, y, barW - 12, barH);
-      ctx.fillStyle = '#111827';
-      const label = d.title.length > 10 ? d.title.slice(0, 10) + '…' : d.title;
-      ctx.fillText(label, x, h - 20);
-      ctx.fillText(
-        `$${Math.round(d.revenue).toLocaleString('es-CL')}`,
-        x,
-        y - 6
-      );
-    });
-  }, [computed]);
-
-  const downloadCanvas = (
-    ref: React.RefObject<HTMLCanvasElement>,
-    name: string
-  ) => {
-    const canvas = ref.current;
-    if (!canvas) return;
-    const url = canvas.toDataURL('image/png');
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `${name}.png`;
-    a.click();
-  };
-
-  const downloadCSV = () => {
-    const headers = ['auction_id', 'title', 'status', 'items_count', 'revenue'];
-    const rows = auctions.map((a) => {
-      const revenue = (a.items || []).reduce(
-        (acc, it) => acc + (Number(it.item?.soldPrice) || 0),
-        0
-      );
-      return [
-        a.id,
-        a.title,
-        a.status,
-        String(a.items?.length || 0),
-        String(revenue),
-      ];
-    });
-    const csv = [headers.join(','), ...rows.map((r) => r.join(','))].join('\n');
-    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'estadisticas_subastas.csv';
-    a.click();
-    URL.revokeObjectURL(url);
-  };
+  }, [auctions, statusFilter, timeFilter, currentPage]);
 
   if (loading) {
     return (
@@ -228,91 +251,252 @@ export default function ManagerStatsPage() {
   }
 
   return (
-    <div className="max-w-6xl mx-auto px-4 py-8 space-y-8">
-      <h1 className="text-2xl font-bold">Estadísticas de Subastas</h1>
+    <div className="max-w-7xl mx-auto px-4 py-8 space-y-8">
+      <h1 className="text-2xl font-bold" style={{ color: primaryColor }}>
+        Panel de Estadísticas
+      </h1>
 
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <Card>
-          <CardHeader>
-            <CardTitle>Total subastas</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-3xl font-bold">{stats?.totalAuctions ?? 0}</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader>
-            <CardTitle>Activas</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-3xl font-bold">{stats?.activeAuctions ?? 0}</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader>
-            <CardTitle>Participantes únicos</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-3xl font-bold">
-              {stats?.totalParticipants ?? 0}
-            </p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader>
-            <CardTitle>Ingresos totales</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-3xl font-bold">
-              ${Math.round(stats?.totalRevenue || 0).toLocaleString('es-CL')}
-            </p>
-          </CardContent>
-        </Card>
-      </div>
+      {/* Global Item Stats */}
+      <section>
+        <h2 className="text-xl font-semibold mb-4 text-gray-700">
+          Estadísticas Globales de Items
+        </h2>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium text-gray-600">
+                Dif. Precio Promedio (Final - Inicial)
+              </CardTitle>
+              <DollarSignIcon
+                className="h-4 w-4"
+                style={{ color: primaryColor }}
+              />
+            </CardHeader>
+            <CardContent>
+              <div
+                className="text-2xl font-bold"
+                style={{ color: primaryColor }}
+              >
+                ${Math.round(computed.avgPriceDiff).toLocaleString('es-CL')}
+              </div>
+              <p className="text-xs text-gray-500">
+                Promedio en items vendidos
+              </p>
+            </CardContent>
+          </Card>
 
-      <Card>
-        <CardHeader className="flex items-center justify-between">
-          <CardTitle>Distribución por estado</CardTitle>
-          <Button
-            onClick={() =>
-              downloadCanvas(
-                activeVsTotalCanvasRef as React.RefObject<HTMLCanvasElement>,
-                'distribucion_estado'
-              )
-            }
-          >
-            Exportar PNG
-          </Button>
-        </CardHeader>
-        <CardContent>
-          <canvas ref={activeVsTotalCanvasRef} width={900} height={300} />
-        </CardContent>
-      </Card>
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium text-gray-600">
+                Margen Promedio
+              </CardTitle>
+              <TrendingUpIcon
+                className="h-4 w-4"
+                style={{ color: primaryColor }}
+              />
+            </CardHeader>
+            <CardContent>
+              <div
+                className="text-2xl font-bold"
+                style={{ color: primaryColor }}
+              >
+                {computed.avgMargin.toFixed(1)}%
+              </div>
+              <p className="text-xs text-gray-500">Sobre precio inicial</p>
+            </CardContent>
+          </Card>
 
-      <Card>
-        <CardHeader className="flex items-center justify-between">
-          <CardTitle>Top ingresos por subasta</CardTitle>
-          <Button
-            onClick={() =>
-              downloadCanvas(
-                revenuePerAuctionCanvasRef as React.RefObject<HTMLCanvasElement>,
-                'ingresos_por_subasta'
-              )
-            }
-          >
-            Exportar PNG
-          </Button>
-        </CardHeader>
-        <CardContent>
-          <canvas ref={revenuePerAuctionCanvasRef} width={900} height={300} />
-        </CardContent>
-      </Card>
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium text-gray-600">
+                Pujas Promedio por Item
+              </CardTitle>
+              <GavelIcon className="h-4 w-4" style={{ color: primaryColor }} />
+            </CardHeader>
+            <CardContent>
+              <div
+                className="text-2xl font-bold"
+                style={{ color: primaryColor }}
+              >
+                {computed.avgBidsPerItem.toFixed(1)}
+              </div>
+              <p className="text-xs text-gray-500">Interacción promedio</p>
+            </CardContent>
+          </Card>
+        </div>
+      </section>
 
-      <div className="flex justify-end">
-        <Button variant="outline" onClick={downloadCSV}>
-          Exportar CSV
-        </Button>
-      </div>
+      {/* Auction Stats Table */}
+      <section>
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-xl font-semibold text-gray-700">
+            Rendimiento por Subasta
+          </h2>
+          <div className="flex items-center gap-4">
+            <div className="w-[200px]">
+              <Select
+                value={timeFilter}
+                onValueChange={(val) => setTimeFilter(val)}
+              >
+                <SelectTrigger
+                  style={
+                    {
+                      '--ring-color': primaryColor,
+                      '--border-color': primaryColor,
+                    } as React.CSSProperties
+                  }
+                >
+                  <SelectValue placeholder="Filtrar por tiempo" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="LAST_MONTH">Último mes</SelectItem>
+                  <SelectItem value="LAST_3_MONTHS">Últimos 3 meses</SelectItem>
+                  <SelectItem value="LAST_6_MONTHS">Últimos 6 meses</SelectItem>
+                  <SelectItem value="LAST_YEAR">Último año</SelectItem>
+                  <SelectItem value="ALL_TIME">Todo el tiempo</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="w-[200px]">
+              <Select
+                value={statusFilter}
+                onValueChange={(val) => setStatusFilter(val)}
+              >
+                <SelectTrigger
+                  style={
+                    {
+                      '--ring-color': primaryColor,
+                      '--border-color': primaryColor,
+                    } as React.CSSProperties
+                  }
+                >
+                  <SelectValue placeholder="Filtrar por estado" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="ALL">Todos los estados</SelectItem>
+                  <SelectItem value="PENDIENTE">Pendiente</SelectItem>
+                  <SelectItem value="ACTIVA">Activa</SelectItem>
+                  <SelectItem value="COMPLETADA">Completada</SelectItem>
+                  <SelectItem value="CANCELADA">Cancelada</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-white rounded-lg border overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm text-left">
+              <thead className="bg-gray-50 text-gray-600 font-medium border-b">
+                <tr>
+                  <th className="px-4 py-3">Subasta</th>
+                  <th className="px-4 py-3">Estado</th>
+                  <th className="px-4 py-3 text-center">Items Total</th>
+                  <th className="px-4 py-3 text-center">Adjudicados</th>
+                  <th className="px-4 py-3 text-center">Margen Prom.</th>
+                  <th className="px-4 py-3 text-right">Tasa Adjudicación</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y">
+                {computed.paginatedAuctions.map((auction) => (
+                  <tr key={auction.id} className="hover:bg-gray-50">
+                    <td className="px-4 py-3 font-medium">
+                      <Link
+                        href={`/subastas/${auction.id}`}
+                        className="hover:underline"
+                        style={{ color: primaryColor }}
+                      >
+                        {auction.title}
+                      </Link>
+                    </td>
+                    <td className="px-4 py-3">
+                      <span
+                        className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                          auction.status === 'ACTIVA'
+                            ? 'bg-green-100 text-green-800'
+                            : auction.status === 'COMPLETADA'
+                            ? 'bg-blue-100 text-blue-800'
+                            : 'bg-gray-100 text-gray-800'
+                        }`}
+                      >
+                        {auction.status}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 text-center">
+                      {auction.totalItems}
+                    </td>
+                    <td className="px-4 py-3 text-center">
+                      {auction.awardedItems}
+                    </td>
+                    <td className="px-4 py-3 text-center font-medium text-gray-600">
+                      {auction.status !== 'CANCELADA' &&
+                      auction.awardedItems > 0
+                        ? `${auction.avgMargin.toFixed(1)}%`
+                        : '-'}
+                    </td>
+                    <td className="px-4 py-3 text-right font-bold">
+                      <div className="flex items-center justify-end gap-2">
+                        <span>{auction.awardRate.toFixed(0)}%</span>
+                        <PercentIcon className="h-3 w-3 text-gray-400" />
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+                {computed.paginatedAuctions.length === 0 && (
+                  <tr>
+                    <td
+                      colSpan={6}
+                      className="px-4 py-8 text-center text-gray-500"
+                    >
+                      No se encontraron subastas
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+          {/* Pagination Controls */}
+          <div className="bg-white px-4 py-3 border-t flex items-center justify-between">
+            <div className="text-sm text-gray-500">
+              Mostrando {computed.paginatedAuctions.length} de{' '}
+              {computed.totalCount} subastas
+            </div>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                disabled={currentPage === 1}
+              >
+                <ChevronLeftIcon className="h-4 w-4" />
+                Anterior
+              </Button>
+              <span className="text-sm text-gray-600">
+                Página {currentPage} de {Math.max(1, computed.totalPages)}
+              </span>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() =>
+                  setCurrentPage((p) => Math.min(computed.totalPages, p + 1))
+                }
+                disabled={currentPage >= computed.totalPages}
+              >
+                Siguiente
+                <ChevronRightIcon className="h-4 w-4" />
+              </Button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* User Stats Section */}
+      <section className="space-y-6 pt-4 border-t">
+        <h2 className="text-xl font-semibold text-gray-700">
+          Estadísticas de Usuarios
+        </h2>
+        <UsersTable />
+      </section>
     </div>
   );
 }

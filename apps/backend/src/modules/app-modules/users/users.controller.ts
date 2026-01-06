@@ -113,7 +113,6 @@ export class UsersController {
     });
 
     const response = { token, expiresAt: expiryDate.toISOString() };
-    console.log('Backend creating invite response:', response);
     return response;
   }
 

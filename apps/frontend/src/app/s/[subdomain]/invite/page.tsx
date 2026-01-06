@@ -35,13 +35,13 @@ export default function InviteAcceptPage() {
         const res = await fetch(
           `/api/users/invite/verify?token=${encodeURIComponent(t)}`
         );
-        console.log(res);
         const data = await res.json();
         if (!res.ok || !data.valid) {
           toast({
             title: 'Invitación inválida',
             variant: 'destructive',
             description: 'El link puede haber expirado',
+            duration: 3000,
           });
         } else {
           setEmail(data.data.email);
@@ -51,6 +51,7 @@ export default function InviteAcceptPage() {
           title: 'Error',
           variant: 'destructive',
           description: 'No se pudo verificar la invitación',
+          duration: 3000,
         });
       } finally {
         setLoading(false);
@@ -61,7 +62,11 @@ export default function InviteAcceptPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!token) {
-      toast({ title: 'Invitación inválida', variant: 'destructive' });
+      toast({
+        title: 'Invitación inválida',
+        variant: 'destructive',
+        duration: 3000,
+      });
       return;
     }
     // Removed duplicate toast for mismatch
@@ -73,6 +78,7 @@ export default function InviteAcceptPage() {
       toast({
         title: 'La contraseña debe tener al menos 8 caracteres',
         variant: 'destructive',
+        duration: 3000,
       });
       return;
     }
@@ -80,6 +86,7 @@ export default function InviteAcceptPage() {
       toast({
         title: 'La contraseña debe tener al menos una mayúscula',
         variant: 'destructive',
+        duration: 3000,
       });
       return;
     }
@@ -87,6 +94,7 @@ export default function InviteAcceptPage() {
       toast({
         title: 'La contraseña debe tener al menos una minúscula',
         variant: 'destructive',
+        duration: 3000,
       });
       return;
     }
@@ -104,12 +112,14 @@ export default function InviteAcceptPage() {
           title: 'Error',
           variant: 'destructive',
           description: data?.error || 'No se pudo crear el usuario',
+          duration: 3000,
         });
       } else {
         toast({
           title: 'Usuario creado',
           variant: 'default',
           description: 'Ahora puedes iniciar sesión',
+          duration: 3000,
         });
         router.push('/login');
       }
@@ -118,6 +128,7 @@ export default function InviteAcceptPage() {
         title: 'Error',
         variant: 'destructive',
         description: 'Error al aceptar invitación',
+        duration: 3000,
       });
     } finally {
       setLoading(false);

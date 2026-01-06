@@ -6,6 +6,14 @@ import type { CompanyDto } from '@suba-go/shared-validation';
 import { Button } from '@suba-go/shared-components/components/ui/button';
 import { useToast } from '@suba-go/shared-components/components/ui/toaster';
 import { Upload } from 'lucide-react';
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+} from '@suba-go/shared-components/components/ui/card';
+import { Input } from '@suba-go/shared-components/components/ui/input';
 
 type Props = {
   initialData: CompanyDto;
@@ -24,10 +32,6 @@ export default function CompanySettingsForm({ initialData }: Props) {
     logo: initialData.logo ?? '',
     background_logo_enabled: initialData.background_logo_enabled ?? false,
     principal_color: initialData.principal_color ?? '',
-    principal_color2: initialData.principal_color2 ?? '',
-    secondary_color: initialData.secondary_color ?? '',
-    secondary_color2: initialData.secondary_color2 ?? '',
-    secondary_color3: initialData.secondary_color3 ?? '',
   });
 
   const [isUploading, setIsUploading] = useState(false);
@@ -123,275 +127,161 @@ export default function CompanySettingsForm({ initialData }: Props) {
     }
   };
 
+  if (!isAllowed) {
+    return (
+      <div className="p-3 rounded bg-yellow-50 text-yellow-800 text-sm">
+        No tienes permisos para editar la configuración. Solo ADMIN o
+        AUCTION_MANAGER.
+      </div>
+    );
+  }
+
   return (
-    <form onSubmit={handleSubmit} className="space-y-6">
-      {!isAllowed && (
-        <div className="p-3 rounded bg-yellow-50 text-yellow-800 text-sm">
-          No tienes permisos para editar la configuración. Solo ADMIN o
-          AUCTION_MANAGER.
-        </div>
-      )}
-
-      {/* Basic Information Section */}
-      <div className="space-y-4">
-        <h3 className="text-lg font-semibold text-gray-900">
-          Información Básica
-        </h3>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <label className="block md:col-span-2">
-            <span className="text-sm font-medium text-gray-700">
+    <form onSubmit={handleSubmit} className="space-y-8">
+      {/* General Information */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Información General</CardTitle>
+          <CardDescription>
+            Configura los detalles básicos de tu empresa.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="space-y-2">
+            <label className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
               Nombre de la Empresa
-            </span>
-            <input
-              type="text"
+            </label>
+            <Input
               value={form.name}
               onChange={(e) => updateField('name', e.target.value)}
-              className="mt-1 w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-              disabled={!isAllowed}
               placeholder="Ej: Wift"
+              disabled={!isAllowed}
             />
-          </label>
+          </div>
+        </CardContent>
+      </Card>
 
-          <label className="block md:col-span-2">
-            <span className="text-sm font-medium text-gray-700">Logo</span>
-            <div className="mt-1 flex flex-col gap-2">
-              <div className="flex gap-2">
-                <input
-                  type="text"
-                  value={form.logo}
-                  onChange={(e) => updateField('logo', e.target.value)}
-                  className="flex-1 border border-gray-300 rounded-md px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                  disabled={!isAllowed}
-                  placeholder="URL del logo"
-                />
-                <div className="relative">
-                  <input
-                    ref={fileInputRef}
-                    type="file"
-                    accept="image/*"
-                    onChange={handleFileUpload}
-                    className="hidden"
-                    disabled={!isAllowed || isUploading}
-                  />
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => fileInputRef.current?.click()}
-                    disabled={!isAllowed || isUploading}
-                    className="flex items-center gap-2"
-                  >
-                    <Upload className="h-4 w-4" />
-                    {isUploading ? 'Subiendo...' : 'Subir'}
-                  </Button>
-                </div>
-              </div>
-
+      {/* Branding Section */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Marca y Apariencia</CardTitle>
+          <CardDescription>
+            Personaliza el logo y los colores de tu plataforma.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          {/* Logo Upload */}
+          <div className="space-y-2">
+            <label className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
+              Logo
+            </label>
+            <div className="flex items-center gap-4">
               {form.logo && (
-                <div className="mt-2 p-2 border rounded-md bg-gray-50 inline-block">
+                <div className="p-2 border rounded-md bg-gray-50 h-16 w-32 flex items-center justify-center">
                   <img
                     src={form.logo}
                     alt="Logo preview"
-                    className="h-16 object-contain"
+                    className="max-h-full max-w-full object-contain"
                   />
                 </div>
               )}
+              <div className="relative">
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*"
+                  onChange={handleFileUpload}
+                  className="hidden"
+                  disabled={!isAllowed || isUploading}
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={!isAllowed || isUploading}
+                  className="flex items-center gap-2"
+                >
+                  <Upload className="h-4 w-4" />
+                  {isUploading ? 'Subiendo...' : 'Subir Logo'}
+                </Button>
+              </div>
             </div>
-          </label>
+          </div>
 
-          <label className="flex items-center gap-2 md:col-span-2">
+          {/* Background Logo Toggle */}
+          <div className="flex items-center space-x-2">
             <input
               type="checkbox"
+              id="bg-logo"
               checked={form.background_logo_enabled}
               onChange={(e) =>
                 updateField('background_logo_enabled', e.target.checked)
               }
-              className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+              className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
               disabled={!isAllowed}
             />
-            <span className="text-sm font-medium text-gray-700">
-              Mostrar logo como fondo transparente
-            </span>
-          </label>
-        </div>
-      </div>
-
-      {/* Colors Section */}
-      <div className="space-y-4">
-        <h3 className="text-lg font-semibold text-gray-900">
-          Colores de la Marca
-        </h3>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <label className="block">
-            <span className="text-sm font-medium text-gray-700">
-              Color Principal
-            </span>
-            <div className="mt-1 flex gap-2">
-              <input
-                type="color"
-                value={form.principal_color}
-                onChange={(e) => updateField('principal_color', e.target.value)}
-                className="h-10 w-16 border border-gray-300 rounded cursor-pointer"
-                disabled={!isAllowed}
-              />
-              <input
-                type="text"
-                value={form.principal_color}
-                onChange={(e) => updateField('principal_color', e.target.value)}
-                className="flex-1 border border-gray-300 rounded-md px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                disabled={!isAllowed}
-                placeholder="#3B82F6"
-              />
-            </div>
-          </label>
-
-          <label className="block">
-            <span className="text-sm font-medium text-gray-700">
-              Color Principal 2
-            </span>
-            <div className="mt-1 flex gap-2">
-              <input
-                type="color"
-                value={form.principal_color2}
-                onChange={(e) =>
-                  updateField('principal_color2', e.target.value)
-                }
-                className="h-10 w-16 border border-gray-300 rounded cursor-pointer"
-                disabled={!isAllowed}
-              />
-              <input
-                type="text"
-                value={form.principal_color2}
-                onChange={(e) =>
-                  updateField('principal_color2', e.target.value)
-                }
-                className="flex-1 border border-gray-300 rounded-md px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                disabled={!isAllowed}
-                placeholder="#60A5FA"
-              />
-            </div>
-          </label>
-
-          <label className="block">
-            <span className="text-sm font-medium text-gray-700">
-              Color Secundario
-            </span>
-            <div className="mt-1 flex gap-2">
-              <input
-                type="color"
-                value={form.secondary_color}
-                onChange={(e) => updateField('secondary_color', e.target.value)}
-                className="h-10 w-16 border border-gray-300 rounded cursor-pointer"
-                disabled={!isAllowed}
-              />
-              <input
-                type="text"
-                value={form.secondary_color}
-                onChange={(e) => updateField('secondary_color', e.target.value)}
-                className="flex-1 border border-gray-300 rounded-md px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                disabled={!isAllowed}
-                placeholder="#10B981"
-              />
-            </div>
-          </label>
-
-          <label className="block">
-            <span className="text-sm font-medium text-gray-700">
-              Color Secundario 2
-            </span>
-            <div className="mt-1 flex gap-2">
-              <input
-                type="color"
-                value={form.secondary_color2}
-                onChange={(e) =>
-                  updateField('secondary_color2', e.target.value)
-                }
-                className="h-10 w-16 border border-gray-300 rounded cursor-pointer"
-                disabled={!isAllowed}
-              />
-              <input
-                type="text"
-                value={form.secondary_color2}
-                onChange={(e) =>
-                  updateField('secondary_color2', e.target.value)
-                }
-                className="flex-1 border border-gray-300 rounded-md px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                disabled={!isAllowed}
-                placeholder="#34D399"
-              />
-            </div>
-          </label>
-
-          <label className="block">
-            <span className="text-sm font-medium text-gray-700">
-              Color Secundario 3
-            </span>
-            <div className="mt-1 flex gap-2">
-              <input
-                type="color"
-                value={form.secondary_color3}
-                onChange={(e) =>
-                  updateField('secondary_color3', e.target.value)
-                }
-                className="h-10 w-16 border border-gray-300 rounded cursor-pointer"
-                disabled={!isAllowed}
-              />
-              <input
-                type="text"
-                value={form.secondary_color3}
-                onChange={(e) =>
-                  updateField('secondary_color3', e.target.value)
-                }
-                className="flex-1 border border-gray-300 rounded-md px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                disabled={!isAllowed}
-                placeholder="#6366F1"
-              />
-            </div>
-          </label>
-        </div>
-
-        {/* Color Preview */}
-        <div className="mt-4 p-4 border border-gray-200 rounded-lg bg-gray-50">
-          <h4 className="text-sm font-medium text-gray-700 mb-3">
-            Vista Previa de Colores
-          </h4>
-          <div className="flex gap-2 flex-wrap">
-            {[
-              { label: 'Principal', color: form.principal_color },
-              { label: 'Principal 2', color: form.principal_color2 },
-              { label: 'Secundario', color: form.secondary_color },
-              { label: 'Secundario 2', color: form.secondary_color2 },
-              { label: 'Secundario 3', color: form.secondary_color3 },
-            ].map((item) => (
-              <div key={item.label} className="flex flex-col items-center">
-                <div
-                  className="w-16 h-16 rounded-lg border-2 border-gray-300 shadow-sm"
-                  style={{ backgroundColor: item.color }}
-                />
-                <span className="text-xs text-gray-600 mt-1">{item.label}</span>
-              </div>
-            ))}
+            <label
+              htmlFor="bg-logo"
+              className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+            >
+              Usar logo como marca de agua en el fondo
+            </label>
           </div>
-        </div>
-      </div>
 
-      <div className="flex items-center gap-3 pt-4 border-t">
-        <button
+          {/* Primary Color */}
+          <div className="space-y-2">
+            <label className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
+              Color Principal
+            </label>
+            <div className="flex items-center gap-3">
+              <div className="relative h-10 w-16 overflow-hidden rounded-md border border-gray-200 shadow-sm">
+                <input
+                  type="color"
+                  value={form.principal_color || '#3B82F6'}
+                  onChange={(e) =>
+                    updateField('principal_color', e.target.value)
+                  }
+                  className="absolute -top-2 -left-2 h-16 w-20 cursor-pointer p-0 border-0"
+                  disabled={!isAllowed}
+                />
+              </div>
+              <Input
+                type="text"
+                value={form.principal_color}
+                onChange={(e) => updateField('principal_color', e.target.value)}
+                placeholder="#3B82F6"
+                className="w-32 font-mono"
+                disabled={!isAllowed}
+              />
+            </div>
+            <p className="text-xs text-gray-500">
+              Este color se utilizará en botones, enlaces y elementos
+              destacados.
+            </p>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Actions */}
+      <div className="flex items-center gap-4">
+        <Button
           type="submit"
-          className="px-6 py-2 rounded-md text-white font-medium disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           style={{
-            backgroundColor: initialData.principal_color || '#3B82F6',
+            backgroundColor: form.principal_color || '#3B82F6',
           }}
           disabled={!isAllowed || status.type === 'saving'}
+          className="text-white"
         >
-          {status.type === 'saving' ? 'Guardando…' : 'Guardar cambios'}
-        </button>
+          {status.type === 'saving' ? 'Guardando...' : 'Guardar Cambios'}
+        </Button>
+
         {status.type === 'error' && (
           <span className="text-sm text-red-600">{status.message}</span>
         )}
         {status.type === 'success' && (
-          <span className="text-sm text-green-700">{status.message}</span>
+          <span className="text-sm text-green-700 font-medium">
+            {status.message}
+          </span>
         )}
       </div>
     </form>
