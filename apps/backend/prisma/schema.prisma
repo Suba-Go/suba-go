@@ -114,7 +114,6 @@ model Tenant {
   items        Item[]
   auctions     Auction[]
   bids         Bid[]
-  observations Observation[]
   feedback     Feedback[]
   invitations  Invitation[]
 
@@ -281,24 +280,6 @@ model Bid {
   @@index([auctionId, createdAt(sort: Desc)])
   @@index([userId, createdAt(sort: Desc)])
   @@map("bid")
-}
-
-model Observation {
-  id        String    @id @default(uuid())
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
-  isDeleted Boolean   @default(false)
-  deletedAt DateTime?
-
-  // Observation-specific fields matching TypeORM entity
-  title       String
-  description String
-
-  // Relations
-  tenantId String
-  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-
-  @@map("observation")
 }
 
 model AuditLog {
