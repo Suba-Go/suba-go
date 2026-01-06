@@ -112,7 +112,7 @@
     "helmet": "^8.1.0",
     "lucide-react": "^0.519.0",
     "module-alias": "^2.2.3",
-    "next": "~15.2.4",
+    "next": "15.2.8",
     "next-auth": "^5.0.0-beta.19",
     "nprogress": "^0.2.0",
     "nuqs": "^2.4.3",
