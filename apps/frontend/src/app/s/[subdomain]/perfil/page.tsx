@@ -5,6 +5,10 @@ import { normalizeCompanyName } from '@/utils/company-normalization';
 import ProfileFormWithUserData from '../../../../components/perfil/profile-form-with-user-data';
 import { CompanyInformation } from '../../../../components/perfil/company-information';
 
+// Force dynamic rendering to always fetch fresh company data
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
 interface ProfilePageProps {
   params: Promise<{
     subdomain: string;
@@ -68,20 +72,19 @@ export default async function ProfilePage({ params }: ProfilePageProps) {
       <div className="max-w-7xl mx-auto px-4">
         <h1 className="text-3xl font-bold text-gray-900 mb-8">Mi Perfil</h1>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-          {/* Left Column - Company Information (only for AUCTION_MANAGER) */}
-          <CompanyInformation />
-
-          {/* Right Column - User Information */}
-          <div className="bg-white rounded-lg shadow p-6">
-            <ProfileFormWithUserData
-              company={{
-                id: company.id,
-                name: company.name,
+        <div className="bg-white rounded-lg shadow p-6">
+          <ProfileFormWithUserData
+            company={
+              {
+                ...company,
                 principal_color: company.principal_color || undefined,
-              }}
-            />
-          </div>
+                principal_color2: company.principal_color2 || undefined,
+                secondary_color: company.secondary_color || undefined,
+                secondary_color2: company.secondary_color2 || undefined,
+                secondary_color3: company.secondary_color3 || undefined,
+              } as any
+            }
+          />
         </div>
       </div>
     </div>

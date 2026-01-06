@@ -1,7 +1,7 @@
 'use client';
 
 import type React from 'react';
-import { useForm } from 'react-hook-form';
+import { Resolver, useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Button } from '@suba-go/shared-components/components/ui/button';
 import { Input } from '@suba-go/shared-components/components/ui/input';
@@ -40,6 +40,7 @@ const loadFromCache = (): CompanyCreateCompactDto | null => {
 
     return {
       name: safe.data.name ?? '',
+      background_logo_enabled: safe.data.background_logo_enabled ?? false,
       principal_color: safe.data.principal_color ?? '#3B82F6',
     };
   } catch (error) {
@@ -78,6 +79,7 @@ export default function CompanyForm({
     }
     return {
       name: initialData.name || '',
+      background_logo_enabled: initialData.background_logo_enabled ?? false,
       principal_color: initialData.principal_color || '#3B82F6',
     };
   };
@@ -89,7 +91,9 @@ export default function CompanyForm({
     watch,
     getValues,
   } = useForm<CompanyCreateCompactDto>({
-    resolver: zodResolver(companyCompactCreateSchema),
+    resolver: zodResolver(
+      companyCompactCreateSchema.partial()
+    ) as Resolver<CompanyCreateCompactDto>,
     defaultValues: getCachedOrInitialData(),
     mode: 'onChange',
   });
@@ -116,6 +120,7 @@ export default function CompanyForm({
   const onFormSubmit = (data: CompanyCreateCompactDto) => {
     const companyData: CompanyCreateCompactDto = {
       name: data.name,
+      background_logo_enabled: data.background_logo_enabled ?? false,
       principal_color: data.principal_color || null,
     };
 

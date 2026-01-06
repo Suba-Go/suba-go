@@ -1,4 +1,6 @@
 import { Module } from '@nestjs/common';
+import { ConfigModule, ConfigService } from '@nestjs/config';
+import { JwtModule } from '@nestjs/jwt';
 import { UsersController } from './users.controller';
 import { UserCreatorService } from './services/user-creator.service';
 import { UserGettersService } from './services/user-getter.service';
@@ -12,7 +14,19 @@ import { TenantPrismaRepository } from '../tenants/services/tenant-prisma-reposi
 import { CompanyPrismaRepository } from '../companies/services/company-prisma-repository.service';
 
 @Module({
-  imports: [],
+  imports: [
+    ConfigModule,
+    JwtModule.registerAsync({
+      imports: [ConfigModule],
+      useFactory: async (configService: ConfigService) => ({
+        secret: configService.get<string>('JWT_SECRET'),
+        signOptions: {
+          expiresIn: configService.get<string>('JWT_ACCESS_EXPIRY_TIME'),
+        },
+      }),
+      inject: [ConfigService],
+    }),
+  ],
   controllers: [UsersController, UserLookupController],
   providers: [
     UserCreatorService,

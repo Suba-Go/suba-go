@@ -169,4 +169,41 @@ export class UserPrismaRepository {
     });
     return count + 1;
   }
+
+  async createInvitation(data: Prisma.InvitationCreateInput) {
+    return this.prisma.invitation.create({
+      data,
+    });
+  }
+
+  async findInvitationByToken(token: string) {
+    return this.prisma.invitation.findUnique({
+      where: { token },
+    });
+  }
+
+  async markInvitationAsUsed(id: string) {
+    return this.prisma.invitation.update({
+      where: { id },
+      data: {
+        isUsed: true,
+        usedAt: new Date(),
+      },
+    });
+  }
+
+  async invalidatePendingInvitations(email: string) {
+    return this.prisma.invitation.updateMany({
+      where: {
+        email,
+        isUsed: false,
+        expiresAt: {
+          gt: new Date(),
+        },
+      },
+      data: {
+        expiresAt: new Date(), // Expire immediately
+      },
+    });
+  }
 }

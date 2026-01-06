@@ -12,7 +12,7 @@
     "lint": "pnpm eslint .",
     "postinstall": "prisma generate --no-engine --schema=apps/backend/prisma/schema.prisma",
     "db:push": "prisma db push --schema=apps/backend/prisma/schema.prisma",
-    "db:seed": "prisma db seed",
+    "db:seed": "prisma db seed --schema=apps/backend/prisma/schema.prisma",
     "db:migrate": "prisma migrate dev --schema=apps/backend/prisma/schema.prisma",
     "db:migrate:deploy": "prisma migrate deploy --schema=apps/backend/prisma/schema.prisma",
     "db:reset": "prisma migrate reset --force --schema=apps/backend/prisma/schema.prisma",
@@ -60,6 +60,7 @@
     "nx": "21.2.1",
     "postcss": "8.4.38",
     "prettier": "^2.6.2",
+    "prisma": "^6.17.1",
     "tailwindcss": "3.4.3",
     "ts-node": "^10.9.2",
     "tsc-alias": "^1.8.16",
@@ -120,7 +121,6 @@
     "passport-local": "^1.0.0",
     "pg": "^8.16.2",
     "postgres": "^3.4.7",
-    "prisma": "^6.15.0",
     "react": "19.0.0",
     "react-day-picker": "^9.11.3",
     "react-dom": "19.0.0",
@@ -139,5 +139,8 @@
   },
   "optionalDependencies": {
     "bufferutil": "^4.0.9"
+  },
+  "prisma": {
+    "seed": "ts-node apps/backend/prisma/seed.ts"
   }
 }

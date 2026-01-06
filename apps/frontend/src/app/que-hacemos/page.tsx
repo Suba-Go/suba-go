@@ -1,184 +1,121 @@
 import { Metadata } from 'next';
 import Link from 'next/link';
+import { TrendingUp, Eye, Timer, BarChart3, ArrowRight } from 'lucide-react';
 
 export const metadata: Metadata = {
   title: 'Qué hacemos | Suba&Go',
   description:
-    'Descubre cómo Suba&Go transforma las ventas a través de subastas en vivo, creando un efecto de tensión positivo que eleva tu precio de venta.',
+    'Redefinimos la forma de vender. Suba&Go transforma las subastas en una estrategia de venta transparente y rentable.',
 };
 
 export default function QueHacemosPage() {
   return (
-    <main className="flex-1">
+    <main className="flex-1 bg-white">
       {/* Hero Section */}
-      <section className="bg-gradient-to-br from-primary via-primary/90 to-primary/80 text-white py-20">
-        <div className="container mx-auto px-4">
+      <section className="bg-gray-900 text-white py-24 relative overflow-hidden">
+        {/* Abstract Background Element */}
+        <div className="absolute top-0 right-0 w-1/2 h-full bg-gradient-to-l from-gray-800 to-transparent opacity-50" />
+
+        <div className="container mx-auto px-4 relative z-10">
           <div className="max-w-4xl mx-auto text-center">
-            <h1 className="text-5xl font-bold mb-6">
-              ¿Qué servicios ofrece Suba&Go?
+            <h1 className="text-4xl md:text-6xl font-bold mb-8 leading-tight">
+              Redefinimos la forma de vender: <br />
+              <span className="text-yellow-400">
+                Vender mejor no es suerte, es una estrategia.
+              </span>
             </h1>
-            <p className="text-xl leading-relaxed">
-              Subastar en vivo frente a múltiples interesados produce un{' '}
-              <span className="font-semibold text-yellow-300">
-                efecto de tensión positivo
-              </span>{' '}
-              que eleva tu precio de venta.
+            <p className="text-xl md:text-2xl text-gray-300 leading-relaxed max-w-3xl mx-auto mb-10">
+              El precio mínimo es solo el punto de partida. En nuestra
+              plataforma, cada oferta empuja el valor hacia arriba de forma
+              transparente, eliminando las negociaciones opacas y maximizando tu
+              retorno.
             </p>
+            <div className="flex justify-center">
+              <Link
+                href="/login"
+                className="inline-flex items-center gap-2 bg-yellow-400 text-gray-900 px-8 py-4 rounded-full font-bold text-lg hover:bg-yellow-300 transition-all transform hover:scale-105 shadow-lg shadow-yellow-400/20"
+              >
+                Ver cómo funciona
+                <ArrowRight className="w-5 h-5" />
+              </Link>
+            </div>
           </div>
         </div>
       </section>
 
-      {/* Main Content */}
-      <section className="py-16">
+      {/* Services Grid Section */}
+      <section className="py-24 bg-gray-50">
         <div className="container mx-auto px-4">
-          <div className="max-w-4xl mx-auto">
-            {/* Value Proposition */}
-            <div className="bg-white rounded-2xl shadow-lg p-8 mb-12">
-              <h2 className="text-3xl font-bold text-dark mb-6 text-center">
-                Transformamos cada subasta en una venta más justa, ágil,
-                transparente y rentable
-              </h2>
-              <p className="text-lg text-gray-700 leading-relaxed text-center">
-                Tu precio mínimo se convierte en un punto de partida atractivo,
-                que gana fuerza con cada nueva oferta. Así transformamos cada
-                subasta en una experiencia que maximiza el valor de lo que
-                vendes.
+          <div className="grid md:grid-cols-2 gap-8 max-w-5xl mx-auto">
+            {/* Card 1: Efecto de Tensión Positivo */}
+            <div className="bg-white p-8 rounded-2xl shadow-sm hover:shadow-xl transition-shadow border border-gray-100 group">
+              <div className="w-14 h-14 bg-yellow-100 rounded-xl flex items-center justify-center mb-6 group-hover:bg-yellow-400 transition-colors">
+                <TrendingUp className="w-8 h-8 text-yellow-600 group-hover:text-gray-900 transition-colors" />
+              </div>
+              <h3 className="text-2xl font-bold text-gray-900 mb-4">
+                Efecto de Tensión Positivo
+              </h3>
+              <p className="text-lg text-gray-600 leading-relaxed">
+                Crear competencia libre de condiciones para que cada oferta
+                empuje el precio al alza.
               </p>
             </div>
 
-            {/* Features Grid */}
-            <div className="grid md:grid-cols-2 gap-8 mb-12">
-              <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-xl p-6">
-                <div className="w-12 h-12 bg-blue-500 rounded-lg flex items-center justify-center mb-4">
-                  <svg
-                    className="w-6 h-6 text-white"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"
-                    />
-                  </svg>
-                </div>
-                <h3 className="text-xl font-semibold text-dark mb-3">
-                  Efecto de Tensión Positivo
-                </h3>
-                <p className="text-gray-700">
-                  Las subastas en vivo crean competencia real entre compradores,
-                  elevando naturalmente el precio final.
-                </p>
+            {/* Card 2: Transparencia Total */}
+            <div className="bg-white p-8 rounded-2xl shadow-sm hover:shadow-xl transition-shadow border border-gray-100 group">
+              <div className="w-14 h-14 bg-gray-100 rounded-xl flex items-center justify-center mb-6 group-hover:bg-gray-900 transition-colors">
+                <Eye className="w-8 h-8 text-gray-600 group-hover:text-white transition-colors" />
               </div>
-
-              <div className="bg-gradient-to-br from-green-50 to-green-100 rounded-xl p-6">
-                <div className="w-12 h-12 bg-green-500 rounded-lg flex items-center justify-center mb-4">
-                  <svg
-                    className="w-6 h-6 text-white"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
-                    />
-                  </svg>
-                </div>
-                <h3 className="text-xl font-semibold text-dark mb-3">
-                  Transparencia Total
-                </h3>
-                <p className="text-gray-700">
-                  Proceso completamente transparente donde todos los
-                  participantes pueden ver las ofertas en tiempo real.
-                </p>
-              </div>
-
-              <div className="bg-gradient-to-br from-purple-50 to-purple-100 rounded-xl p-6">
-                <div className="w-12 h-12 bg-purple-500 rounded-lg flex items-center justify-center mb-4">
-                  <svg
-                    className="w-6 h-6 text-white"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
-                    />
-                  </svg>
-                </div>
-                <h3 className="text-xl font-semibold text-dark mb-3">
-                  Proceso Ágil
-                </h3>
-                <p className="text-gray-700">
-                  Ventas rápidas y eficientes que reducen el tiempo entre la
-                  decisión de vender y el cierre de la transacción.
-                </p>
-              </div>
-
-              <div className="bg-gradient-to-br from-orange-50 to-orange-100 rounded-xl p-6">
-                <div className="w-12 h-12 bg-orange-500 rounded-lg flex items-center justify-center mb-4">
-                  <svg
-                    className="w-6 h-6 text-white"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1"
-                    />
-                  </svg>
-                </div>
-                <h3 className="text-xl font-semibold text-dark mb-3">
-                  Mayor Rentabilidad
-                </h3>
-                <p className="text-gray-700">
-                  La competencia entre compradores genera mejores márgenes y
-                  precios más justos para los vendedores.
-                </p>
-              </div>
+              <h3 className="text-2xl font-bold text-gray-900 mb-4">
+                Transparencia Total
+              </h3>
+              <p className="text-lg text-gray-600 leading-relaxed">
+                Ofertas visibles y trazables, eliminando negociaciones opacas.
+              </p>
             </div>
 
-            {/* Platform Description */}
-            <div className="bg-gradient-to-r from-primary/10 to-primary/5 rounded-2xl p-8 text-center">
-              <h2 className="text-2xl font-bold text-dark mb-4">
-                La forma más simple y rentable de vender
-              </h2>
-              <p className="text-lg text-gray-700 mb-6">
-                Una plataforma de subastas donde la confianza no es magia, es
-                margen.
+            {/* Card 3: Proceso Ágil */}
+            <div className="bg-white p-8 rounded-2xl shadow-sm hover:shadow-xl transition-shadow border border-gray-100 group">
+              <div className="w-14 h-14 bg-yellow-100 rounded-xl flex items-center justify-center mb-6 group-hover:bg-yellow-400 transition-colors">
+                <Timer className="w-8 h-8 text-yellow-600 group-hover:text-gray-900 transition-colors" />
+              </div>
+              <h3 className="text-2xl font-bold text-gray-900 mb-4">
+                Proceso Ágil
+              </h3>
+              <p className="text-lg text-gray-600 leading-relaxed">
+                Venta concretada en minutos. Crea el producto, invita y cierra.
               </p>
-              <Link
-                href="/#formulario"
-                className="inline-flex items-center space-x-2 bg-primary text-white px-6 py-3 rounded-lg font-semibold hover:bg-primary/90 transition-colors"
-              >
-                <span>Suba&Go</span>
-                <svg
-                  className="w-5 h-5"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M13 7l5 5m0 0l-5 5m5-5H6"
-                  />
-                </svg>
-              </Link>
+            </div>
+
+            {/* Card 4: Mayor Rentabilidad */}
+            <div className="bg-white p-8 rounded-2xl shadow-sm hover:shadow-xl transition-shadow border border-gray-100 group">
+              <div className="w-14 h-14 bg-gray-100 rounded-xl flex items-center justify-center mb-6 group-hover:bg-gray-900 transition-colors">
+                <BarChart3 className="w-8 h-8 text-gray-600 group-hover:text-white transition-colors" />
+              </div>
+              <h3 className="text-2xl font-bold text-gray-900 mb-4">
+                Mayor Rentabilidad
+              </h3>
+              <p className="text-lg text-gray-600 leading-relaxed">
+                Mejores márgenes sin bajar el precio mínimo.
+              </p>
             </div>
           </div>
+        </div>
+      </section>
+
+      {/* Bottom CTA */}
+      <section className="bg-gray-900 py-20 border-t border-gray-800">
+        <div className="container mx-auto px-4 text-center">
+          <h2 className="text-3xl font-bold text-white mb-8">
+            ¿Listo para escalar tus ventas?
+          </h2>
+          <Link
+            href="/login"
+            className="inline-flex items-center gap-2 bg-transparent border-2 border-primary text-white px-8 py-3 rounded-full font-bold text-lg hover:bg-primary hover:text-white transition-all"
+          >
+            Comenzar ahora
+            <ArrowRight className="w-5 h-5" />
+          </Link>
         </div>
       </section>
     </main>

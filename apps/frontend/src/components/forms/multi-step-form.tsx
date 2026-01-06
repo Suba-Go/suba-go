@@ -48,6 +48,7 @@ export default function MultiStepForm() {
 
   const [companyData, setCompanyData] = useState<CompanyCreateCompactDto>({
     name: '',
+    background_logo_enabled: false,
     principal_color: null,
   });
   const [isLoading, setIsLoading] = useState(false);

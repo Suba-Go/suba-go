@@ -9,7 +9,8 @@ export const getCompanyBySubdomainServerAction = async (
   try {
     const result = await fetcher(`/companies/subdomain/${subdomain}`, {
       method: 'GET',
-      requireAuth: false, // Public endpoint for subdomain pages
+      requireAuth: false,
+      cache: 'no-store',
     });
 
     if (result.success) {
