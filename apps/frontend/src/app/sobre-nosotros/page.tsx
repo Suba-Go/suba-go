@@ -1,187 +1,136 @@
 import { Metadata } from 'next';
-import Link from 'next/link';
+import Image from 'next/image';
+import { Wrench, Users, ShieldCheck } from 'lucide-react';
 
 export const metadata: Metadata = {
   title: 'Sobre nosotros | Suba&Go',
   description:
-    'Conoce a los jóvenes emprendedores detrás de Suba&Go, construyendo una plataforma útil, accesible y profesional para revolucionar las ventas.',
+    'Conoce al equipo detrás de Suba&Go. Construimos una plataforma simple, confiable y escalable para maximizar tus ventas.',
 };
 
 export default function SobreNosotrosPage() {
   return (
-    <main className="flex-1">
-      {/* Hero Section */}
-      <section className="bg-gradient-to-br from-dark via-dark/95 to-dark/90 text-white py-20">
-        <div className="container mx-auto px-4">
+    <main className="flex-1 bg-white">
+      {/* Hero Section - Mission */}
+      <section className="bg-gray-900 text-white py-24 relative overflow-hidden">
+        <div className="absolute top-0 left-0 w-full h-full bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-gray-800 via-gray-900 to-black opacity-60" />
+        <div className="container mx-auto px-4 relative z-10">
           <div className="max-w-4xl mx-auto text-center">
-            <h1 className="text-5xl font-bold mb-6">Sobre nosotros</h1>
-            <p className="text-xl leading-relaxed">
-              Somos jóvenes emprendedores construyendo una plataforma útil,
-              accesible y profesional
+            <h1 className="text-5xl md:text-7xl font-bold mb-8 tracking-tight">
+              Sobre nosotros
+            </h1>
+            <p className="text-xl md:text-3xl font-light leading-relaxed text-gray-300">
+              "Construir una plataforma{' '}
+              <span className="text-yellow-400 font-medium">
+                simple, confiable y escalable
+              </span>{' '}
+              para que nuestros clientes ganen más, eliminando negociaciones
+              opacas".
             </p>
           </div>
         </div>
       </section>
 
-      {/* Main Content */}
-      <section className="py-16">
+      {/* Team Section */}
+      <section className="py-24 bg-gray-50">
         <div className="container mx-auto px-4">
-          <div className="max-w-4xl mx-auto">
-            {/* Mission Statement */}
-            <div className="text-center mb-16">
-              <h2 className="text-3xl font-bold text-dark mb-6">
-                Nuestra Misión
-              </h2>
-              <p className="text-xl text-gray-700 leading-relaxed">
-                Construimos una plataforma pensada tanto para{' '}
-                <span className="font-semibold text-primary">
-                  grandes empresas
-                </span>{' '}
-                como para{' '}
-                <span className="font-semibold text-primary">
-                  quienes venden por primera vez
-                </span>
-                .
+          <div className="text-center mb-16">
+            <h2 className="text-3xl font-bold text-gray-900 mb-4">
+              Nuestro Equipo
+            </h2>
+            <p className="text-gray-600 max-w-2xl mx-auto">
+              Liderado por expertos en estrategia comercial y tecnología
+              aplicada.
+            </p>
+          </div>
+
+          <div className="grid md:grid-cols-2 gap-12 max-w-5xl mx-auto">
+            {/* Juan Aspillaga */}
+            <div className="bg-white rounded-2xl overflow-hidden shadow-lg hover:shadow-2xl transition-shadow border border-gray-100 flex flex-col">
+              <div className="aspect-[4/3] relative w-full bg-gray-200">
+                <img
+                  src="https://g95bzcjyoeattqzt.public.blob.vercel-storage.com/WhatsApp%20Image%202026-01-05%20at%2021.17.48.jpeg"
+                  alt="Juan Aspillaga"
+                  className="w-full h-full object-cover"
+                />
+              </div>
+              <div className="p-8 flex-1 flex flex-col justify-center text-center">
+                <h3 className="text-2xl font-bold text-gray-900 mb-1">
+                  Juan Aspillaga
+                </h3>
+                <p className="text-yellow-600 font-semibold mb-4">CEO</p>
+                <p className="text-gray-600 leading-relaxed">
+                  Ingeniero Comercial con formación internacional y experto en
+                  estrategia de ventas.
+                </p>
+              </div>
+            </div>
+
+            {/* Nicolás Hörmann */}
+            <div className="bg-white rounded-2xl overflow-hidden shadow-lg hover:shadow-2xl transition-shadow border border-gray-100 flex flex-col">
+              <div className="aspect-[4/3] relative w-full bg-gray-200">
+                <img
+                  src="https://g95bzcjyoeattqzt.public.blob.vercel-storage.com/nicofin.png"
+                  alt="Nicolás Hörmann"
+                  className="w-full h-full object-cover"
+                />
+              </div>
+              <div className="p-8 flex-1 flex flex-col justify-center text-center">
+                <h3 className="text-2xl font-bold text-gray-900 mb-1">
+                  Nicolás Hörmann
+                </h3>
+                <p className="text-yellow-600 font-semibold mb-4">CTO / CDO</p>
+                <p className="text-gray-600 leading-relaxed">
+                  Ingeniero en Ciencias de la Computación de la PUC,
+                  especialista en tecnología aplicada y experiencia en el sector
+                  automotriz.
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Values Section */}
+      <section className="py-20 bg-white border-t border-gray-100">
+        <div className="container mx-auto px-4">
+          <div className="grid md:grid-cols-3 gap-8 max-w-6xl mx-auto">
+            {/* Value 1: Útil */}
+            <div className="text-center px-4">
+              <div className="w-16 h-16 bg-yellow-100 rounded-full flex items-center justify-center mx-auto mb-6">
+                <Wrench className="w-8 h-8 text-yellow-600" />
+              </div>
+              <h3 className="text-xl font-bold text-gray-900 mb-3">Útil</h3>
+              <p className="text-gray-600 leading-relaxed">
+                Resolvemos problemas reales con impacto directo en los
+                resultados.
               </p>
             </div>
 
-            {/* Values Grid */}
-            <div className="grid md:grid-cols-3 gap-8 mb-16">
-              <div className="text-center">
-                <div className="w-16 h-16 bg-primary rounded-full flex items-center justify-center mx-auto mb-4">
-                  <svg
-                    className="w-8 h-8 text-white"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M13 10V3L4 14h7v7l9-11h-7z"
-                    />
-                  </svg>
-                </div>
-                <h3 className="text-xl font-semibold text-dark mb-3">Útil</h3>
-                <p className="text-gray-600">
-                  Creamos herramientas que realmente resuelven problemas y
-                  agregan valor a nuestros usuarios.
-                </p>
+            {/* Value 2: Accesible */}
+            <div className="text-center px-4 border-l border-r border-gray-100 md:border-x">
+              <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-6">
+                <Users className="w-8 h-8 text-gray-700" />
               </div>
-
-              <div className="text-center">
-                <div className="w-16 h-16 bg-primary rounded-full flex items-center justify-center mx-auto mb-4">
-                  <svg
-                    className="w-8 h-8 text-white"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"
-                    />
-                  </svg>
-                </div>
-                <h3 className="text-xl font-semibold text-dark mb-3">
-                  Accesible
-                </h3>
-                <p className="text-gray-600">
-                  Diseñamos experiencias simples e intuitivas para usuarios de
-                  todos los niveles.
-                </p>
-              </div>
-
-              <div className="text-center">
-                <div className="w-16 h-16 bg-primary rounded-full flex items-center justify-center mx-auto mb-4">
-                  <svg
-                    className="w-8 h-8 text-white"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
-                    />
-                  </svg>
-                </div>
-                <h3 className="text-xl font-semibold text-dark mb-3">
-                  Profesional
-                </h3>
-                <p className="text-gray-600">
-                  Mantenemos los más altos estándares de calidad y confiabilidad
-                  en todo lo que hacemos.
-                </p>
-              </div>
-            </div>
-
-            {/* Current Focus */}
-            <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-2xl p-8 mb-12">
-              <div className="flex items-start space-x-6">
-                <div className="w-12 h-12 bg-blue-500 rounded-lg flex items-center justify-center flex-shrink-0">
-                  <svg
-                    className="w-6 h-6 text-white"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-4m-5 0H9m0 0H5m4 0V9a2 2 0 012-2h2a2 2 0 012 2v12M13 7a1 1 0 11-2 0 1 1 0 012 0z"
-                    />
-                  </svg>
-                </div>
-                <div>
-                  <h3 className="text-2xl font-bold text-dark mb-3">
-                    Enfoque Actual: Rubro Automotriz
-                  </h3>
-                  <p className="text-lg text-gray-700 leading-relaxed">
-                    Hoy operamos en el rubro automotriz, donde hemos
-                    perfeccionado nuestro modelo de subastas para maximizar el
-                    valor de cada vehículo. Esta especialización nos ha
-                    permitido entender profundamente las necesidades específicas
-                    del sector.
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            {/* Call to Action */}
-            <div className="text-center bg-gradient-to-r from-primary/10 to-primary/5 rounded-2xl p-8">
-              <h2 className="text-2xl font-bold text-dark mb-4">
-                Únete a la Revolución de las Ventas
-              </h2>
-              <p className="text-lg text-gray-700 mb-6">
-                Descubre cómo Suba&Go puede transformar tu forma de vender y
-                maximizar tus resultados.
+              <h3 className="text-xl font-bold text-gray-900 mb-3">
+                Accesible
+              </h3>
+              <p className="text-gray-600 leading-relaxed">
+                Tecnología que facilita la toma de decisiones, no la complica.
               </p>
-              <Link
-                href="/#formulario"
-                className="inline-flex items-center space-x-2 bg-primary text-white px-8 py-3 rounded-lg font-semibold hover:bg-primary/90 transition-colors"
-              >
-                <span>Comenzar ahora</span>
-                <svg
-                  className="w-5 h-5"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M13 7l5 5m0 0l-5 5m5-5H6"
-                  />
-                </svg>
-              </Link>
+            </div>
+
+            {/* Value 3: Profesional */}
+            <div className="text-center px-4">
+              <div className="w-16 h-16 bg-yellow-100 rounded-full flex items-center justify-center mx-auto mb-6">
+                <ShieldCheck className="w-8 h-8 text-yellow-600" />
+              </div>
+              <h3 className="text-xl font-bold text-gray-900 mb-3">
+                Profesional
+              </h3>
+              <p className="text-gray-600 leading-relaxed">
+                Estándares claros y foco en resultados medibles.
+              </p>
             </div>
           </div>
         </div>
