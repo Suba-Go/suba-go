@@ -153,7 +153,9 @@ export default function UserHomePage() {
               <AuctionCard
                 key={auction.id}
                 auction={auction}
-                onUpdate={() => {}} // No-op for user view
+                onUpdate={() => {
+                  /* No-op for user view */
+                }}
               />
             ))}
           </div>

@@ -20,12 +20,12 @@ export default function SobreNosotrosPage() {
               Sobre nosotros
             </h1>
             <p className="text-xl md:text-3xl font-light leading-relaxed text-gray-300">
-              "Construir una plataforma{' '}
+              &quot;Construir una plataforma{' '}
               <span className="text-yellow-400 font-medium">
                 simple, confiable y escalable
               </span>{' '}
               para que nuestros clientes ganen más, eliminando negociaciones
-              opacas".
+              opacas&quot;.
             </p>
           </div>
         </div>

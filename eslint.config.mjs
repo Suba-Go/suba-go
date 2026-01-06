@@ -27,7 +27,7 @@ export default [
   {
     plugins: {
       '@nx': nx,
-      'react-hooks': reactHooks,
+      // 'react-hooks': reactHooks,
     },
   },
   {
@@ -70,7 +70,7 @@ export default [
     ...config,
     files: ['**/*.ts', '**/*.tsx'],
   })),
-  ...compat.extends('plugin:react-hooks/recommended'),
+  //...compat.extends('plugin:react-hooks/recommended'),
   //{
   //files: ['libs/shared-validation/src/lib/schemas/**/*.ts'],
   //rules: {
