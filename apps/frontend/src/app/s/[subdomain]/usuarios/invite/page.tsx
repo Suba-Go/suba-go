@@ -102,7 +102,7 @@ export default function ManagerInvitePage() {
     <div className="max-w-lg mx-auto px-4 py-8">
       <h1 className="text-2xl font-bold mb-2">Invitar usuario</h1>
       <p className="text-sm text-gray-600 mb-6">
-        Genera un link tokenizado para que el usuario cree su cuenta.
+        Genera un link para que el usuario se registre en la plataforma.
       </p>
       <form onSubmit={handleGenerate} className="space-y-4">
         <div>
@@ -160,8 +160,15 @@ export default function ManagerInvitePage() {
             </Button>
           </div>
           <p className="text-xs text-gray-500 mt-2">
-            Comparte este link con el usuario. El link expirará en 7 días.
+            El link expirará en 7 días.
           </p>
+          <div className="mt-3 p-3 bg-blue-50 border border-blue-200 rounded-md">
+            <p className="text-sm text-blue-800 font-medium">
+              Ahora copia el link y envíaselo a quien quieras invitar a la
+              plataforma. Tendrás que generar un link por usuario ya que es de
+              un solo uso.
+            </p>
+          </div>
         </div>
       )}
     </div>

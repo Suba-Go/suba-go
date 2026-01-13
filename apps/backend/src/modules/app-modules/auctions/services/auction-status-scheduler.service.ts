@@ -29,7 +29,7 @@ export class AuctionStatusSchedulerService
   private isRunning = false;
 
   private readonly config: SchedulerConfig = {
-    defaultInterval: 30000, // 30 seconds
+    defaultInterval: 300000, // 5 minutes
     urgentInterval: 5000, // 5 seconds
     urgentThreshold: 60000, // 1 minutes
   };

@@ -57,7 +57,7 @@ export default function ManagerStatsPage() {
   // Filters and Pagination State
   const [statusFilter, setStatusFilter] = useState<string>('ALL');
   const [currentPage, setCurrentPage] = useState(1);
-  const [timeFilter, setTimeFilter] = useState<string>('LAST_MONTH');
+  const [timeFilter, setTimeFilter] = useState<string>('ALL_TIME');
   const itemsPerPage = 10;
 
   // Get company context

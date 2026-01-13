@@ -3,8 +3,8 @@
 import { useState } from 'react';
 import { useUsers, User } from '@/hooks/use-users';
 import { Button } from '@suba-go/shared-components/components/ui/button';
-import { 
-  ChevronDownIcon, 
+import {
+  ChevronDownIcon,
   ChevronUpIcon,
   RefreshCwIcon,
   UserIcon,
@@ -14,30 +14,70 @@ import {
   ShieldIcon,
   IdCardIcon,
   BarChartIcon,
+  Trash2,
 } from 'lucide-react';
 import { UsersTableSkeleton } from './users-table-skeleton';
 import { UsersSearchBar } from './users-search-bar';
 import { UserStatisticsDialog } from './user-statistics-dialog';
+import { useToast } from '@suba-go/shared-components/components/ui/toaster';
 
 interface UsersTableProps {
   className?: string;
 }
 
 export function UsersTable({ className }: UsersTableProps) {
-  const { users, allUsers, loading, error, refetch, filterByEmail } = useUsers();
+  const { users, allUsers, loading, error, refetch, filterByEmail } =
+    useUsers();
   const [sortField, setSortField] = useState<keyof User>('createdAt');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
   const [selectedUserName, setSelectedUserName] = useState<string>('');
   const [isStatsOpen, setIsStatsOpen] = useState(false);
+  const { toast } = useToast();
 
   const handleOpenStats = (user: User) => {
     setSelectedUserId(user.id);
-    const displayName = user.public_name 
+    const displayName = user.public_name
       ? `${user.name || user.email} | ${user.public_name}`
-      : (user.name || user.email);
+      : user.name || user.email;
     setSelectedUserName(displayName);
     setIsStatsOpen(true);
+  };
+
+  const handleDeleteUser = async (user: User) => {
+    if (
+      !confirm(
+        `¿Estás seguro de eliminar al usuario ${
+          user.name || user.email
+        }? Esta acción no se puede deshacer.`
+      )
+    ) {
+      return;
+    }
+
+    try {
+      const response = await fetch(`/api/users/${user.id}`, {
+        method: 'DELETE',
+      });
+
+      if (!response.ok) {
+        throw new Error('Error al eliminar usuario');
+      }
+
+      toast({
+        title: 'Usuario eliminado',
+        description: 'El usuario ha sido eliminado correctamente del sistema.',
+      });
+
+      refetch();
+    } catch (error) {
+      console.error('Error deleting user:', error);
+      toast({
+        title: 'Error',
+        description: 'No se pudo eliminar al usuario',
+        variant: 'destructive',
+      });
+    }
   };
 
   const handleSort = (field: keyof User) => {
@@ -52,20 +92,20 @@ export function UsersTable({ className }: UsersTableProps) {
   const sortedUsers = [...users].sort((a, b) => {
     const aValue = a[sortField];
     const bValue = b[sortField];
-    
+
     if (aValue === null || aValue === undefined) return 1;
     if (bValue === null || bValue === undefined) return -1;
-    
+
     if (typeof aValue === 'string' && typeof bValue === 'string') {
-      return sortDirection === 'asc' 
+      return sortDirection === 'asc'
         ? aValue.localeCompare(bValue)
         : bValue.localeCompare(aValue);
     }
-    
+
     if (typeof aValue === 'number' && typeof bValue === 'number') {
       return sortDirection === 'asc' ? aValue - bValue : bValue - aValue;
     }
-    
+
     return 0;
   });
 
@@ -75,7 +115,7 @@ export function UsersTable({ className }: UsersTableProps) {
       month: 'short',
       day: 'numeric',
       hour: '2-digit',
-      minute: '2-digit'
+      minute: '2-digit',
     });
   };
 
@@ -105,7 +145,13 @@ export function UsersTable({ className }: UsersTableProps) {
     }
   };
 
-  const SortButton = ({ field, children }: { field: keyof User; children: React.ReactNode }) => (
+  const SortButton = ({
+    field,
+    children,
+  }: {
+    field: keyof User;
+    children: React.ReactNode;
+  }) => (
     <Button
       variant="ghost"
       size="sm"
@@ -114,9 +160,12 @@ export function UsersTable({ className }: UsersTableProps) {
     >
       <span className="flex items-center gap-1">
         {children}
-        {sortField === field && (
-          sortDirection === 'asc' ? <ChevronUpIcon className="h-4 w-4" /> : <ChevronDownIcon className="h-4 w-4" />
-        )}
+        {sortField === field &&
+          (sortDirection === 'asc' ? (
+            <ChevronUpIcon className="h-4 w-4" />
+          ) : (
+            <ChevronDownIcon className="h-4 w-4" />
+          ))}
       </span>
     </Button>
   );
@@ -152,9 +201,13 @@ export function UsersTable({ className }: UsersTableProps) {
         <div>
           <h2 className="text-xl font-semibold">Usuarios de la Empresa</h2>
           <p className="text-sm text-gray-600">
-            {users.length} usuario{users.length !== 1 ? 's' : ''} encontrado{users.length !== 1 ? 's' : ''}
+            {users.length} usuario{users.length !== 1 ? 's' : ''} encontrado
+            {users.length !== 1 ? 's' : ''}
             {users.length !== allUsers.length && (
-              <span className="text-blue-600"> (de {allUsers.length} total)</span>
+              <span className="text-blue-600">
+                {' '}
+                (de {allUsers.length} total)
+              </span>
             )}
           </p>
         </div>
@@ -164,7 +217,7 @@ export function UsersTable({ className }: UsersTableProps) {
         </Button>
       </div>
 
-      <UsersSearchBar 
+      <UsersSearchBar
         onSearch={filterByEmail}
         placeholder="Buscar por email..."
         className="max-w-md"
@@ -227,16 +280,14 @@ export function UsersTable({ className }: UsersTableProps) {
                 <td colSpan={7} className="text-center py-8 text-gray-500">
                   <UserIcon className="h-8 w-8 mx-auto mb-2" />
                   <p className="font-medium">
-                    {allUsers.length === 0 
-                      ? "No hay usuarios registrados" 
-                      : "No se encontraron usuarios"
-                    }
+                    {allUsers.length === 0
+                      ? 'No hay usuarios registrados'
+                      : 'No se encontraron usuarios'}
                   </p>
                   <p className="text-sm">
-                    {allUsers.length === 0 
-                      ? "Los usuarios aparecerán aquí cuando se registren"
-                      : "Intenta con otro término de búsqueda"
-                    }
+                    {allUsers.length === 0
+                      ? 'Los usuarios aparecerán aquí cuando se registren'
+                      : 'Intenta con otro término de búsqueda'}
                   </p>
                 </td>
               </tr>
@@ -250,10 +301,18 @@ export function UsersTable({ className }: UsersTableProps) {
                     {user.public_name || 'No especificado'}
                   </td>
                   <td className="px-4 py-4 whitespace-nowrap">{user.email}</td>
-                  <td className="px-4 py-4 whitespace-nowrap">{user.phone || 'No especificado'}</td>
-                  <td className="px-4 py-4 whitespace-nowrap">{user.rut || 'No especificado'}</td>
                   <td className="px-4 py-4 whitespace-nowrap">
-                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getRoleBadgeColor(user.role)}`}>
+                    {user.phone || 'No especificado'}
+                  </td>
+                  <td className="px-4 py-4 whitespace-nowrap">
+                    {user.rut || 'No especificado'}
+                  </td>
+                  <td className="px-4 py-4 whitespace-nowrap">
+                    <span
+                      className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getRoleBadgeColor(
+                        user.role
+                      )}`}
+                    >
                       {getRoleLabel(user.role)}
                     </span>
                   </td>
@@ -261,15 +320,26 @@ export function UsersTable({ className }: UsersTableProps) {
                     {formatDate(user.createdAt)}
                   </td>
                   <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-600">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="rounded-full"
-                      onClick={() => handleOpenStats(user)}
-                    >
-                      <BarChartIcon className="h-4 w-4 mr-2" />
-                      Estadísticas
-                    </Button>
+                    <div className="flex gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="rounded-full"
+                        onClick={() => handleOpenStats(user)}
+                      >
+                        <BarChartIcon className="h-4 w-4 mr-2" />
+                        Estadísticas
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="text-red-600 hover:text-red-700 hover:bg-red-50 rounded-full"
+                        onClick={() => handleDeleteUser(user)}
+                        title="Eliminar usuario"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
                   </td>
                 </tr>
               ))
@@ -277,7 +347,7 @@ export function UsersTable({ className }: UsersTableProps) {
           </tbody>
         </table>
       </div>
-      
+
       <UserStatisticsDialog
         userId={selectedUserId}
         userName={selectedUserName}

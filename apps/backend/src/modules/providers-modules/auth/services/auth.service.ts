@@ -25,15 +25,6 @@ export class AuthService {
       companyId: user.companyId || undefined,
     };
 
-    // Debug log to verify payload
-    this.logger.verbose(`Creating JWT for user ${user.email} with payload:`, {
-      sub: payload.sub,
-      email: payload.email,
-      role: payload.role,
-      tenantId: payload.tenantId,
-      companyId: payload.companyId,
-    });
-
     const accessToken = this.generateJwtToken(payload);
     const refreshToken = this.generateRefreshToken({ sub: user.id });
     const expiryTime = this.generateExpiryTime();

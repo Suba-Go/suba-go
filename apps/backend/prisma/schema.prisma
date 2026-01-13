@@ -97,7 +97,7 @@ model User {
 
   // Unique constraints matching TypeORM indexes
   @@unique([email], map: "IDX_user_email_unique")
-  @@unique([rut], map: "IDX_user_rut_unique")
+  @@unique([rut, tenantId], map: "IDX_user_rut_tenant_unique")
   @@map("user")
 }
 

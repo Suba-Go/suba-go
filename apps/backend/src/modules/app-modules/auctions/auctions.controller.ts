@@ -151,6 +151,21 @@ export class AuctionsController {
     return this.auctionsService.getUserAuctionRegistrations(req.user.userId);
   }
 
+  @Get('registered/active')
+  @UseGuards(RolesGuard)
+  @Roles(UserRolesEnum.USER)
+  @ApiOperation({ summary: 'Obtener subastas activas donde estoy registrado' })
+  @ApiResponse({
+    status: 200,
+    description: 'Lista de subastas activas donde el usuario está registrado',
+  })
+  async getMyActiveRegisteredAuctions(@Request() req: AuthenticatedRequest) {
+    return this.auctionsService.getUserActiveRegisteredAuctions(
+      req.user.userId,
+      req.user.tenantId
+    );
+  }
+
   @Get('user/:userId/registrations')
   @UseGuards(RolesGuard)
   @Roles(UserRolesEnum.AUCTION_MANAGER, UserRolesEnum.ADMIN)

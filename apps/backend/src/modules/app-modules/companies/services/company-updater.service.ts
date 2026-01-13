@@ -1,6 +1,7 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, ConflictException } from '@nestjs/common';
 import { CompanyPrismaRepository } from './company-prisma-repository.service';
 import { CompanyUpdateDto } from '@suba-go/shared-validation';
+import { PrismaClientKnownRequestError } from '@prisma/client/runtime/library';
 
 @Injectable()
 export class CompanyUpdaterService {
@@ -26,6 +27,21 @@ export class CompanyUpdaterService {
     if (data.secondary_color3 !== undefined)
       updateData.secondary_color3 = data.secondary_color3 || null;
 
-    return this.companyRepository.update(id, updateData);
+    try {
+      return await this.companyRepository.update(id, updateData);
+    } catch (error) {
+      if (
+        error instanceof PrismaClientKnownRequestError &&
+        error.code === 'P2002'
+      ) {
+        const target = error.meta?.target as string[];
+        if (target?.includes('name')) {
+          throw new ConflictException(
+            'El nombre de la empresa ya está en uso. Por favor, elige otro.'
+          );
+        }
+      }
+      throw error;
+    }
   }
 }
