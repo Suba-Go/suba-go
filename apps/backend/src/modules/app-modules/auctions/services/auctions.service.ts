@@ -88,6 +88,16 @@ export class AuctionsService {
     return this.auctionRepository.getUserAuctionRegistrations(userId);
   }
 
+  async getUserActiveRegisteredAuctions(
+    userId: string,
+    tenantId: string
+  ): Promise<Auction[]> {
+    return this.auctionRepository.getUserActiveRegisteredAuctions(
+      userId,
+      tenantId
+    );
+  }
+
   async getAuctionById(id: string, tenantId: string): Promise<Auction> {
     const auction = await this.auctionRepository.getAuctionById(id);
 

@@ -36,8 +36,9 @@ export class UserUpdaterService {
 
       // Validate RUT uniqueness
       if (updateData.rut && updateData.rut !== existingUser.rut) {
-        const userWithRut = await this.userPrismaRepository.findByRut(
-          updateData.rut
+        const userWithRut = await this.userPrismaRepository.findByRutAndTenant(
+          updateData.rut,
+          existingUser.tenantId
         );
         if (userWithRut && userWithRut.id !== userId) {
           throw new ConflictException('El RUT ya está en uso por otro usuario');

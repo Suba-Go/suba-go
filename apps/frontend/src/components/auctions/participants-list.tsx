@@ -13,7 +13,7 @@ import { useToast } from '@suba-go/shared-components/components/ui/toaster';
 import {
   Users,
   UserPlus,
-  Trash2,
+  UserMinus,
   Mail,
   Phone,
   Calendar,
@@ -300,14 +300,17 @@ export function ParticipantsList({
                         </div>
                       </div>
                     </div>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => setParticipantToRemove(participant)}
-                      className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
+                    <div className="flex gap-2">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setParticipantToRemove(participant)}
+                        title="Desregistrar de la subasta"
+                        className="text-orange-600 hover:text-orange-700 hover:bg-orange-50"
+                      >
+                        <UserMinus className="h-4 w-4" />
+                      </Button>
+                    </div>
                   </div>
                 );
               })}

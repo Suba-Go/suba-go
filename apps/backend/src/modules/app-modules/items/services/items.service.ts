@@ -198,6 +198,42 @@ export class ItemsService {
   }
 
   async getItemsSoldToUser(userId: string, tenantId: string): Promise<Item[]> {
-    return this.itemRepository.findSoldToUser(userId, tenantId);
+    const items = await this.itemRepository.findSoldToUser(userId, tenantId);
+    
+    // Process photos field to ensure consistent array format
+    // This is needed because sometimes photos might be stored as stringified JSON or plain string
+    return items.map((item) => {
+      // Create a shallow copy to modify photos property
+      const processedItem = { ...item };
+      
+      if (processedItem.photos) {
+        try {
+          // If it looks like a JSON array, parse it
+          if (processedItem.photos.trim().startsWith('[')) {
+            // It's already good if it's a valid JSON array string
+            // But we keep it as string for frontend to parse or we could return object if DTO allows
+            // Currently DTO expects string, so we leave it as is if it's valid JSON
+            // Just validation here
+            JSON.parse(processedItem.photos);
+          } else if (
+            processedItem.photos.startsWith('http') ||
+            processedItem.photos.startsWith('/')
+          ) {
+            // If it's a single URL string, wrap it in a JSON array string
+            processedItem.photos = JSON.stringify([processedItem.photos]);
+          }
+        } catch (e) {
+          // If parsing failed or other error, and it looks like a url, wrap it
+          if (
+            processedItem.photos.startsWith('http') ||
+            processedItem.photos.startsWith('/')
+          ) {
+            processedItem.photos = JSON.stringify([processedItem.photos]);
+          }
+        }
+      }
+      
+      return processedItem;
+    });
   }
 }
