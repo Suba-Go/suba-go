@@ -121,15 +121,7 @@ export const companyCompactCreateSchema = companySchema.omit({
   secondary_color2: true,
   secondary_color3: true,
   tenantId: true,
-}).superRefine((data, ctx) => {
-  if (isDisallowedPrincipalColor(data.principal_color)) {
-    ctx.addIssue({
-      code: z.ZodIssueCode.custom,
-      path: ['principal_color'],
-      message: PRINCIPAL_COLOR_TOO_LIGHT_MSG,
-    });
-  }
-});
+}).strict();
 
 export const companyCreateSchema = companySchema
   .omit({
@@ -145,16 +137,7 @@ export const companyCreateSchema = companySchema
     secondary_color3: true,
     tenantId: true,
   })
-  .strict()
-  .superRefine((data, ctx) => {
-    if (isDisallowedPrincipalColor(data.principal_color)) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ['principal_color'],
-        message: PRINCIPAL_COLOR_TOO_LIGHT_MSG,
-      });
-    }
-  });
+  .strict();
 
 export type CompanyDto = z.infer<typeof companySchema>;
 export type CompanyWithTenantDto = z.infer<typeof companyWithTenantSchema>;
