@@ -22,6 +22,7 @@ import {
   SelectValue,
 } from '@suba-go/shared-components/components/ui/select';
 import { useToast } from '@suba-go/shared-components/components/ui/toaster';
+import { apiFetch } from '@/lib/api/api-fetch';
 import { FileUpload } from '@/components/ui/file-upload';
 import { FormattedInput } from '@/components/ui/formatted-input';
 import {
@@ -144,7 +145,7 @@ export function ItemEditModal({
         docs: allDocUrls.length > 0 ? allDocUrls.join(', ') : null,
       };
 
-      const response = await fetch(`/api/items/${item.id}`, {
+      const response = await apiFetch(`/api/items/${item.id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -299,7 +300,6 @@ export function ItemEditModal({
                 </p>
               )}
             </div>
-
             <div>
               <Label htmlFor="kilometraje">Kilometraje</Label>
               <FormattedInput
@@ -307,7 +307,35 @@ export function ItemEditModal({
                 formatType="number"
                 placeholder="50.000"
                 value={watch('kilometraje')}
-                onChange={(value) => setValue('kilometraje', value as number)}
+                inputMode="numeric"
+                onKeyDown={(e) => {
+                  const allowed = ['Backspace', 'Delete', 'ArrowLeft', 'ArrowRight', 'Tab', 'Home', 'End'];
+                  if (allowed.includes(e.key)) return;
+
+                  // solo permitir dígitos
+                  if (!/^\d$/.test(e.key)) {
+                    e.preventDefault();
+                    return;
+                  }
+
+                  // contar dígitos actuales (sin puntos/espacios)
+                  const currentDigits = (e.currentTarget as HTMLInputElement).value.replace(/\D/g, '').length;
+                  if (currentDigits >= 7) e.preventDefault(); // 👈 bloquea el 7º dígito
+                }}
+                onPaste={(e) => {
+                  const pasted = e.clipboardData.getData('text');
+                  const digits = pasted.replace(/\D/g, '');
+                  const currentDigits = (e.currentTarget as HTMLInputElement).value.replace(/\D/g, '');
+                  if ((currentDigits + digits).length > 7) {
+                    e.preventDefault(); // 👈 bloquea pegado que exceda 6 dígitos
+                  }
+                }}
+                onChange={(value) => {
+                  // respaldo: asegura que el valor guardado tampoco supere 6 dígitos
+                  const digits = String(value ?? '').replace(/\D/g, '').slice(0, 7);
+                  const next = digits ? Number(digits) : 0;
+                  setValue('kilometraje', next, { shouldValidate: true, shouldDirty: true });
+                }}
                 className={errors.kilometraje ? 'border-red-500' : ''}
               />
               {errors.kilometraje && (
@@ -316,6 +344,7 @@ export function ItemEditModal({
                 </p>
               )}
             </div>
+
 
             <div>
               <Label htmlFor="basePrice">Precio Base</Label>

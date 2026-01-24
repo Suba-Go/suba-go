@@ -1,15 +1,21 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import superjson from 'superjson';
+import { readBackendError } from '@/lib/read-backend-error';
 
-export async function GET(
+export const GET = auth(async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ userId: string }> }
 ) {
   try {
-    const session = await auth();
+    const session = (request as any).auth;
 
     if (!session) {
+      return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
+    }
+
+    const accessToken = session.tokens?.accessToken;
+    if (!accessToken) {
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
     }
 
@@ -30,12 +36,13 @@ export async function GET(
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',
-        Authorization: `Bearer ${session.tokens.accessToken}`,
+        Authorization: `Bearer ${accessToken}`,
       },
     });
 
     if (!response.ok) {
-      throw new Error(`Backend responded with status: ${response.status}`);
+      const message = await readBackendError(response);
+      return NextResponse.json({ error: message }, { status: response.status });
     }
 
     const data = await response.json();
@@ -59,4 +66,4 @@ export async function GET(
       { status: 500 }
     );
   }
-}
+});

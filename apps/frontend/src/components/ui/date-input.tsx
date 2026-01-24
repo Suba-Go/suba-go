@@ -172,7 +172,7 @@ export function DateInput({
           value={inputValue}
           onChange={handleChange}
           onBlur={handleBlur}
-          placeholder="dd/mm/yyyy"
+          placeholder="dd/MM/yyyy"
           className={`flex-1 ${className} ${
             error
               ? 'border-red-500 focus-visible:ring-red-500'

@@ -12,7 +12,7 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../../../providers-modules/prisma/prisma.service';
 import { AuctionsGateway } from '../../../providers-modules/realtime/auctions.gateway';
-import { AuctionStatusEnum } from '@suba-go/shared-validation';
+import { AuctionStatusEnum } from '@prisma/client';
 
 interface SchedulerConfig {
   defaultInterval: number; // 30 seconds
@@ -193,6 +193,20 @@ export class AuctionStatusSchedulerService
 
         this.logger.log(`✅ Started auction: ${auction.title} (${auction.id})`);
 
+// Ensure per-item clocks are initialized (independent timers).
+// This keeps the API/UI consistent and allows soft-close to extend only one item.
+await this.prisma.auctionItem.updateMany({
+  where: {
+    auctionId: auction.id,
+    OR: [{ startTime: null }, { endTime: null }],
+  },
+  data: {
+    startTime: updatedAuction.startTime,
+    endTime: updatedAuction.endTime,
+  },
+});
+
+
         // Broadcast status change via WebSocket
         this.auctionsGateway.broadcastAuctionStatusChange(
           auction.tenantId,
@@ -226,6 +240,34 @@ export class AuctionStatusSchedulerService
     });
 
     for (const auction of auctionsToComplete) {
+      // Determine the real auction end based on per-item clocks (soft-close extensions).
+      // We treat auction.endTime as the authoritative "overall" end, but keep it in sync with item endTimes.
+      const maxItemEndRow = await this.prisma.client.$queryRaw<
+        Array<{ max_end: Date | null }>
+      >`
+        SELECT MAX(COALESCE(ai."endTime", a."endTime")) AS max_end
+        FROM "public"."auction_item" ai
+        JOIN "public"."auction" a ON a."id" = ai."auctionId"
+        WHERE ai."auctionId" = ${auction.id}
+      `;
+      const maxItemEnd = maxItemEndRow?.[0]?.max_end || auction.endTime;
+
+      // If any item was extended beyond the auction.endTime, keep auction.endTime synced and skip completion.
+      if (maxItemEnd && maxItemEnd.getTime() > auction.endTime.getTime()) {
+        await this.prisma.auction.update({
+          where: { id: auction.id },
+          data: { endTime: maxItemEnd },
+        });
+        this.logger.warn(
+          `⏳ Auction ${auction.id} has item endTime beyond auction.endTime. Synced endTime and postponing completion.`
+        );
+      }
+
+      // If any item still has time remaining, do not complete the auction yet.
+      if (maxItemEnd && maxItemEnd.getTime() > now.getTime()) {
+        continue;
+      }
+
       try {
         // Process each auction item to determine winners and update item status
         await this.processAuctionItemsOnCompletion(
@@ -341,11 +383,16 @@ export class AuctionStatusSchedulerService
           },
         });
       } else {
-        // No bids - item remains in its current state
+        // No bids - release item back to DISPONIBLE
+        await this.prisma.item.update({
+          where: { id: auctionItem.itemId },
+          data: { state: 'DISPONIBLE' },
+        });
+
         this.logger.log(
           `📦 Item ${
             auctionItem.item.plate || auctionItem.itemId
-          } had no bids - remains ${auctionItem.item.state}`
+          } had no bids - released to DISPONIBLE`
         );
       }
     }

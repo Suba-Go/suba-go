@@ -6,6 +6,24 @@ import { Item, Prisma, ItemStateEnum } from '@prisma/client';
 export class ItemPrismaRepository {
   constructor(private readonly prisma: PrismaService) {}
 
+  /**
+   * Returns true if the given user has a registration for at least one of the auctions.
+   * Used to protect item detail access for USER role.
+   */
+  async isUserRegisteredForAuctions(
+    userId: string,
+    auctionIds: string[]
+  ): Promise<boolean> {
+    if (!userId || auctionIds.length === 0) return false;
+    const count = await this.prisma.auctionRegistration.count({
+      where: {
+        userId,
+        auctionId: { in: auctionIds },
+      },
+    });
+    return count > 0;
+  }
+
   async create(data: Prisma.ItemCreateInput): Promise<Item> {
     return this.prisma.item.create({
       data,
@@ -110,11 +128,26 @@ export class ItemPrismaRepository {
   }
 
   async findAvailableItems(tenantId: string): Promise<Item[]> {
+    // An item is considered available only if:
+    // - It is DISPONIBLE
+    // - It is NOT currently linked to an auction that is PENDIENTE or ACTIVA
+    //   (This protects against older data where state might not have been updated yet).
     return this.prisma.item.findMany({
       where: {
         tenantId,
         state: ItemStateEnum.DISPONIBLE,
         isDeleted: false,
+        auctionItems: {
+          none: {
+            isDeleted: false,
+            auction: {
+              isDeleted: false,
+              status: {
+                in: ['PENDIENTE', 'ACTIVA'],
+              },
+            },
+          },
+        },
       },
       include: {
         tenant: true,

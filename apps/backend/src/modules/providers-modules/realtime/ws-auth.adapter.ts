@@ -9,11 +9,13 @@ import { WsAdapter } from '@nestjs/platform-ws';
 import { WebSocketServer } from 'ws';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
+import { PrismaService } from '../prisma/prisma.service';
 
 export class WsAuthAdapter extends WsAdapter {
   protected readonly logger = new Logger(WsAuthAdapter.name);
   private jwtService: JwtService;
   private configService: ConfigService;
+  private prisma: PrismaService;
   private app: INestApplicationContext;
 
   constructor(app: INestApplicationContext) {
@@ -24,6 +26,7 @@ export class WsAuthAdapter extends WsAdapter {
     // Get services from DI container
     this.jwtService = app.get(JwtService);
     this.configService = app.get(ConfigService);
+    this.prisma = app.get(PrismaService);
 
     this.logger.log('WsAuthAdapter initialized with JWT authentication');
   }
@@ -151,6 +154,9 @@ export class WsAuthAdapter extends WsAdapter {
 
     // Add our custom upgrade handler with authentication
     httpServer.on('upgrade', (request: any, socket: any, head: Buffer) => {
+      // We need async I/O (tenant block check) inside upgrade.
+      // Node's 'upgrade' callback isn't awaited, so we execute an async IIFE.
+      (async () => {
       const url = new URL(request.url!, 'http://localhost');
 
       // Only handle /ws path
@@ -188,6 +194,22 @@ export class WsAuthAdapter extends WsAdapter {
 
         this.logger.log(`WebSocket upgrade authenticated: ${payload.email}`);
 
+        // Tenant blocking (except ADMIN)
+        if (payload.role !== 'ADMIN' && payload.tenantId) {
+          const tenant = await this.prisma.tenant.findUnique({
+            where: { id: payload.tenantId },
+            select: { isBlocked: true },
+          });
+          if (tenant?.isBlocked) {
+            this.logger.warn(
+              `WebSocket connection rejected: Tenant blocked (tenantId=${payload.tenantId}, email=${payload.email})`
+            );
+            socket.write('HTTP/1.1 403 Forbidden\r\n\r\n');
+            socket.destroy();
+            return;
+          }
+        }
+
         // Attach user info to request
         (request as any).user = payload;
 
@@ -203,6 +225,16 @@ export class WsAuthAdapter extends WsAdapter {
         socket.write('HTTP/1.1 401 Unauthorized\r\n\r\n');
         socket.destroy();
       }
+      })().catch((err) => {
+        const message = err instanceof Error ? err.message : 'Upgrade error';
+        this.logger.warn(`WebSocket connection rejected: ${message}`);
+        try {
+          socket.write('HTTP/1.1 500 Internal Server Error\r\n\r\n');
+        } catch {
+          // ignore
+        }
+        socket.destroy();
+      });
     });
 
     // Call the original callback for each connection

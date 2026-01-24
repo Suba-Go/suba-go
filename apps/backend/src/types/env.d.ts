@@ -9,6 +9,7 @@ declare namespace NodeJS {
     PRISMA_DATABASE_URL?: string;
     JWT_SECRET: string;
     JWT_REFRESH_SECRET: string;
+    JWT_REFRESH_HASH_SECRET?: string;
     JWT_ACCESS_EXPIRY_TIME: string;
     JWT_ACCESS_EXPIRY_TIME_INT: string;
     JWT_REFRESH_EXPIRY_TIME: string;

@@ -1,13 +1,226 @@
 import { Injectable } from '@nestjs/common';
 import { randomUUID } from 'crypto';
 import { PrismaService } from '../../../providers-modules/prisma/prisma.service';
+import { Prisma, ItemStateEnum } from '@prisma/client';
 import type {
-  Auction,
-  Bid,
+  Auction as AuctionModel,
+  Bid as BidModel,
   AuctionTypeEnum,
   AuctionStatusEnum,
 } from '@prisma/client';
-import { AuctionDto } from '@suba-go/shared-validation';
+
+/**
+ * Best practice: strongly-type Prisma queries that use `include` / `select`.
+ * Returning a plain `Auction`/`Bid` type while using `include` leads to future TS errors
+ * (e.g. "Property 'items' does not exist on type 'Auction'").
+ */
+const auctionWithDetailsArgs = Prisma.validator<Prisma.AuctionDefaultArgs>()({
+  include: {
+    tenant: true,
+    items: {
+      include: {
+        item: {
+          include: {
+            soldToUser: {
+              select: {
+                id: true,
+                email: true,
+                public_name: true,
+                name: true,
+              },
+            },
+          },
+        },
+        bids: {
+          include: {
+            user: {
+              select: {
+                id: true,
+                email: true,
+                public_name: true,
+              },
+            },
+          },
+          orderBy: {
+            createdAt: 'desc',
+          },
+        },
+      },
+    },
+  },
+});
+
+export type AuctionWithDetails = Prisma.AuctionGetPayload<
+  typeof auctionWithDetailsArgs
+>;
+
+const activeAuctionsArgs = Prisma.validator<Prisma.AuctionDefaultArgs>()({
+  include: {
+    items: {
+      include: {
+        item: true,
+        bids: {
+          take: 1,
+          orderBy: {
+            offered_price: 'desc',
+          },
+          include: {
+            user: {
+              select: {
+                id: true,
+                email: true,
+              },
+            },
+          },
+        },
+      },
+    },
+  },
+});
+
+export type ActiveAuctionWithItems = Prisma.AuctionGetPayload<
+  typeof activeAuctionsArgs
+>;
+
+const bidWithUserArgs = Prisma.validator<Prisma.BidDefaultArgs>()({
+  include: {
+    user: {
+      select: {
+        id: true,
+        email: true,
+      },
+    },
+  },
+});
+
+export type BidWithUser = Prisma.BidGetPayload<typeof bidWithUserArgs>;
+
+const bidWithAuctionItemArgs = Prisma.validator<Prisma.BidDefaultArgs>()({
+  include: {
+    auctionItem: {
+      include: {
+        item: true,
+        auction: true,
+      },
+    },
+  },
+});
+
+export type BidWithAuctionItem = Prisma.BidGetPayload<
+  typeof bidWithAuctionItemArgs
+>;
+
+const placedBidArgs = Prisma.validator<Prisma.BidDefaultArgs>()({
+  include: {
+    user: {
+      select: {
+        id: true,
+        email: true,
+      },
+    },
+    auctionItem: {
+      include: {
+        item: true,
+      },
+    },
+  },
+});
+
+export type PlacedBid = Prisma.BidGetPayload<typeof placedBidArgs>;
+
+const auctionsByTenantArgs = Prisma.validator<Prisma.AuctionDefaultArgs>()({
+  include: {
+    items: {
+      include: {
+        item: {
+          include: {
+            soldToUser: {
+              select: {
+                id: true,
+                email: true,
+                public_name: true,
+                name: true,
+              },
+            },
+          },
+        },
+        bids: {
+          orderBy: {
+            offered_price: 'desc',
+          },
+        },
+      },
+    },
+  },
+});
+
+export type AuctionsByTenant = Prisma.AuctionGetPayload<
+  typeof auctionsByTenantArgs
+>;
+
+const auctionStatusUpdateArgs = Prisma.validator<Prisma.AuctionDefaultArgs>()({
+  include: {
+    tenant: true,
+    items: {
+      include: {
+        item: true,
+        bids: {
+          include: {
+            user: {
+              select: {
+                id: true,
+                email: true,
+              },
+            },
+          },
+          orderBy: {
+            createdAt: 'desc',
+          },
+        },
+      },
+    },
+  },
+});
+
+export type AuctionWithStatusUpdate = Prisma.AuctionGetPayload<
+  typeof auctionStatusUpdateArgs
+>;
+
+const closeAuctionFetchArgs = Prisma.validator<Prisma.AuctionDefaultArgs>()({
+  include: {
+    items: {
+      include: {
+        item: true,
+        bids: {
+          where: { isDeleted: false },
+          orderBy: { offered_price: 'desc' },
+          take: 1,
+        },
+      },
+    },
+  },
+});
+
+type CloseAuctionFetch = Prisma.AuctionGetPayload<typeof closeAuctionFetchArgs>;
+
+const closeAuctionResultArgs = Prisma.validator<Prisma.AuctionDefaultArgs>()({
+  include: {
+    items: {
+      include: {
+        item: true,
+        bids: {
+          orderBy: { offered_price: 'desc' },
+          take: 1,
+          include: { user: true },
+        },
+      },
+    },
+  },
+});
+
+export type CloseAuctionResult = Prisma.AuctionGetPayload<
+  typeof closeAuctionResultArgs
+>;
 
 @Injectable()
 export class AuctionPrismaService {
@@ -23,56 +236,22 @@ export class AuctionPrismaService {
     type?: AuctionTypeEnum;
     bidIncrement?: number;
     itemIds?: string[];
-  }): Promise<AuctionDto> {
+  }): Promise<AuctionModel> {
     return this.prisma.auction.create({
       data,
     });
   }
 
   // Get auction with all related data
-  async getAuctionById(id: string): Promise<Auction | null> {
+  async getAuctionById(id: string): Promise<AuctionWithDetails | null> {
     return this.prisma.auction.findUnique({
       where: { id },
-      include: {
-        tenant: true,
-        items: {
-          include: {
-            item: {
-              include: {
-                soldToUser: {
-                  select: {
-                    id: true,
-                    email: true,
-                    public_name: true,
-                    name: true,
-                    // Don't include password
-                  },
-                },
-              },
-            },
-            bids: {
-              include: {
-                user: {
-                  select: {
-                    id: true,
-                    email: true,
-                    public_name: true,
-                    // Don't include password
-                  },
-                },
-              },
-              orderBy: {
-                createdAt: 'desc',
-              },
-            },
-          },
-        },
-      },
+      ...auctionWithDetailsArgs,
     });
   }
 
   // Get active auctions for a tenant
-  async getActiveAuctions(tenantId: string): Promise<Auction[]> {
+  async getActiveAuctions(tenantId: string): Promise<ActiveAuctionWithItems[]> {
     const now = new Date();
 
     return this.prisma.auction.findMany({
@@ -83,27 +262,7 @@ export class AuctionPrismaService {
         status: 'ACTIVA',
         isDeleted: false,
       },
-      include: {
-        items: {
-          include: {
-            item: true,
-            bids: {
-              take: 1,
-              orderBy: {
-                offered_price: 'desc',
-              },
-              include: {
-                user: {
-                  select: {
-                    id: true,
-                    email: true,
-                  },
-                },
-              },
-            },
-          },
-        },
-      },
+      ...activeAuctionsArgs,
       orderBy: {
         endTime: 'asc',
       },
@@ -117,7 +276,7 @@ export class AuctionPrismaService {
     auctionItemId: string;
     amount: number;
     tenantId: string;
-  }): Promise<Bid> {
+  }): Promise<PlacedBid> {
     return this.prisma.executeTransaction(async (prisma) => {
       // Check if auction is still active
       const auction = await prisma.auction.findUnique({
@@ -160,38 +319,19 @@ export class AuctionPrismaService {
           tenantId: data.tenantId,
           bid_time: new Date(),
         },
-        include: {
-          user: {
-            select: {
-              id: true,
-              email: true,
-            },
-          },
-          auctionItem: {
-            include: {
-              item: true,
-            },
-          },
-        },
+        ...placedBidArgs,
       });
     });
   }
 
   // Get bid history for an auction item
-  async getBidHistory(auctionItemId: string): Promise<Bid[]> {
+  async getBidHistory(auctionItemId: string): Promise<BidWithUser[]> {
     return this.prisma.bid.findMany({
       where: {
         auctionItemId,
         isDeleted: false,
       },
-      include: {
-        user: {
-          select: {
-            id: true,
-            email: true,
-          },
-        },
-      },
+      ...bidWithUserArgs,
       orderBy: {
         createdAt: 'desc',
       },
@@ -199,20 +339,13 @@ export class AuctionPrismaService {
   }
 
   // Get user's bids
-  async getUserBids(userId: string): Promise<Bid[]> {
+  async getUserBids(userId: string): Promise<BidWithAuctionItem[]> {
     return this.prisma.bid.findMany({
       where: {
         userId,
         isDeleted: false,
       },
-      include: {
-        auctionItem: {
-          include: {
-            item: true,
-            auction: true,
-          },
-        },
-      },
+      ...bidWithAuctionItemArgs,
       orderBy: {
         createdAt: 'desc',
       },
@@ -220,35 +353,13 @@ export class AuctionPrismaService {
   }
 
   // Get auctions by tenant
-  async getAuctionsByTenant(tenantId: string): Promise<Auction[]> {
+  async getAuctionsByTenant(tenantId: string): Promise<AuctionsByTenant[]> {
     return this.prisma.auction.findMany({
       where: {
         tenantId,
         isDeleted: false,
       },
-      include: {
-        items: {
-          include: {
-            item: {
-              include: {
-                soldToUser: {
-                  select: {
-                    id: true,
-                    email: true,
-                    public_name: true,
-                    name: true,
-                  },
-                },
-              },
-            },
-            bids: {
-              orderBy: {
-                offered_price: 'desc',
-              },
-            },
-          },
-        },
-      },
+      ...auctionsByTenantArgs,
       orderBy: {
         createdAt: 'desc',
       },
@@ -295,7 +406,7 @@ export class AuctionPrismaService {
       type?: AuctionTypeEnum;
       bidIncrement?: number;
     }
-  ): Promise<AuctionDto> {
+  ): Promise<AuctionModel> {
     return this.prisma.auction.update({
       where: { id },
       data,
@@ -317,31 +428,11 @@ export class AuctionPrismaService {
   async updateAuctionStatus(
     id: string,
     status: AuctionStatusEnum
-  ): Promise<Auction> {
+  ): Promise<AuctionWithStatusUpdate> {
     return this.prisma.auction.update({
       where: { id },
       data: { status },
-      include: {
-        tenant: true,
-        items: {
-          include: {
-            item: true,
-            bids: {
-              include: {
-                user: {
-                  select: {
-                    id: true,
-                    email: true,
-                  },
-                },
-              },
-              orderBy: {
-                createdAt: 'desc',
-              },
-            },
-          },
-        },
-      },
+      ...auctionStatusUpdateArgs,
     });
   }
 
@@ -421,54 +512,195 @@ export class AuctionPrismaService {
     };
   }
 
-  // Add items to auction
   async addItemsToAuction(auctionId: string, itemIds: string[]): Promise<void> {
-    // Create AuctionItem records for each selected item
-    const items = await this.prisma.item.findMany({
-      where: {
-        id: {
-          in: itemIds,
+    await this.prisma.executeTransaction(async (prisma) => {
+      // Reserve items first (atomic) so they can't be selected by other pending auctions
+      const notAvailable = await prisma.item.findMany({
+        where: {
+          id: { in: itemIds },
+          isDeleted: false,
+          state: { not: ItemStateEnum.DISPONIBLE },
         },
+        select: { id: true, state: true },
+      });
+
+      if (notAvailable.length > 0) {
+        const details = notAvailable.map((i) => `${i.id}(${i.state})`).join(', ');
+        throw new Error(`Algunos items no están disponibles para agregar a la subasta: ${details}`);
+      }
+
+      await prisma.item.updateMany({
+        where: {
+          id: { in: itemIds },
+          isDeleted: false,
+          state: ItemStateEnum.DISPONIBLE,
+        },
+        data: {
+          state: ItemStateEnum.EN_SUBASTA,
+        },
+      });
+
+      // Create AuctionItem records for each selected item
+      const items = await prisma.item.findMany({
+        where: {
+          id: { in: itemIds },
+        },
+        select: { id: true, basePrice: true },
+      });
+
+      const auctionItems = items.map((item) => ({
+        auctionId,
+        itemId: item.id,
+        startingBid: item.basePrice,
+      }));
+
+      await prisma.auctionItem.createMany({
+        data: auctionItems,
+        skipDuplicates: true,
+      });
+    });
+  }
+
+  /**
+   * Reserve items that are already linked to an auction via AuctionItem rows.
+   * Used when an auction is uncancelled (relations already exist).
+   */
+  async reserveItemsFromAuction(auctionId: string): Promise<void> {
+    await this.prisma.executeTransaction(async (prisma) => {
+      const auctionItems = await prisma.auctionItem.findMany({
+        where: { auctionId, isDeleted: false },
+        select: { itemId: true },
+      });
+
+      const itemIds = Array.from(new Set(auctionItems.map((ai) => ai.itemId)));
+      if (itemIds.length === 0) return;
+
+      const notAvailable = await prisma.item.findMany({
+        where: {
+          id: { in: itemIds },
+          isDeleted: false,
+          state: { not: ItemStateEnum.DISPONIBLE },
+        },
+        select: { id: true, state: true },
+      });
+
+      if (notAvailable.length > 0) {
+        const details = notAvailable.map((i) => `${i.id}(${i.state})`).join(', ');
+        throw new Error(`No se pueden reservar items porque ya están en otra subasta: ${details}`);
+      }
+
+      await prisma.item.updateMany({
+        where: {
+          id: { in: itemIds },
+          isDeleted: false,
+          state: ItemStateEnum.DISPONIBLE,
+        },
+        data: { state: ItemStateEnum.EN_SUBASTA },
+      });
+    });
+  }
+
+  /**
+   * Releases items reserved for an auction back to DISPONIBLE (only if still EN_SUBASTA).
+   * Does NOT delete auction-item relations; sold items remain untouched.
+   */
+  async releaseItemsFromAuction(auctionId: string): Promise<void> {
+    const auctionItems = await this.prisma.auctionItem.findMany({
+      where: { auctionId, isDeleted: false },
+      select: { itemId: true },
+    });
+
+    const itemIds = Array.from(new Set(auctionItems.map((ai) => ai.itemId)));
+    if (itemIds.length === 0) return;
+
+    await this.prisma.item.updateMany({
+      where: {
+        id: { in: itemIds },
+        state: ItemStateEnum.EN_SUBASTA,
+        isDeleted: false,
+      },
+      data: {
+        state: ItemStateEnum.DISPONIBLE,
       },
     });
-    const auctionItems = items.map((item) => ({
-      auctionId,
-      itemId: item.id,
-      startingBid: item.basePrice,
-    }));
-
-    await this.prisma.auctionItem.createMany({
-      data: auctionItems,
-    });
   }
 
-  // Remove all items from auction
   async removeAllItemsFromAuction(auctionId: string): Promise<void> {
-    await this.prisma.auctionItem.deleteMany({
-      where: { auctionId },
+    await this.prisma.executeTransaction(async (prisma) => {
+      // First release reserved items back to DISPONIBLE (only those still EN_SUBASTA)
+      const auctionItems = await prisma.auctionItem.findMany({
+        where: { auctionId, isDeleted: false },
+        select: { itemId: true },
+      });
+
+      const itemIds = Array.from(new Set(auctionItems.map((ai) => ai.itemId)));
+      if (itemIds.length > 0) {
+        await prisma.item.updateMany({
+          where: {
+            id: { in: itemIds },
+            state: ItemStateEnum.EN_SUBASTA,
+            isDeleted: false,
+          },
+          data: { state: ItemStateEnum.DISPONIBLE },
+        });
+      }
+
+      await prisma.auctionItem.deleteMany({
+        where: { auctionId },
+      });
     });
   }
+
+
+async removeItemsFromAuction(
+    auctionId: string,
+    itemIds: string[]
+  ): Promise<void> {
+    const uniqueIds = Array.from(new Set(itemIds.filter(Boolean)));
+    if (uniqueIds.length === 0) return;
+
+    await this.prisma.executeTransaction(async (prisma) => {
+      // Only operate on items that are actually linked to this auction
+      const linked = await prisma.auctionItem.findMany({
+        where: {
+          auctionId,
+          itemId: { in: uniqueIds },
+          isDeleted: false,
+        },
+        select: { itemId: true },
+      });
+
+      const linkedIds = Array.from(new Set(linked.map((ai) => ai.itemId)));
+      if (linkedIds.length === 0) return;
+
+      // Release reserved items back to DISPONIBLE (only those still EN_SUBASTA)
+      await prisma.item.updateMany({
+        where: {
+          id: { in: linkedIds },
+          state: ItemStateEnum.EN_SUBASTA,
+          isDeleted: false,
+        },
+        data: { state: ItemStateEnum.DISPONIBLE },
+      });
+
+      // Remove the auction-item relations
+      await prisma.auctionItem.deleteMany({
+        where: {
+          auctionId,
+          itemId: { in: linkedIds },
+        },
+      });
+    });
+  }
+
 
   // Close auction and determine winners
-  async closeAuction(auctionId: string): Promise<Auction> {
+  async closeAuction(auctionId: string): Promise<CloseAuctionResult> {
     return this.prisma.executeTransaction(async (prisma) => {
       // Get auction with items and their highest bids
       const auction = await prisma.auction.findUnique({
         where: { id: auctionId },
-        include: {
-          items: {
-            include: {
-              item: true,
-              bids: {
-                where: { isDeleted: false },
-                orderBy: {
-                  offered_price: 'desc',
-                },
-                take: 1,
-              },
-            },
-          },
-        },
+        ...closeAuctionFetchArgs,
       });
 
       if (!auction) {
@@ -480,7 +712,6 @@ export class AuctionPrismaService {
         const winningBid = auctionItem.bids[0];
 
         if (winningBid && auctionItem.item) {
-          // Update item with soldPrice and mark as VENDIDO
           await prisma.item.update({
             where: { id: auctionItem.item.id },
             data: {
@@ -490,29 +721,23 @@ export class AuctionPrismaService {
               state: 'VENDIDO',
             },
           });
+        } else if (auctionItem.item) {
+          // No bids -> item is NOT sold, release it back to DISPONIBLE
+          await prisma.item.update({
+            where: { id: auctionItem.item.id },
+            data: {
+              state: ItemStateEnum.DISPONIBLE,
+            },
+          });
         }
       }
+
 
       // Update auction status to COMPLETADA
       const updatedAuction = await prisma.auction.update({
         where: { id: auctionId },
         data: { status: 'COMPLETADA' },
-        include: {
-          items: {
-            include: {
-              item: true,
-              bids: {
-                orderBy: {
-                  offered_price: 'desc',
-                },
-                take: 1,
-                include: {
-                  user: true,
-                },
-              },
-            },
-          },
-        },
+        ...closeAuctionResultArgs,
       });
 
       return updatedAuction;

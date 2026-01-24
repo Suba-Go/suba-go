@@ -11,6 +11,7 @@ import {
   Request,
   HttpStatus,
   HttpCode,
+  ForbiddenException,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -74,6 +75,8 @@ export class ItemsController {
   }
 
   @Get('tenant/:tenantId')
+  @UseGuards(RolesGuard)
+  @Roles(UserRolesEnum.AUCTION_MANAGER, UserRolesEnum.ADMIN)
   @ApiOperation({ summary: 'Obtener items por tenant' })
   @ApiParam({ name: 'tenantId', description: 'ID del tenant' })
   @ApiResponse({
@@ -87,13 +90,15 @@ export class ItemsController {
   ) {
     // Validate that user belongs to the tenant
     if (req.user.tenantId !== tenantId) {
-      throw new Error('No tienes acceso a los items de este tenant');
+      throw new ForbiddenException('No tienes acceso a los items de este tenant');
     }
 
     return this.itemsService.getItemsByTenant(tenantId);
   }
 
   @Get('available/tenant/:tenantId')
+  @UseGuards(RolesGuard)
+  @Roles(UserRolesEnum.AUCTION_MANAGER, UserRolesEnum.ADMIN)
   @ApiOperation({ summary: 'Obtener items disponibles por tenant' })
   @ApiParam({ name: 'tenantId', description: 'ID del tenant' })
   @ApiResponse({
@@ -107,7 +112,7 @@ export class ItemsController {
   ) {
     // Validate that user belongs to the tenant
     if (req.user.tenantId !== tenantId) {
-      throw new Error('No tienes acceso a los items de este tenant');
+      throw new ForbiddenException('No tienes acceso a los items de este tenant');
     }
 
     return this.itemsService.getAvailableItems(tenantId);
@@ -129,7 +134,9 @@ export class ItemsController {
   ) {
     // Validate that user belongs to the tenant
     if (req.user.tenantId !== tenantId) {
-      throw new Error('No tienes acceso a las estadísticas de este tenant');
+      throw new ForbiddenException(
+        'No tienes acceso a las estadísticas de este tenant'
+      );
     }
 
     return this.itemsService.getItemStats(tenantId);
@@ -148,10 +155,19 @@ export class ItemsController {
     @Request() req: AuthenticatedRequest
   ) {
     const tenantId = req.user.tenantId;
+
+    // USER can only fetch their own sold items
+    if (req.user.role === UserRolesEnum.USER && req.user.userId !== userId) {
+      throw new ForbiddenException(
+        'No tienes acceso a los items vendidos de otro usuario'
+      );
+    }
     return this.itemsService.getItemsSoldToUser(userId, tenantId);
   }
 
   @Get('by-state/:state/tenant/:tenantId')
+  @UseGuards(RolesGuard)
+  @Roles(UserRolesEnum.AUCTION_MANAGER, UserRolesEnum.ADMIN)
   @ApiOperation({ summary: 'Obtener items por estado y tenant' })
   @ApiParam({ name: 'state', description: 'Estado del item' })
   @ApiParam({ name: 'tenantId', description: 'ID del tenant' })
@@ -167,7 +183,7 @@ export class ItemsController {
   ) {
     // Validate that user belongs to the tenant
     if (req.user.tenantId !== tenantId) {
-      throw new Error('No tienes acceso a los items de este tenant');
+      throw new ForbiddenException('No tienes acceso a los items de este tenant');
     }
 
     return this.itemsService.getItemsByState(state, tenantId);
@@ -187,7 +203,10 @@ export class ItemsController {
     @Request() req: AuthenticatedRequest
   ) {
     const tenantId = req.user.tenantId;
-    return this.itemsService.getItemById(id, tenantId);
+    return this.itemsService.getItemById(id, tenantId, {
+      role: req.user.role,
+      userId: req.user.userId,
+    });
   }
 
   @Put(':id')

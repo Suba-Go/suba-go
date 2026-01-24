@@ -8,6 +8,7 @@ import { Spinner } from '@suba-go/shared-components/components/ui/spinner';
 import { useToast } from '@suba-go/shared-components/components/ui/toaster';
 import { useCompany } from '@/hooks/use-company';
 import { PasswordChecklist } from '@/components/auth/password-checklist';
+import { apiFetch } from '@/lib/api/api-fetch';
 
 import { Check, Circle, X } from 'lucide-react';
 
@@ -101,7 +102,7 @@ export default function InviteAcceptPage() {
 
     setLoading(true);
     try {
-      const res = await fetch('/api/users/invite/accept', {
+      const res = await apiFetch('/api/users/invite/accept', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ token, password }),

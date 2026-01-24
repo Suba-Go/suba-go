@@ -31,6 +31,7 @@ export interface JwtPayload {
  */
 export interface RefreshPayload {
   sub: string; // User ID
+  jti?: string; // Refresh token id (for rotation)
   iat?: number;
   exp?: number;
 }

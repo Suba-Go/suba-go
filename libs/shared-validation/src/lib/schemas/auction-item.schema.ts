@@ -9,6 +9,9 @@ export const auctionItemSchema = baseSchema
     startingBid: z.number().positive(),
     auctionId: z.uuid(),
     itemId: z.uuid(),
+    // Independent item timer (nullable for backwards compatibility)
+    startTime: z.date().nullable().optional(),
+    endTime: z.date().nullable().optional(),
   })
   .strict();
 
@@ -17,6 +20,9 @@ export const auctionItemWithItmeAndBidsSchema = baseSchema
     startingBid: z.number().positive(),
     auctionId: z.uuid(),
     itemId: z.uuid(),
+    // Independent item timer (nullable for backwards compatibility)
+    startTime: z.date().nullable().optional(),
+    endTime: z.date().nullable().optional(),
     get item() {
       return itemWithSoldToUserSchema.nullable();
     },

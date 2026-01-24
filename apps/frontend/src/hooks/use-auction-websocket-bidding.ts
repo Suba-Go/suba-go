@@ -1,8 +1,15 @@
 /**
  * @file use-auction-websocket-bidding.ts
- * @description Hook for managing WebSocket connection for auction bidding
+ * @description Hook for managing WebSocket connection for auction bidding.
+ *
+ * Key goals:
+ * - One WS per (tenantId, auctionId) per browser tab.
+ * - No leaked sockets when navigating (ref-counted close on last subscriber).
+ * - Safe sendBid (never stuck loading when WS not ready/joined).
+ * - Stable handlers (no stale-closure issues).
  */
-import { useState, useEffect, useRef, useCallback } from 'react';
+
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 export interface BidData {
   auctionItemId: string;
@@ -10,13 +17,32 @@ export interface BidData {
   userId: string;
   userName?: string;
   bidId: string;
+  requestId?: string;
   timestamp: number;
+  serverTimeMs?: number; // optional, for time sync
 }
 
 interface TimeExtensionData {
   auctionId: string;
+  auctionItemId?: string;
   newEndTime: string;
   extensionSeconds: number;
+  serverTimeMs?: number;
+}
+
+
+export interface JoinedSnapshotData {
+  auction?: {
+    id: string;
+    status: string;
+    startTime: string;
+    endTime: string;
+  };
+  auctionItems?: Array<{
+    id: string;
+    startTime: string;
+    endTime: string;
+  }>;
 }
 
 interface WebSocketMessage {
@@ -29,10 +55,15 @@ interface UseAuctionWebSocketBiddingProps {
   tenantId: string;
   accessToken: string;
   onBidPlaced?: (data: BidData) => void;
-  onBidRejected?: (data: { auctionItemId: string; reason: string }) => void;
+  onBidRejected?: (data: {
+    auctionItemId: string;
+    reason: string;
+    requestId?: string;
+  }) => void;
   onTimeExtension?: (data: TimeExtensionData) => void;
   onStatusChanged?: (status: string) => void;
   onJoined?: () => void;
+  onSnapshot?: (data: JoinedSnapshotData) => void;
 }
 
 interface UseAuctionWebSocketBiddingReturn {
@@ -40,10 +71,13 @@ interface UseAuctionWebSocketBiddingReturn {
   isJoined: boolean;
   participantCount: number;
   connectionError: string | null;
-  sendBid: (auctionItemId: string, amount: number) => void;
+  /** Difference between server clock and local clock in ms (server - local). */
+  serverOffsetMs: number;
+  /** Returns requestId if the bid was sent. */
+  sendBid: (auctionItemId: string, amount: number) => string | null;
 }
 
-const getWebSocketUrl = () => {
+const getWebSocketUrl = (): string => {
   if (process.env.NEXT_PUBLIC_WS_ENDPOINT) {
     return process.env.NEXT_PUBLIC_WS_ENDPOINT;
   }
@@ -51,8 +85,204 @@ const getWebSocketUrl = () => {
   return backendUrl.replace(/^http/, 'ws') + '/ws';
 };
 
-// Global connection tracker to prevent multiple connections in React Strict Mode
-const activeConnections = new Map<string, WebSocket>();
+type Subscriber = {
+  onOpen: () => void;
+  onClose: () => void;
+  onError: (err: string) => void;
+  onMessage: (msg: WebSocketMessage) => void;
+};
+
+type ManagedConn = {
+  key: string;
+  socket: WebSocket;
+  subscribers: Set<Subscriber>;
+  refCount: number;
+  joined: boolean;
+  participantCount: number;
+  serverOffsetMs: number;
+  lastError: string | null;
+  closing: boolean;
+  reconnectAttempts: number;
+  reconnectTimer: ReturnType<typeof setTimeout> | null;
+  tenantId: string;
+  auctionId: string;
+  accessToken: string;
+};
+
+// Global, per-tab connection pool.
+const connections = new Map<string, ManagedConn>();
+
+function backoffMs(attempt: number): number {
+  // 0 -> 500ms, 1 -> 750ms, 2 -> 1125ms ... capped
+  const base = 500;
+  const ms = Math.floor(base * Math.pow(1.5, attempt));
+  return Math.min(ms, 8000);
+}
+
+function safeParseMessage(raw: any): WebSocketMessage | null {
+  try {
+    if (typeof raw !== 'string') return null;
+    return JSON.parse(raw) as WebSocketMessage;
+  } catch {
+    return null;
+  }
+}
+
+function createSocket(accessToken: string): WebSocket {
+  const wsEndpoint = getWebSocketUrl();
+  const wsUrl = `${wsEndpoint}?token=${encodeURIComponent(accessToken)}`;
+  return new WebSocket(wsUrl);
+}
+
+function createRequestId(): string {
+  // Safer than relying on crypto.randomUUID() existing in every browser.
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const c: any = typeof crypto !== 'undefined' ? (crypto as any) : undefined;
+    if (c && typeof c.randomUUID === 'function') {
+      return c.randomUUID();
+    }
+  } catch {
+    // ignore
+  }
+  return `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+}
+
+function attachSocketHandlers(conn: ManagedConn) {
+  const ws = conn.socket;
+
+  ws.onopen = () => {
+    conn.reconnectAttempts = 0;
+    conn.lastError = null;
+    conn.subscribers.forEach((s) => s.onOpen());
+
+    // Always (re)join on open.
+    try {
+      ws.send(
+        JSON.stringify({
+          event: 'JOIN_AUCTION',
+          data: { tenantId: conn.tenantId, auctionId: conn.auctionId },
+        })
+      );
+    } catch {
+      // If send fails here, onclose/onerror will take over.
+    }
+  };
+
+  ws.onmessage = (ev) => {
+    const msg = safeParseMessage(ev.data);
+    if (!msg) return;
+
+    // Keep minimal shared state on the connection.
+    if (msg.event === 'JOINED') {
+      conn.joined = true;
+      if (typeof msg.data?.participantCount === 'number') {
+        conn.participantCount = msg.data.participantCount;
+      }
+      if (typeof msg.data?.serverTimeMs === 'number') {
+        conn.serverOffsetMs = msg.data.serverTimeMs - Date.now();
+      }
+    }
+
+    if (msg.event === 'PARTICIPANT_COUNT') {
+      if (typeof msg.data?.count === 'number') {
+        conn.participantCount = msg.data.count;
+      }
+    }
+
+    // IMPORTANT: if this socket got kicked because of a duplicate connection,
+    // close it to avoid leaks / zombie sockets (server only removes it from the room).
+    if (msg.event === 'KICKED_DUPLICATE') {
+      conn.joined = false;
+      try {
+        conn.socket.close(4000, 'Duplicate connection');
+      } catch {
+        // ignore
+      }
+    }
+
+    // Update server offset when available.
+    if (
+      (msg.event === 'BID_PLACED' || msg.event === 'AUCTION_TIME_EXTENDED') &&
+      typeof msg.data?.serverTimeMs === 'number'
+    ) {
+      conn.serverOffsetMs = msg.data.serverTimeMs - Date.now();
+    }
+
+    if (msg.event === 'ERROR') {
+      const serverMsg =
+        typeof msg.data?.message === 'string'
+          ? msg.data.message
+          : 'Error de conexión WebSocket';
+      conn.lastError = serverMsg;
+    }
+
+    conn.subscribers.forEach((s) => s.onMessage(msg));
+  };
+
+  ws.onerror = () => {
+    conn.lastError = 'Error de conexión WebSocket';
+    conn.subscribers.forEach((s) => s.onError(conn.lastError!));
+  };
+
+  ws.onclose = () => {
+    conn.joined = false;
+    conn.subscribers.forEach((s) => s.onClose());
+
+    if (conn.closing) {
+      // Expected close (last subscriber unmounted).
+      return;
+    }
+
+    // Reconnect only if somebody still needs the connection.
+    if (conn.refCount <= 0) return;
+
+    if (conn.reconnectTimer) clearTimeout(conn.reconnectTimer);
+    const wait = backoffMs(conn.reconnectAttempts++);
+    conn.reconnectTimer = setTimeout(() => {
+      if (conn.refCount <= 0 || conn.closing) return;
+      conn.socket = createSocket(conn.accessToken);
+      attachSocketHandlers(conn);
+    }, wait);
+  };
+}
+
+function getOrCreateConnection(params: {
+  tenantId: string;
+  auctionId: string;
+  accessToken: string;
+}): ManagedConn {
+  const key = `${params.tenantId}:${params.auctionId}`;
+  const existing = connections.get(key);
+  if (existing) {
+    // If token changed, update it for future reconnects.
+    existing.accessToken = params.accessToken;
+    existing.tenantId = params.tenantId;
+    existing.auctionId = params.auctionId;
+    return existing;
+  }
+
+  const conn: ManagedConn = {
+    key,
+    socket: createSocket(params.accessToken),
+    subscribers: new Set<Subscriber>(),
+    refCount: 0,
+    joined: false,
+    participantCount: 0,
+    serverOffsetMs: 0,
+    lastError: null,
+    closing: false,
+    reconnectAttempts: 0,
+    reconnectTimer: null,
+    tenantId: params.tenantId,
+    auctionId: params.auctionId,
+    accessToken: params.accessToken,
+  };
+
+  attachSocketHandlers(conn);
+  connections.set(key, conn);
+  return conn;
+}
 
 export function useAuctionWebSocketBidding({
   auctionId,
@@ -63,190 +293,210 @@ export function useAuctionWebSocketBidding({
   onTimeExtension,
   onStatusChanged,
   onJoined,
+  onSnapshot,
 }: UseAuctionWebSocketBiddingProps): UseAuctionWebSocketBiddingReturn {
-  const wsRef = useRef<WebSocket | null>(null);
-  const connectionKey = `${tenantId}:${auctionId}`;
+  const connectionKey = useMemo(() => `${tenantId}:${auctionId}`, [tenantId, auctionId]);
 
   const [isConnected, setIsConnected] = useState(false);
   const [isJoined, setIsJoined] = useState(false);
   const [participantCount, setParticipantCount] = useState(0);
   const [connectionError, setConnectionError] = useState<string | null>(null);
+  const [serverOffsetMs, setServerOffsetMs] = useState(0);
 
-  // WebSocket connection - single useEffect
+  const callbacksRef = useRef({
+    onBidPlaced,
+    onBidRejected,
+    onTimeExtension,
+    onStatusChanged,
+    onJoined,
+    onSnapshot,
+  });
+
   useEffect(() => {
-    // Check if there's already an active connection for this auction
-    const existingConnection = activeConnections.get(connectionKey);
-    if (existingConnection) {
-      const state = existingConnection.readyState;
-      // Reuse if OPEN or CONNECTING (don't interrupt connection in progress)
-      if (state === WebSocket.OPEN || state === WebSocket.CONNECTING) {
-        wsRef.current = existingConnection;
+    callbacksRef.current = {
+      onBidPlaced,
+      onBidRejected,
+      onTimeExtension,
+      onStatusChanged,
+      onJoined,
+      onSnapshot,
+    };
+  }, [onBidPlaced, onBidRejected, onTimeExtension, onStatusChanged, onJoined, onSnapshot]);
 
-        // Set states based on current connection state
-        if (state === WebSocket.OPEN) {
-          setIsConnected(true);
-          setIsJoined(true);
-        }
+  const connRef = useRef<ManagedConn | null>(null);
 
-        return () => {
-          // Don't close the connection on cleanup if we're reusing it
-        };
-      }
-
-      // If CLOSING or CLOSED, remove it
-      activeConnections.delete(connectionKey);
-    }
-
-    // Prevent multiple connections from same component
-    if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+  useEffect(() => {
+    if (!tenantId || !auctionId || !accessToken) {
+      setConnectionError('Faltan datos para conectar en tiempo real');
       return;
     }
 
-    const wsEndpoint = getWebSocketUrl();
-    const wsUrl = `${wsEndpoint}?token=${encodeURIComponent(accessToken)}`;
+    const conn = getOrCreateConnection({ tenantId, auctionId, accessToken });
+    connRef.current = conn;
+    conn.refCount += 1;
 
-    const ws = new WebSocket(wsUrl);
-    wsRef.current = ws;
-    activeConnections.set(connectionKey, ws);
+    // Initial state sync for late subscribers.
+    setConnectionError(conn.lastError);
+    setParticipantCount(conn.participantCount);
+    setServerOffsetMs(conn.serverOffsetMs);
+    setIsJoined(conn.joined);
+    setIsConnected(conn.socket.readyState === WebSocket.OPEN);
 
-    ws.onopen = () => {
-      setIsConnected(true);
-      setConnectionError(null);
-
-      // Join auction room immediately (no handshake needed)
-      ws.send(
-        JSON.stringify({
-          event: 'JOIN_AUCTION',
-          data: { tenantId, auctionId },
-        })
-      );
-    };
-
-    ws.onmessage = (event) => {
-      try {
-        const message = JSON.parse(event.data) as WebSocketMessage;
-
-        switch (message.event) {
-          case 'CONNECTED':
-            // Ignore - we already joined in onopen
-            break;
-
-          case 'JOINED':
-            setIsJoined(true);
-            if (message.data.participantCount) {
-              setParticipantCount(message.data.participantCount);
-            }
-            onJoined?.();
-            break;
-
-          case 'PARTICIPANT_COUNT':
-            setParticipantCount(message.data.count);
-            break;
-
-          case 'KICKED_DUPLICATE':
-            console.warn(
-              '[WS] Removed from room due to duplicate connection:',
-              message.data
-            );
-            // We were removed from the room on this tab because another tab joined.
-            // Keep the socket but mark as not joined; server will broadcast new count.
-            setIsJoined(false);
-            break;
-
-          case 'BID_PLACED':
-            onBidPlaced?.(message.data);
-            break;
-
-          case 'BID_REJECTED':
-            onBidRejected?.(message.data);
-            break;
-
-          case 'AUCTION_TIME_EXTENDED':
-            onTimeExtension?.(message.data);
-            break;
-
-          case 'AUCTION_STATUS_CHANGED':
-            onStatusChanged?.(message.data.status);
-            if (message.data.status === 'COMPLETADA') {
-              window.location.reload();
-            }
-            break;
-
-          case 'ERROR':
-            console.error('[WS] Server error:', message.data);
-            console.error('[WS] Error details:', {
-              code: message.data.code,
-              message: message.data.message,
-              auctionId,
-              tenantId,
-            });
-            setConnectionError(message.data.message);
-            break;
+    const subscriber: Subscriber = {
+      onOpen: () => {
+        setIsConnected(true);
+        setConnectionError(null);
+      },
+      onClose: () => {
+        setIsConnected(false);
+        setIsJoined(false);
+      },
+      onError: (err) => {
+        setConnectionError(err);
+      },
+      onMessage: (msg) => {
+        // Keep local state updated from connection shared state.
+        if (msg.event === 'JOINED') {
+          setIsJoined(true);
+          setParticipantCount(conn.participantCount);
+          setServerOffsetMs(conn.serverOffsetMs);
+          // If server provided a snapshot (auction / item clocks), sync it immediately.
+          callbacksRef.current.onSnapshot?.({
+            auction: msg.data?.auction,
+            auctionItems: msg.data?.auctionItems,
+          });
+          callbacksRef.current.onJoined?.();
+          return;
         }
-      } catch (error) {
-        console.error('[WS] Failed to parse message:', error);
-      }
+
+        if (msg.event === 'PARTICIPANT_COUNT') {
+          setParticipantCount(conn.participantCount);
+          return;
+        }
+
+        if (msg.event === 'KICKED_DUPLICATE') {
+          setIsJoined(false);
+          setConnectionError(
+            'Se detectó otra sesión conectada a esta subasta con tu usuario.'
+          );
+          return;
+        }
+
+        if (msg.event === 'BID_PLACED') {
+          setServerOffsetMs(conn.serverOffsetMs);
+          callbacksRef.current.onBidPlaced?.(msg.data);
+          return;
+        }
+
+        if (msg.event === 'BID_REJECTED') {
+          callbacksRef.current.onBidRejected?.(msg.data);
+          return;
+        }
+
+        if (msg.event === 'AUCTION_TIME_EXTENDED') {
+          setServerOffsetMs(conn.serverOffsetMs);
+          callbacksRef.current.onTimeExtension?.(msg.data);
+          return;
+        }
+
+        if (msg.event === 'AUCTION_STATUS_CHANGED') {
+          callbacksRef.current.onStatusChanged?.(msg.data?.status);
+          return;
+        }
+
+        if (msg.event === 'ERROR') {
+          const msgText =
+            typeof msg.data?.message === 'string'
+              ? msg.data.message
+              : 'Error de conexión WebSocket';
+          setConnectionError(msgText);
+          return;
+        }
+      },
     };
 
-    ws.onerror = (error) => {
-      console.error('[WS] Error:', error);
-      setConnectionError('Error de conexión WebSocket');
-    };
-
-    ws.onclose = () => {
-      setIsConnected(false);
-      setIsJoined(false);
-      activeConnections.delete(connectionKey);
-    };
+    conn.subscribers.add(subscriber);
 
     return () => {
-      // In React Strict Mode, cleanup is called immediately after mount
-      // We should NOT close the connection here, as it will be reused
-      // Only close if the connection is not in the global map (component truly unmounting)
-      const globalConnection = activeConnections.get(connectionKey);
+      conn.subscribers.delete(subscriber);
+      conn.refCount = Math.max(0, conn.refCount - 1);
 
-      if (wsRef.current && wsRef.current === globalConnection) {
-        // Don't close - let it be reused
-      } else if (wsRef.current) {
-        if (wsRef.current.readyState === WebSocket.OPEN) {
-          wsRef.current.close();
+      if (conn.refCount === 0) {
+        // Close connection cleanly when last subscriber unmounts.
+        conn.closing = true;
+        if (conn.reconnectTimer) {
+          clearTimeout(conn.reconnectTimer);
+          conn.reconnectTimer = null;
         }
+        try {
+          if (conn.socket.readyState === WebSocket.OPEN && conn.joined) {
+            conn.socket.send(
+              JSON.stringify({
+                event: 'LEAVE_AUCTION',
+                data: { tenantId: conn.tenantId, auctionId: conn.auctionId },
+              })
+            );
+          }
+        } catch {
+          // ignore
+        }
+        try {
+          if (
+            conn.socket.readyState === WebSocket.OPEN ||
+            conn.socket.readyState === WebSocket.CONNECTING
+          ) {
+            conn.socket.close(1000, 'Unmount');
+          }
+        } catch {
+          // ignore
+        }
+
+        connections.delete(conn.key);
       }
 
-      // Clear the ref but keep the connection in the global map
-      wsRef.current = null;
+      if (connRef.current?.key === conn.key) {
+        connRef.current = null;
+      }
     };
-  }, []); // Empty deps - only connect once on mount
+  }, [tenantId, auctionId, accessToken, connectionKey]);
 
-  // Send bid function
   const sendBid = useCallback(
-    (auctionItemId: string, amount: number) => {
-      // Always try to get the active connection from the global Map
-      const activeWs = activeConnections.get(connectionKey);
-      const ws = activeWs || wsRef.current;
-
-      if (!isJoined) {
-        console.warn('[WS] Not joined to auction room - ignoring bid');
-        return;
+    (auctionItemId: string, amount: number): string | null => {
+      const conn = connRef.current;
+      if (!conn) {
+        return null;
       }
 
-      if (ws?.readyState === WebSocket.OPEN) {
-        const requestId = crypto.randomUUID();
+      // Must be joined to the room.
+      if (!conn.joined) {
+        return null;
+      }
+
+      const ws = conn.socket;
+      if (!ws || ws.readyState !== WebSocket.OPEN) {
+        return null;
+      }
+
+      const requestId = createRequestId();
+      try {
         ws.send(
           JSON.stringify({
             event: 'PLACE_BID',
-            data: { tenantId, auctionId, auctionItemId, amount, requestId },
+            data: {
+              tenantId: conn.tenantId,
+              auctionId: conn.auctionId,
+              auctionItemId,
+              amount,
+              requestId,
+            },
           })
         );
-      } else {
-        console.error('[WS] Cannot send bid - connection not open', {
-          wsRefState: wsRef.current?.readyState,
-          activeWsState: activeWs?.readyState,
-          hasActiveConnection: !!activeWs,
-        });
+        return requestId;
+      } catch {
+        return null;
       }
     },
-    [tenantId, auctionId, connectionKey, isJoined]
+    []
   );
 
   return {
@@ -254,6 +504,7 @@ export function useAuctionWebSocketBidding({
     isJoined,
     participantCount,
     connectionError,
+    serverOffsetMs,
     sendBid,
   };
 }

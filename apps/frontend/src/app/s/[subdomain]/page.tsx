@@ -1,52 +1,34 @@
-import type { Metadata } from 'next';
-import { rootDomain } from '@suba-go/shared-components/lib/utils';
-import { getCompanyBySubdomainServerAction } from '@/domain/server-actions/company/get-company-by-subdomain-server-action';
-import { normalizeCompanyName } from '@/utils/company-normalization';
-import { notFound } from 'next/navigation';
-import CompanyBrandedPage from '@/components/subdomain/company-branded-page';
-import ManagerStatsPage from './estadisticas/page';
-import UserHomePage from '@/components/subdomain/user-home-page';
 import { auth } from '@/auth';
+import { redirect } from 'next/navigation';
+import UserHomePage from '@/components/subdomain/user-home-page';
 
-export async function generateMetadata({
+/**
+ * IMPORTANT:
+ * - This file lives under /s/[subdomain] which is an **internal** route.
+ * - User-facing routes (no /s prefix) are handled by middleware rewrites.
+ * - Therefore, any redirects MUST go to the **public path** (e.g. /estadisticas),
+ *   not to /s/${subdomain}/estadisticas, otherwise middleware will bounce back to '/'
+ *   and the UI may get stuck loading.
+ */
+export default async function SubdomainHomePage({
   params,
 }: {
-  params: Promise<{ subdomain: string }>;
-}): Promise<Metadata> {
-  const { subdomain } = await params;
-
-  return {
-    title: `${subdomain}.${rootDomain}`,
-    description: `Subdomain page for ${subdomain}.${rootDomain}`,
-  };
-}
-
-export default async function SubdomainPage({
-  params,
-}: {
-  params: Promise<{ subdomain: string }>;
+  params: { subdomain: string };
 }) {
-  const { subdomain } = await params;
   const session = await auth();
 
-  // Get company data for this subdomain
-  const normalizedSubdomain = normalizeCompanyName(subdomain);
-  const companyResult = await getCompanyBySubdomainServerAction(
-    normalizedSubdomain
-  );
-
-  if (!companyResult.success || !companyResult.data) {
-    notFound();
+  // If unauthenticated, go to public login (middleware will rewrite it to /s/[subdomain]/login)
+  if (!session) {
+    redirect('/login');
   }
 
-  // If user is manager or admin, show stats page
-  if (
-    session?.user?.role === 'AUCTION_MANAGER' ||
-    session?.user?.role === 'ADMIN'
-  ) {
-    return <ManagerStatsPage />;
+  const role = session.user?.role;
+
+  // Manager/Admin home -> Estadísticas
+  if (role === 'AUCTION_MANAGER' || role === 'ADMIN') {
+    redirect('/estadisticas');
   }
 
-  // Otherwise (user or not logged in - though middleware redirects usually), show user home
+  // USER home -> the "Mis Adjudicaciones + Subastas Activas y Próximas" view
   return <UserHomePage />;
 }

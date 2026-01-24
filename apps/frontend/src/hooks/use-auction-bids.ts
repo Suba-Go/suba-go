@@ -36,7 +36,10 @@ export function useAuctionBids(
   const [error, setError] = useState<string | null>(null);
 
   const fetchBids = async () => {
-    if (!auctionId || !accessToken) {
+    // Access token is intentionally NOT required here.
+    // We call a Next.js Route Handler (/api/...) which is wrapped with NextAuth
+    // so refresh/rotation happens server-side and cookies are persisted.
+    if (!auctionId) {
       return;
     }
 
@@ -44,12 +47,10 @@ export function useAuctionBids(
     setError(null);
 
     try {
-      const backendUrl = process.env.BACKEND_URL || 'http://localhost:3001';
-      const url = `${backendUrl}/bids/auction/${auctionId}`;
+      const url = `/api/bids/auction/${auctionId}`;
 
       const response = await fetch(url, {
         headers: {
-          Authorization: `Bearer ${accessToken}`,
           'Content-Type': 'application/json',
         },
       });
@@ -99,7 +100,7 @@ export function useAuctionBids(
 
   useEffect(() => {
     fetchBids();
-  }, [auctionId, accessToken]);
+  }, [auctionId]);
 
   return {
     bids,

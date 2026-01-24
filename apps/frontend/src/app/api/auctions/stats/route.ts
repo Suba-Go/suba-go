@@ -2,21 +2,42 @@ import { NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import superjson from 'superjson';
 
-export async function GET() {
+async function readBackendError(response: Response): Promise<string> {
   try {
-    const session = await auth();
+    const contentType = response.headers.get('content-type') || '';
+    if (contentType.includes('application/json')) {
+      const json: any = await response.json();
+      return (
+        json?.message ||
+        json?.error ||
+        json?.details ||
+        `Backend responded with status: ${response.status}`
+      );
+    }
+    const text = await response.text();
+    return text || `Backend responded with status: ${response.status}`;
+  } catch {
+    return `Backend responded with status: ${response.status}`;
+  }
+}
+
+export const GET = auth(async function GET(request: any) {
+  try {
+    const session = (request as any).auth;
 
     if (!session) {
+      return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
+    }
+
+    const accessToken = session.tokens?.accessToken;
+    if (!accessToken) {
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
     }
 
     // Get tenant from user session
     const tenantId = session.user.tenantId;
     if (!tenantId) {
-      return NextResponse.json(
-        { error: 'Usuario sin tenant' },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: 'Usuario sin tenant' }, { status: 400 });
     }
 
     // Forward request to backend
@@ -26,8 +47,9 @@ export async function GET() {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',
-        Authorization: `Bearer ${session.tokens.accessToken}`,
+        Authorization: `Bearer ${accessToken}`,
       },
+      cache: 'no-store',
     });
 
     if (!response.ok) {
@@ -40,7 +62,9 @@ export async function GET() {
           totalRevenue: 0,
         });
       }
-      throw new Error(`Backend responded with status: ${response.status}`);
+
+      const message = await readBackendError(response);
+      return NextResponse.json({ error: message }, { status: response.status });
     }
 
     const data = await response.json();
@@ -60,7 +84,7 @@ export async function GET() {
   } catch (error) {
     console.error('Error fetching auction stats:', error);
 
-    // Return mock data as fallback
+    // Return mock data as fallback (solo para errores internos del frontend)
     return NextResponse.json({
       totalAuctions: 0,
       activeAuctions: 0,
@@ -68,4 +92,4 @@ export async function GET() {
       totalRevenue: 0,
     });
   }
-}
+});

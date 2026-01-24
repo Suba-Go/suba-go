@@ -1,12 +1,12 @@
 import { auth } from '@/auth';
 import { NextRequest, NextResponse } from 'next/server';
 
-export async function DELETE(
+export const DELETE = auth(async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ auctionId: string; userId: string }> }
 ) {
   try {
-    const session = await auth();
+    const session = (request as any).auth;
     const { auctionId, userId } = await params;
 
     if (!session) {
@@ -49,5 +49,5 @@ export async function DELETE(
       { status: 500 }
     );
   }
-}
+});
 

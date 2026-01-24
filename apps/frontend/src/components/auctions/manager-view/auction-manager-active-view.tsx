@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback, useMemo, useEffect } from 'react';
+import { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { ArrowLeft, Clock, Wifi, WifiOff, Trophy } from 'lucide-react';
 import { Button } from '@suba-go/shared-components/components/ui/button';
@@ -33,10 +33,12 @@ import {
   AuctionDto,
   AuctionItemWithItmeAndBidsDto,
   BidWithUserDto,
+  ItemStateEnum,
   UserSafeDto,
 } from '@suba-go/shared-validation';
 import { ParticipantsList } from '../participants-list';
 import { ItemBidHistory } from '../user-view/item-bid-history';
+import { CountdownTimer } from '../countdown-timer';
 import { AuctionItemDetailModal } from '../auction-item-detail-modal';
 import { ItemCreateModal } from '@/components/items/item-create-modal';
 
@@ -75,10 +77,59 @@ export function AuctionManagerActiveView({
   const [activeTab, setActiveTab] = useState('items');
   const [selectedItemForDetail, setSelectedItemForDetail] =
     useState<AuctionItemWithItmeAndBidsDto | null>(null);
+
+  // AUCTION_MANAGER should see real bidder names (fallback to email)
+  const getRealUserLabel = (u?: {
+    name?: string | null;
+    email?: string | null;
+    public_name?: string | null;
+  } | null) => u?.name || u?.email || u?.public_name || 'Usuario';
   const [isCreateItemModalOpen, setIsCreateItemModalOpen] = useState(false);
 
   // Local state for bids to handle real-time updates
   const [bidHistory, setBidHistory] = useState<ItemBidData>({});
+
+  // Keep item positions stable during live updates (avoid confusion when bids arrive).
+  // We lock the initial order we see for each item id and sort by that order thereafter.
+  const itemOrderRef = useRef<Map<string, number>>(new Map());
+  const [itemOrderVersion, setItemOrderVersion] = useState(0);
+
+  useEffect(() => {
+    if (!auctionItems) return;
+    let changed = false;
+    for (const ai of auctionItems) {
+      const id = String(ai.id);
+      if (!itemOrderRef.current.has(id)) {
+        itemOrderRef.current.set(id, itemOrderRef.current.size);
+        changed = true;
+      }
+    }
+    if (changed) setItemOrderVersion((v) => v + 1);
+  }, [auctionItems]);
+
+  const stableAuctionItems = useMemo(() => {
+    if (!auctionItems) return [];
+    const order = itemOrderRef.current;
+    return [...auctionItems].sort((a, b) => {
+      const oa = order.get(String(a.id));
+      const ob = order.get(String(b.id));
+      return (oa ?? 0) - (ob ?? 0);
+    });
+  }, [auctionItems, itemOrderVersion]);
+
+  // Per-item clock (independent timers / soft-close)
+  const [itemTimes, setItemTimes] = useState<Record<string, { startTime: string | Date; endTime: string | Date }>>({});
+
+
+  // Server-authoritative end time (can be extended via soft-close)
+  const [auctionEndTime, setAuctionEndTime] = useState<string | Date>(auction.endTime);
+
+  useEffect(() => {
+    setAuctionEndTime(auction.endTime);
+  }, [auction.endTime]);
+
+  // Server/client clock offset (ms). Updated from WebSocket JOINED message.
+  const [serverOffsetMs, setServerOffsetMs] = useState(0);
 
   // Fetch participants
   const { data: participants, refetch: refetchParticipants } = useFetchData<
@@ -93,7 +144,8 @@ export function AuctionManagerActiveView({
   const auctionStatus = useAuctionStatus(
     auction.status,
     auction.startTime,
-    auction.endTime
+    auctionEndTime,
+    { serverOffsetMs }
   );
 
   // Initialize bid history from props
@@ -180,16 +232,81 @@ export function AuctionManagerActiveView({
     [refetchParticipants, toast]
   );
 
-  const { isConnected, participantCount } = useAuctionWebSocketBidding({
+  const handleTimeExtension = useCallback(
+    (data: any) => {
+      if (!data?.newEndTime) return;
+
+      if (data?.auctionItemId) {
+        const itemId = String(data.auctionItemId);
+        setItemTimes((prev) => {
+          const current = prev[itemId];
+          return {
+            ...prev,
+            [itemId]: {
+              startTime: current?.startTime || auction.startTime,
+              endTime: data.newEndTime,
+            },
+          };
+        });
+      } else {
+        setItemTimes((prev) => {
+          const next = { ...prev };
+          for (const key of Object.keys(next)) {
+            next[key] = { ...next[key], endTime: data.newEndTime };
+          }
+          return next;
+        });
+      }
+
+      onRealtimeSnapshot?.();
+    },
+    [onRealtimeSnapshot, auction.startTime]
+  );
+
+  const { isConnected, participantCount, serverOffsetMs: wsServerOffsetMs } = useAuctionWebSocketBidding({
     auctionId: auction.id,
     tenantId: tenantId || '',
     accessToken: accessToken || '',
     onBidPlaced: handleBidPlaced,
+    onTimeExtension: handleTimeExtension,
     onStatusChanged: () => {
-      router.refresh();
+      // When the backend switches to COMPLETADA, refetch snapshot data so the router swaps
+      // the view for everyone in real-time.
+      onRealtimeSnapshot?.();
     },
     onJoined: onRealtimeSnapshot,
   });
+
+  useEffect(() => {
+    setServerOffsetMs(wsServerOffsetMs);
+  }, [wsServerOffsetMs]);
+
+  // Shared, server-synced clock for consistent per-item timers (avoids N intervals).
+  const [nowMs, setNowMs] = useState(() => Date.now() + (wsServerOffsetMs || 0));
+
+  useEffect(() => {
+    const tick = () => setNowMs(Date.now() + (wsServerOffsetMs || 0));
+    tick();
+    const id = setInterval(tick, 1000);
+    return () => clearInterval(id);
+  }, [wsServerOffsetMs]);
+
+
+  // Initialize per-item clocks (fallback to auction-level times when item times are null)
+  useEffect(() => {
+    if (!auctionItems) return;
+    setItemTimes((prev) => {
+      const next: Record<string, { startTime: string | Date; endTime: string | Date }> = { ...prev };
+      for (const ai of auctionItems) {
+        next[ai.id] = {
+          startTime: (ai as any).startTime || auction.startTime,
+          endTime: (ai as any).endTime || auction.endTime,
+        };
+      }
+      return next;
+    });
+  }, [auctionItems, auction.startTime, auction.endTime]);
+
 
   // Calculate totals based on real-time data
   const totalItems = auctionItems?.length || 0;
@@ -202,7 +319,7 @@ export function AuctionManagerActiveView({
   }, [bidHistory]);
 
   const displayItems = useMemo(() => {
-    return auctionItems.map((item) => {
+    return stableAuctionItems.map((item) => {
       const history = bidHistory[item.id] || [];
       const realTimeBids = history.map(
         (h: BidHistoryItem) =>
@@ -225,36 +342,36 @@ export function AuctionManagerActiveView({
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center gap-4">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:gap-4">
         <Button
           variant="ghost"
           size="sm"
           onClick={() => router.back()}
-          className="gap-2"
+          className="gap-2 w-fit"
         >
           <ArrowLeft className="h-4 w-4" />
           Volver
         </Button>
         <div className="flex-1">
-          <div className="flex items-center gap-3 mb-2">
-            <h1 className="text-2xl font-bold text-gray-900">
+          <div className="flex flex-wrap items-center gap-2 mb-2">
+            <h1 className="text-xl sm:text-2xl font-bold text-gray-900 break-words">
               {auction.title}
             </h1>
             <Badge
               className={`${getAuctionBadgeColor(
                 auctionStatus.displayStatus
-              )} text-sm`}
+              )} text-xs sm:text-sm`}
             >
               {getAuctionStatusLabel(auctionStatus.displayStatus)}
             </Badge>
 
             {isConnected ? (
-              <Badge variant="outline" className="gap-1">
+              <Badge variant="outline" className="gap-1 text-xs">
                 <Wifi className="h-3 w-3 text-green-600" />
                 En vivo
               </Badge>
             ) : (
-              <Badge variant="outline" className="gap-1">
+              <Badge variant="outline" className="gap-1 text-xs">
                 <WifiOff className="h-3 w-3 text-gray-400" />
                 Sin conexión
               </Badge>
@@ -276,7 +393,7 @@ export function AuctionManagerActiveView({
                 <h3 className="font-medium text-green-900 mb-2">
                   Subasta Activa - Termina en:
                 </h3>
-                <div className="flex gap-4 text-2xl font-bold text-green-700">
+                <div className="flex gap-3 sm:gap-4 text-xl sm:text-2xl font-bold text-green-700">
                   <div className="flex flex-col items-center">
                     <span>
                       {String(
@@ -364,12 +481,12 @@ export function AuctionManagerActiveView({
         <TabsList className="grid w-full grid-cols-2 bg-gray-100 p-1 rounded-lg">
           <TabsTrigger
             value="items"
-            className="data-[state=active]:text-black data-[state=active]:shadow-sm font-medium transition-all"
+            className="text-black data-[state=active]:text-white data-[state=active]:shadow-sm font-medium transition-all"
             style={
               activeTab === 'items' && primaryColor
                 ? {
                     backgroundColor: primaryColor,
-                    color: '#000000',
+                    color: '#ffffff',
                   }
                 : undefined
             }
@@ -378,12 +495,12 @@ export function AuctionManagerActiveView({
           </TabsTrigger>
           <TabsTrigger
             value="participants"
-            className="data-[state=active]:text-black data-[state=active]:shadow-sm font-medium transition-all"
+            className="text-black data-[state=active]:text-white data-[state=active]:shadow-sm font-medium transition-all"
             style={
               activeTab === 'participants' && primaryColor
                 ? {
                     backgroundColor: primaryColor,
-                    color: '#000000',
+                    color: '#ffffff',
                   }
                 : undefined
             }
@@ -421,7 +538,11 @@ export function AuctionManagerActiveView({
                             alt={`${auctionItem.item.brand} ${auctionItem.item.model}`}
                             fill
                             className="object-cover"
-                            sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+                            // This view is rendered as 1 column on <lg and 2 columns on >=lg.
+                            // Using 33vw here causes Next/Image to request a too-small variant on desktop,
+                            // resulting in noticeable blur when the card is ~50% width.
+                            sizes="(max-width: 1024px) 100vw, 50vw"
+                            quality={82}
                             onError={(e) => {
                               const target =
                                 e.currentTarget as HTMLImageElement;
@@ -434,9 +555,20 @@ export function AuctionManagerActiveView({
 
                       <CardContent className="p-4">
                         <div className="space-y-2">
-                          <h3 className="font-semibold text-lg">
-                            {auctionItem.item?.plate || 'Sin Patente'}
-                          </h3>
+                          <div className="flex items-start justify-between gap-3">
+                            <h3 className="font-semibold text-lg">
+                              {auctionItem.item?.plate || 'Sin Patente'}
+                            </h3>
+                            <CountdownTimer
+                              status={auction.status}
+                              startTime={itemTimes[auctionItem.id]?.startTime || auction.startTime}
+                              endTime={itemTimes[auctionItem.id]?.endTime || auction.endTime}
+                              serverOffsetMs={serverOffsetMs}
+                              nowMs={nowMs}
+                              variant="compact"
+                              className="px-2 py-1 rounded bg-gray-50"
+                            />
+                          </div>
                           <p className="text-sm text-gray-600">
                             {auctionItem.item?.brand} {auctionItem.item?.model}{' '}
                             {auctionItem.item?.year}
@@ -469,14 +601,27 @@ export function AuctionManagerActiveView({
                                       )
                                     ).toLocaleString()}
                                   </p>
-                                  {topBid && (
-                                    <p className="text-xs text-gray-600 mt-1">
-                                      Ganando:{' '}
-                                      <span className="font-medium text-gray-900">
-                                        {topBid.user?.public_name || 'Usuario'}
-                                      </span>
-                                    </p>
-                                  )}
+                                  {topBid &&
+                                        (() => {
+                                          const itemEndTime =
+                                            itemTimes[auctionItem.id]?.endTime || auction.endTime;
+
+                                          const isTimerFinished = nowMs >= new Date(itemEndTime).getTime();
+
+                                          const isSold = auctionItem.item?.state === ItemStateEnum.VENDIDO;
+
+                                          const winnerLabel =
+                                            isSold || isTimerFinished ? 'Ganador/a:' : 'Ganando:';
+
+                                          return (
+                                            <p className="text-xs text-gray-600 mt-1">
+                                              {winnerLabel}{' '}
+                                              <span className="font-medium text-gray-900">
+                                                {getRealUserLabel(topBid.user as any)}
+                                              </span>
+                                            </p>
+                                          );
+                                        })()}
                                 </div>
                               )}
                           </div>
@@ -489,6 +634,7 @@ export function AuctionManagerActiveView({
                               <ItemBidHistory
                                 bids={auctionItem.bids as BidWithUserDto[]}
                                 maxItems={5}
+                                showRealNames
                               />
                             </>
                           )}
@@ -537,6 +683,7 @@ export function AuctionManagerActiveView({
           bidIncrement={Number(auction.bidIncrement || 50000)}
           isUserView={false}
           showBidHistory={true}
+          showBidderRealNames={true}
           bidHistory={bidHistory[selectedItemForDetail.id] || []}
         />
       )}

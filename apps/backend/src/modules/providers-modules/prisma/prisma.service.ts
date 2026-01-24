@@ -94,6 +94,10 @@ export class PrismaService implements OnModuleInit, OnModuleDestroy {
     return this.prisma.invitation;
   }
 
+  get refreshToken() {
+    return (this.prisma as any).refreshToken;
+  }
+
   // Health check method
   async healthCheck(): Promise<boolean> {
     try {

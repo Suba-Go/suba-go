@@ -13,6 +13,7 @@ import { useToast } from '@suba-go/shared-components/components/ui/toaster';
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import { UsersTable } from '@/components/users/users-table';
+import { apiFetch } from '@/lib/api/api-fetch';
 import {
   PercentIcon,
   TrendingUpIcon,
@@ -30,6 +31,7 @@ import {
   SelectValue,
 } from '@suba-go/shared-components/components/ui/select';
 import { Button } from '@suba-go/shared-components/components/ui/button';
+import { AuctionTypeEnum } from '@suba-go/shared-validation';
 
 type AuctionItem = {
   id: string;
@@ -41,6 +43,7 @@ type AuctionItem = {
 type Auction = {
   id: string;
   title: string;
+  type?: AuctionTypeEnum | string | null;
   status: 'PENDIENTE' | 'ACTIVA' | 'CANCELADA' | 'COMPLETADA' | 'ELIMINADA';
   startTime: string;
   endTime: string;
@@ -82,7 +85,7 @@ export default function ManagerStatsPage() {
 
     (async () => {
       try {
-        const auctionsRes = await fetch('/api/auctions');
+        const auctionsRes = await apiFetch('/api/auctions');
         const auctionsData = await auctionsRes.json();
 
         if (!auctionsRes.ok) {
@@ -117,6 +120,11 @@ export default function ManagerStatsPage() {
   const computed = useMemo(() => {
     // 0. Filter Auctions first (Time & Status)
     const filteredAuctions = auctions.filter((a) => {
+      // 0. Business rule: test auctions must NOT appear in statistics.
+      // We accept either enum value or raw string from the API.
+      const auctionType = String((a as any)?.type ?? '').toUpperCase();
+      if (auctionType === String(AuctionTypeEnum.TEST).toUpperCase()) return false;
+
       // 1. Time Filter
       const auctionDate = new Date(a.startTime); // Use startTime for filtering
       const now = new Date();
@@ -149,6 +157,34 @@ export default function ManagerStatsPage() {
       return true;
     });
 
+    /**
+     * BUGFIX (Tasa de adjudicación por subasta):
+     * Un ítem puede quedar NO vendido en una subasta y luego volver a subastarse.
+     * Como el backend guarda `soldPrice/soldAt` en la entidad Item (global), si usamos
+     * ese campo para estadísticas, una venta posterior hace que subastas anteriores
+     * aparezcan erróneamente con 100% adjudicación.
+     *
+     * Para evitarlo, calculamos adjudicación y márgenes usando los bids del AuctionItem
+     * dentro de ESTA subasta (máxima oferta), en vez de `item.soldPrice`.
+     */
+    const getWinningPrice = (ai: AuctionItem): number | null => {
+      const bids = ai.bids || [];
+      if (bids.length === 0) return null;
+      return bids.reduce(
+        (max, b) => (b.offered_price > max ? b.offered_price : max),
+        bids[0].offered_price
+      );
+    };
+
+    const isAwardedInThisAuction = (
+      auction: Auction,
+      ai: AuctionItem
+    ): boolean => {
+      // We only consider items "awarded" once the auction is completed.
+      if (auction.status !== 'COMPLETADA') return false;
+      return (ai.bids?.length || 0) > 0;
+    };
+
     // 1. Auction Award Rate (per auction)
     const auctionStats = filteredAuctions.map((a) => {
       // Don't count awarded items for canceled auctions
@@ -164,17 +200,17 @@ export default function ManagerStatsPage() {
 
       const totalItems = a.items?.length || 0;
       const awardedItems =
-        a.items?.filter(
-          (i) => i.item?.soldPrice !== null && i.item?.soldPrice !== undefined
-        ).length || 0;
+        a.items?.filter((i) => isAwardedInThisAuction(a, i)).length || 0;
       const awardRate = totalItems > 0 ? (awardedItems / totalItems) * 100 : 0;
 
       // Calculate margin per auction
       let auctionMarginTotal = 0;
       let auctionSoldCount = 0;
       a.items?.forEach((i) => {
-        if (i.item?.soldPrice && i.startingBid) {
-          const sold = Number(i.item.soldPrice);
+        if (isAwardedInThisAuction(a, i) && i.startingBid) {
+          const soldPrice = getWinningPrice(i);
+          if (soldPrice === null) return;
+          const sold = Number(soldPrice);
           const start = Number(i.startingBid);
           if (start > 0) {
             auctionMarginTotal += sold / start - 1;
@@ -213,8 +249,10 @@ export default function ManagerStatsPage() {
         totalItemsGlobal++;
         totalBids += i.bids?.length || 0;
 
-        if (i.item?.soldPrice && i.startingBid) {
-          const sold = Number(i.item.soldPrice);
+        if (isAwardedInThisAuction(a, i) && i.startingBid) {
+          const soldPrice = getWinningPrice(i);
+          if (soldPrice === null) return;
+          const sold = Number(soldPrice);
           const start = Number(i.startingBid);
 
           if (start > 0) {
@@ -251,8 +289,11 @@ export default function ManagerStatsPage() {
   }
 
   return (
-    <div className="max-w-7xl mx-auto px-4 py-8 space-y-8">
-      <h1 className="text-2xl font-bold" style={{ color: primaryColor }}>
+    <div className="max-w-7xl mx-auto px-3 sm:px-4 py-6 sm:py-8 space-y-8">
+      <h1
+        className="text-2xl sm:text-3xl font-bold leading-tight break-words"
+        style={{ color: primaryColor }}
+      >
         Panel de Estadísticas
       </h1>
 
@@ -328,12 +369,12 @@ export default function ManagerStatsPage() {
 
       {/* Auction Stats Table */}
       <section>
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-xl font-semibold text-gray-700">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-4">
+          <h2 className="text-xl font-semibold text-gray-700 leading-tight break-words">
             Rendimiento por Subasta
           </h2>
-          <div className="flex items-center gap-4">
-            <div className="w-[200px]">
+          <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4 w-full sm:w-auto">
+            <div className="w-full sm:w-[200px]">
               <Select
                 value={timeFilter}
                 onValueChange={(val) => setTimeFilter(val)}
@@ -357,7 +398,7 @@ export default function ManagerStatsPage() {
                 </SelectContent>
               </Select>
             </div>
-            <div className="w-[200px]">
+            <div className="w-full sm:w-[200px]">
               <Select
                 value={statusFilter}
                 onValueChange={(val) => setStatusFilter(val)}
@@ -385,8 +426,76 @@ export default function ManagerStatsPage() {
         </div>
 
         <div className="bg-white rounded-lg border overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm text-left">
+          {/* Mobile: cards */}
+          <div className="md:hidden">
+            <div className="divide-y">
+              {computed.paginatedAuctions.map((auction) => (
+                <div key={auction.id} className="p-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <Link
+                        href={`/subastas/${auction.id}`}
+                        className="font-semibold leading-snug break-words"
+                        style={{ color: primaryColor }}
+                      >
+                        {auction.title}
+                      </Link>
+                      <div className="mt-2">
+                        <span
+                          className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                            auction.status === 'ACTIVA'
+                              ? 'bg-green-100 text-green-800'
+                              : auction.status === 'COMPLETADA'
+                              ? 'bg-blue-100 text-blue-800'
+                              : 'bg-gray-100 text-gray-800'
+                          }`}
+                        >
+                          {auction.status}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="shrink-0 text-right">
+                      <div className="text-xs text-gray-500">Tasa adjudicación</div>
+                      <div className="flex items-center justify-end gap-1 font-bold">
+                        <span>{auction.awardRate.toFixed(0)}%</span>
+                        <PercentIcon className="h-3 w-3 text-gray-400" />
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="mt-4 grid grid-cols-2 gap-3 text-sm">
+                    <div className="rounded-md bg-gray-50 p-3">
+                      <div className="text-xs text-gray-500">Items total</div>
+                      <div className="font-semibold text-gray-800">{auction.totalItems}</div>
+                    </div>
+                    <div className="rounded-md bg-gray-50 p-3">
+                      <div className="text-xs text-gray-500">Adjudicados</div>
+                      <div className="font-semibold text-gray-800">{auction.awardedItems}</div>
+                    </div>
+                    <div className="rounded-md bg-gray-50 p-3 col-span-2">
+                      <div className="text-xs text-gray-500">Margen promedio</div>
+                      <div className="font-semibold text-gray-800">
+                        {auction.status !== 'CANCELADA' && auction.awardedItems > 0
+                          ? `${auction.avgMargin.toFixed(1)}%`
+                          : '-'}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ))}
+
+              {computed.paginatedAuctions.length === 0 && (
+                <div className="px-4 py-10 text-center text-gray-500">
+                  No se encontraron subastas
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Desktop/tablet: table */}
+          <div className="hidden md:block overflow-x-auto">
+            <table className="min-w-[900px] w-full text-sm text-left">
               <thead className="bg-gray-50 text-gray-600 font-medium border-b">
                 <tr>
                   <th className="px-4 py-3">Subasta</th>
@@ -456,12 +565,12 @@ export default function ManagerStatsPage() {
             </table>
           </div>
           {/* Pagination Controls */}
-          <div className="bg-white px-4 py-3 border-t flex items-center justify-between">
+          <div className="bg-white px-4 py-3 border-t flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div className="text-sm text-gray-500">
-              Mostrando {computed.paginatedAuctions.length} de{' '}
-              {computed.totalCount} subastas
+              Mostrando {computed.paginatedAuctions.length} de {computed.totalCount}{' '}
+              subastas
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               <Button
                 variant="outline"
                 size="sm"
@@ -469,7 +578,7 @@ export default function ManagerStatsPage() {
                 disabled={currentPage === 1}
               >
                 <ChevronLeftIcon className="h-4 w-4" />
-                Anterior
+                <span className="hidden sm:inline">Anterior</span>
               </Button>
               <span className="text-sm text-gray-600">
                 Página {currentPage} de {Math.max(1, computed.totalPages)}
@@ -482,7 +591,7 @@ export default function ManagerStatsPage() {
                 }
                 disabled={currentPage >= computed.totalPages}
               >
-                Siguiente
+                <span className="hidden sm:inline">Siguiente</span>
                 <ChevronRightIcon className="h-4 w-4" />
               </Button>
             </div>

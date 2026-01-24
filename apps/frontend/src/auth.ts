@@ -11,55 +11,217 @@ if (!AUTH_SECRET || !BACKEND_URL) {
   throw new Error('Missing environment variables');
 }
 
+const APP_ENV =
+  process.env.APP_ENV || process.env.NEXT_PUBLIC_APP_ENV || 'development';
+
+// Cookie domain strategy:
+// - Default: per-host cookies (best for custom domains per company).
+// - If you need session shared across subdomains, set NEXTAUTH_COOKIE_DOMAIN (e.g. .subago.cl).
+function getCookieDomain(): string | undefined {
+  // If you want cookies shared across *subdomains* (e.g. *.subago.cl), set this explicitly.
+  // For custom per-company domains (e.g. empresa-a.com, empresa-b.cl), leave it undefined.
+  const explicit = process.env.NEXTAUTH_COOKIE_DOMAIN;
+  if (!explicit) return undefined;
+
+  const d = explicit.trim();
+  if (!d || d.includes("localhost")) return undefined;
+  return d.startsWith('.') ? d : `.${d}`;
+}
+
+const COOKIE_DOMAIN = getCookieDomain();
+const USE_SECURE_COOKIES = APP_ENV !== 'local' && process.env.NODE_ENV === 'production';
+
+const SESSION_MAX_AGE = Number(
+  process.env.NEXTAUTH_SESSION_MAX_AGE ?? 60 * 60 * 24 * 7 // 7 days
+);
+
+function decodeJwtPayload(token: string): Record<string, any> | null {
+  try {
+    const parts = token.split('.');
+    if (parts.length < 2) return null;
+    const payload = parts[1];
+    const base64 = payload.replace(/-/g, '+').replace(/_/g, '/');
+    const padded = base64.padEnd(base64.length + ((4 - (base64.length % 4)) % 4), '=');
+    const json =
+      typeof (globalThis as any).atob === 'function'
+        ? (globalThis as any).atob(padded)
+        : Buffer.from(padded, 'base64').toString('utf8');
+    return JSON.parse(json);
+  } catch {
+    return null;
+  }
+}
+
 /**
- * Refreshes an expired JWT token using the refresh token.
+ * Returns exp (ms epoch) from an access token, if present.
+ */
+function getAccessTokenExpMs(accessToken?: string | null): number | undefined {
+  if (!accessToken) return undefined;
+  const payload = decodeJwtPayload(accessToken);
+  const exp = payload?.exp;
+  if (typeof exp !== 'number') return undefined;
+  // JWT exp is seconds since epoch
+  return exp * 1000;
+}
+
+/**
+ * Compute an absolute access-token expiry (ms epoch) from a backend `expiresIn` field.
  *
- * @param token - The current JWT token containing the refresh token
- * @returns Promise<JWT | null> - Returns the new token with updated access/refresh tokens,
- *                                or null if the refresh token is expired (401 status)
+ * IMPORTANT:
+ * Different backends use different semantics for `expiresIn`:
+ * - duration in seconds (e.g. 3600)
+ * - duration in milliseconds (e.g. 3600000)
+ * - epoch seconds (e.g. 1730000000)
+ * - epoch milliseconds (e.g. 1730000000000)
  *
- * @description
- * This function attempts to refresh an expired access token by calling the backend's
- * /auth/refresh endpoint with the current refresh token. If the refresh token is also
- * expired (401 response), it returns null to trigger a logout. For other errors,
- * it throws an exception to be handled by the caller.
+ * We normalize everything into a single representation: **ms since epoch**.
+ */
+function computeExpiresAtMs(
+  expiresInRaw?: number | null,
+  baseMs: number = Date.now()
+): number | undefined {
+  if (expiresInRaw == null) return undefined;
+
+  const v = Number(expiresInRaw);
+  if (!Number.isFinite(v) || v <= 0) return undefined;
+
+  // ms epoch (>= ~2001-09-09)
+  if (v >= 1_000_000_000_000) return v;
+
+  // seconds epoch (>= ~2001-09-09)
+  if (v >= 1_000_000_000) return v * 1000;
+
+  // Anything below here is almost certainly a duration.
+  // Distinguish seconds vs milliseconds duration.
+  // If it's bigger than ~31 days in seconds, it is very likely milliseconds.
+  const THIRTY_ONE_DAYS_SECONDS = 31 * 24 * 60 * 60; // 2_678_400
+  if (v > THIRTY_ONE_DAYS_SECONDS) {
+    // milliseconds duration
+    return baseMs + v;
+  }
+
+  // seconds duration
+  return baseMs + v * 1000;
+}
+
+/**
+ * Normalizes a previously stored expiry value (tokens.expiresIn) into ms epoch.
+ * This provides backward compatibility with older cookies that might have stored:
+ * - seconds duration
+ * - milliseconds duration
+ * - epoch seconds
+ */
+function normalizeStoredExpiryMs(
+  stored?: number | null,
+  baseMs: number = Date.now()
+): number | undefined {
+  if (stored == null) return undefined;
+  const v = Number(stored);
+  if (!Number.isFinite(v) || v <= 0) return undefined;
+
+  // already ms epoch
+  if (v >= 1_000_000_000_000) return v;
+
+  // seconds epoch
+  if (v >= 1_000_000_000) return v * 1000;
+
+  // duration (seconds or ms) -> use baseMs (updatedAt) as reference
+  return computeExpiresAtMs(v, baseMs);
+}
+
+/**
+ * Refreshes an expired access token using the refresh token.
+ *
+ * Returns:
+ * - JWT with updated tokens
+ * - null when refresh token is invalid/expired -> forces logout
  */
 async function refreshToken(token: JWT): Promise<JWT | null> {
+  // Prevent refresh storms when multiple concurrent requests detect an expired token.
+  // IMPORTANT: this must be *per refresh token* (per user/session). A global singleton mutex
+  // would incorrectly mix different users' refresh flows under load.
+  const refreshKey = (token as any)?.tokens?.refreshToken as string | undefined;
+  if (!refreshKey) return null;
+
+  const inflightMap: Map<string, Promise<JWT | null>> =
+    ((globalThis as any).__subago_refresh_inflight_map as Map<
+      string,
+      Promise<JWT | null>
+    >) ?? new Map();
+  (globalThis as any).__subago_refresh_inflight_map = inflightMap;
+
+  const existing = inflightMap.get(refreshKey);
+  if (existing) return existing;
+
   try {
-    const res = await fetch(BACKEND_URL + '/auth/refresh', {
-      method: 'POST',
-      headers: {
-        authorization: `Bearer ${token.tokens.refreshToken}`,
-      },
-    });
+    const inflight = (async () => {
+      // Use a short timeout so a transient backend hang doesn't immediately
+      // invalidate the user's session.
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 8000);
 
-    if (!res.ok) {
-      // Token expired, force logout
-      if (res.status === 401) {
-        return null;
+      const res = await fetch(BACKEND_URL + '/auth/refresh', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${refreshKey}`,
+        },
+        signal: controller.signal,
+      }).finally(() => clearTimeout(timeout));
+
+      if (!res.ok) {
+        if (res.status === 401) {
+          return null;
+        }
+        // Non-auth failures should not automatically sign the user out.
+        // We'll let the caller decide how to handle this.
+        throw new Error(`Failed to refresh token (status ${res.status})`);
       }
-      throw new Error('Failed to refresh token');
-    }
 
-    const response = await res.json();
+      const response = await res.json();
 
-    // Check if response has superjson property (success) or is plain JSON (error)
-    let deserializedData: Tokens;
-    if (response.superjson) {
-      deserializedData = superjson.deserialize(response.superjson) as Tokens;
-    } else {
-      // Plain JSON error response
-      throw new Error(response.message || 'Token refresh failed');
-    }
+      let deserializedData: Tokens;
+      if (response.superjson) {
+        deserializedData = superjson.deserialize(response.superjson) as Tokens;
+      } else {
+        throw new Error(response.message || 'Token refresh failed');
+      }
 
-    return {
-      ...token,
-      tokens: deserializedData,
-    };
+      const baseMs = Date.now();
+
+      // Normalize backend expiry into an absolute ms epoch timestamp.
+      const expFromBackend = computeExpiresAtMs(deserializedData.expiresIn, baseMs);
+      const expFromJwt = getAccessTokenExpMs(deserializedData.accessToken);
+
+      // Effective expiry = earliest known expiry.
+      const candidates = [expFromBackend, expFromJwt].filter(
+        (v): v is number => typeof v === 'number' && v > 0
+      );
+      const effectiveExpiresAt = candidates.length ? Math.min(...candidates) : 0;
+
+      const normalizedTokens: Tokens = {
+        ...deserializedData,
+        // We store an absolute expiry (ms epoch) in `expiresIn` for consistent checks.
+        expiresIn: effectiveExpiresAt,
+      };
+
+      return {
+        ...token,
+        tokens: normalizedTokens,
+        updatedAt: Date.now(),
+        error: undefined,
+      };
+    })();
+
+    inflightMap.set(refreshKey, inflight);
+    return await inflight;
   } catch (error) {
-    // For non-401 errors, throw to prevent silent failures
     console.error('Refresh token error:', error);
     throw error;
+  } finally {
+    // Remove only this key, never clear the whole map.
+    const map: Map<string, Promise<JWT | null>> = (globalThis as any)
+      .__subago_refresh_inflight_map;
+    map?.delete(refreshKey);
   }
 }
 
@@ -68,6 +230,57 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
     signIn: '/login',
   },
   secret: AUTH_SECRET,
+
+  // Professional cookie setup for subdomain multi-tenancy
+  cookies: {
+    sessionToken: {
+      name: USE_SECURE_COOKIES
+        ? '__Secure-next-auth.session-token'
+        : 'next-auth.session-token',
+      options: {
+        httpOnly: true,
+        sameSite: 'lax',
+        path: '/',
+        secure: USE_SECURE_COOKIES,
+        domain: COOKIE_DOMAIN,
+      },
+    },
+    csrfToken: {
+      name: USE_SECURE_COOKIES
+        ? '__Host-next-auth.csrf-token'
+        : 'next-auth.csrf-token',
+      options: {
+        httpOnly: true,
+        sameSite: 'lax',
+        path: '/',
+        secure: USE_SECURE_COOKIES,
+        // __Host- cookies MUST NOT set domain.
+        domain: USE_SECURE_COOKIES ? undefined : COOKIE_DOMAIN,
+      },
+    },
+    callbackUrl: {
+      name: USE_SECURE_COOKIES
+        ? '__Secure-next-auth.callback-url'
+        : 'next-auth.callback-url',
+      options: {
+        sameSite: 'lax',
+        path: '/',
+        secure: USE_SECURE_COOKIES,
+        domain: COOKIE_DOMAIN,
+      },
+    },
+  },
+
+  session: {
+    strategy: 'jwt',
+    maxAge: SESSION_MAX_AGE,
+    updateAge: 60 * 60, // refresh cookie at most once per hour
+  },
+
+  jwt: {
+    maxAge: SESSION_MAX_AGE,
+  },
+
   providers: [
     credentials({
       name: 'Credentials',
@@ -83,12 +296,10 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         try {
           if (!credentials?.email || !credentials?.password) return null;
           const { email, password } = credentials;
+
           const res = await fetch(BACKEND_URL + '/auth/signin', {
             method: 'POST',
-            body: JSON.stringify({
-              email,
-              password,
-            }),
+            body: JSON.stringify({ email, password }),
             headers: {
               'Content-Type': 'application/json',
             },
@@ -96,15 +307,12 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
 
           const result = await res.json();
 
-          // Check if response has superjson property (success) or is plain JSON (error)
-          let parsedResult;
-          if (result.superjson) {
-            parsedResult = superjson.deserialize(result.superjson);
-          } else {
-            parsedResult = result;
-          }
+          // Backend uses superjson interceptor on success
+          const parsedResult = result.superjson
+            ? superjson.deserialize(result.superjson)
+            : result;
 
-          // Handle error responses (either with error property or HTTP error status)
+          // Handle error responses
           if (parsedResult.error || parsedResult.statusCode) {
             console.error(
               'Authentication failed:',
@@ -112,6 +320,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
             );
             return null;
           }
+
           return parsedResult;
         } catch (error) {
           console.error(error);
@@ -121,24 +330,40 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
     }),
   ],
 
-  //   Initial Sign-In: When the user first signs in, the jwt callback is called with the user object.
-  //   Subsequent Requests: For every subsequent request after the initial sign-in, the jwt callback is called, but the user object is not present. Instead, the token object is provided.
   callbacks: {
     async jwt({ token, user, trigger, session }) {
+      // Initial sign-in
       if (user) {
-        return { ...token, ...user, updatedAt: Date.now() };
+        // Normalize token expiry to avoid backend/JWT mismatches.
+        const t: any = (user as any)?.tokens;
+        if (t?.accessToken) {
+          const baseMs = Date.now();
+          const expFromJwt = getAccessTokenExpMs(t.accessToken);
+          const expFromBackend = computeExpiresAtMs(t.expiresIn, baseMs);
+
+          const candidates = [expFromBackend, expFromJwt].filter(
+            (v): v is number => typeof v === 'number' && v > 0
+          );
+          const effectiveExpiry = candidates.length ? Math.min(...candidates) : undefined;
+
+          // We store an absolute expiry (ms epoch) in `expiresIn`.
+          t.expiresIn =
+            effectiveExpiry ?? computeExpiresAtMs(t.expiresIn, baseMs) ?? 0;
+        }
+
+        return { ...token, ...user, updatedAt: Date.now(), error: undefined };
       }
 
-      if (trigger === 'update') {
-        // Check if any user data has changed
+      // Profile updates -> keep token.user in sync
+      if (trigger === 'update' && session?.user) {
         const hasChanges =
-          session.user.name !== token.user.name ||
-          session.user.email !== token.user.email ||
-          session.user.phone !== token.user.phone ||
-          session.user.rut !== token.user.rut;
+          session.user.name !== token.user?.name ||
+          session.user.email !== token.user?.email ||
+          session.user.phone !== token.user?.phone ||
+          session.user.rut !== token.user?.rut;
 
         if (hasChanges) {
-          const newToken = {
+          return {
             tokens: token.tokens,
             updatedAt: Date.now(),
             user: {
@@ -148,61 +373,143 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
               phone: session.user.phone,
               rut: session.user.rut,
             },
-          };
-          return newToken;
+            error: undefined,
+          } as any;
         }
       }
 
-      // If token doesn't have required properties, return as-is to avoid errors
-      if (!token.tokens || !token.tokens.expiresIn) {
-        return token;
+      // If token doesn't have required properties -> invalidate
+      if (!token?.tokens) {
+        return null as any;
       }
 
-      const currentTime = new Date().getTime();
-      const expiryTime = token.tokens.expiresIn;
+      // IMPORTANT:
+      // Do NOT immediately invalidate the session on refresh failures.
+      // Under load (multiple tabs / multiple API bursts / serverless concurrency)
+      // you can get a transient 401 from /auth/refresh if another request already
+      // rotated the refresh token and updated the cookie. If we logged the user
+      // out immediately, they get kicked to /login even though they *could* recover.
 
-      if (currentTime < expiryTime) {
-        return token;
+	      const currentTime = Date.now();
+	      const baseMs = (token as any).updatedAt ?? currentTime;
+	      const expiryFromBackend = normalizeStoredExpiryMs(token.tokens.expiresIn, baseMs);
+      const expiryFromJwt = getAccessTokenExpMs(token.tokens.accessToken);
+
+      // Effective expiry = the earliest known expiry (avoid mismatches between backend config and JWT exp)
+      const candidates = [expiryFromBackend, expiryFromJwt].filter(
+        (v): v is number => typeof v === 'number' && v > 0
+      );
+      const effectiveExpiry = candidates.length ? Math.min(...candidates) : undefined;
+
+      // Refresh a bit BEFORE it expires to avoid clock drift / race conditions.
+      // Using 2 minutes reduces the chances of the token expiring during a websocket/API burst.
+      const SKEW_MS = 120_000;
+
+      // If we can't determine expiry -> treat as expired and try refresh
+      if (!effectiveExpiry) {
+        try {
+          const newToken = await refreshToken(token);
+          if (!newToken) {
+            // Don't hard-logout immediately. This can happen transiently if another
+            // request already rotated the refresh token and updated the cookie.
+            return {
+              ...token,
+              error: 'RefreshRejected',
+              refreshRejectedAt: (token as any).refreshRejectedAt ?? Date.now(),
+            } as any;
+          }
+          return newToken as any;
+        } catch (error) {
+          // Keep the session alive on transient errors and retry on the next refetch.
+          return { ...token, error: 'RefreshFailed', refreshErrorAt: Date.now() } as any;
+        }
       }
 
-      try {
-        const newToken = await refreshToken(token);
+      // If we recently had a refresh rejection, allow a short grace window where the
+      // session stays alive so the client can receive the updated cookie and recover.
+      if ((token as any).error === 'RefreshRejected') {
+        const rejectedAt = (token as any).refreshRejectedAt ?? currentTime;
+        const GRACE_MS = 10 * 60_000; // 10 minutes (session recovery window)
 
-        // If the refresh token is expired, return token as-is
-        // NextAuth will handle the session invalidation
-        if (newToken === null) {
-          console.warn('Refresh token expired, session will be invalidated');
+        // If access token is still valid, keep going normally.
+        if (currentTime < effectiveExpiry) {
           return token;
         }
-        return newToken;
+
+        // If access token is expired but we're still in grace, keep session alive.
+        if (currentTime - rejectedAt < GRACE_MS) {
+          return token;
+        }
+
+        // Past grace window: do NOT hard-logout automatically. Keep session so UI can recover or prompt re-auth.
+        return { ...token, error: "ReauthRequired" } as any;
+      }
+
+      // Access token still valid
+      if (currentTime < effectiveExpiry - SKEW_MS) {
+        // keep expiresIn normalized in memory (helps downstream checks)
+        if (expiryFromBackend && token.tokens.expiresIn !== expiryFromBackend) {
+          token.tokens.expiresIn = expiryFromBackend;
+        }
+        return token;
+      }
+
+      // Access token expired -> refresh
+      try {
+        const newToken = await refreshToken(token);
+        if (newToken === null) {
+          return {
+            ...token,
+            error: 'RefreshRejected',
+            refreshRejectedAt: (token as any).refreshRejectedAt ?? Date.now(),
+          } as any;
+        }
+        return newToken as any;
       } catch (error) {
         console.error('Token refresh failed:', error);
-        // Return token as-is to prevent breaking the session callback
-        return token;
+        // Do NOT wipe the session on transient refresh errors.
+        // The SessionProvider (refetchInterval=60) will retry shortly.
+        return { ...token, error: 'RefreshFailed', refreshErrorAt: Date.now() } as any;
       }
     },
 
     async session({ session, token }) {
-      // If token is invalid or missing required data, return null
-      // This will cause auth() to return null, which route handlers can handle
-      if (!token || !token.user || !token.tokens) {
-        console.error('Invalid token in session callback:', {
-          hasToken: !!token,
-          hasUser: !!token?.user,
-          hasTokens: !!token?.tokens,
-        });
-        // Return null to signal invalid session
-        // NextAuth will handle this and auth() will return null
+      if (!token || !(token as any).user || !(token as any).tokens) {
         return null as any;
       }
 
+      // propagate token error for client-side handling if needed
+      (session as any).error = (token as any).error;
+
       session.user = {
-        ...token.user,
-        email: token.user.email ?? null,
+        ...(token as any).user,
+        email: (token as any).user?.email ?? null,
         emailVerified: null,
       };
-      session.tokens = token.tokens as Tokens;
+
+      (session as any).tokens = (token as any).tokens as Tokens;
       return session;
+    },
+  },
+
+  events: {
+    async signOut(message) {
+      try {
+        // JWT sessions provide token in signOut event
+        const t = (message as any)?.token as any;
+        const refresh = t?.tokens?.refreshToken;
+        if (!refresh) return;
+
+        await fetch(BACKEND_URL + '/auth/logout', {
+          method: 'POST',
+          headers: {
+            authorization: `Bearer ${refresh}`,
+          },
+        });
+      } catch (e) {
+        // best-effort revocation
+        console.warn('Logout revocation failed:', e);
+      }
     },
   },
 

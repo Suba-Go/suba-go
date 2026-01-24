@@ -1,12 +1,12 @@
 import { NextResponse } from 'next/server';
 import { auth } from '@/auth';
 
-export async function POST(
+export const POST = auth(async function POST(
   request: Request,
   { params }: { params: Promise<{ auctionId: string }> }
 ) {
   try {
-    const session = await auth();
+    const session = (request as any).auth;
 
     if (!session) {
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
@@ -50,5 +50,5 @@ export async function POST(
       { status: 500 }
     );
   }
-}
+});
 

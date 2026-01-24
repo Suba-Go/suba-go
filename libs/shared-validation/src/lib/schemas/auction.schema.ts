@@ -50,8 +50,15 @@ export const auctionWithItemsAndBidsSchema = baseSchema
 
 export const auctionCreateSchema = z
   .object({
-    title: z.string().min(1).max(100),
-    description: z.string().nullable().optional(),
+    title: z
+      .string()
+      .min(1, 'Debe ingresar un nombre')
+      .max(50, 'Largo máximo: 50 caracteres'),
+    description: z
+      .string()
+      .max(300, 'Largo máximo: 300 caracteres')
+      .nullable()
+      .optional(),
     startTime: z.date(),
     endTime: z.date(),
     bidIncrement: z.number().positive(),

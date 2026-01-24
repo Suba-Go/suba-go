@@ -2,9 +2,9 @@ import { NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import superjson from 'superjson';
 
-export async function GET() {
+export const GET = auth(async function GET(request: any) {
   try {
-    const session = await auth();
+    const session = (request as any).auth;
 
     if (!session) {
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
@@ -53,4 +53,4 @@ export async function GET() {
     // Return empty array instead of error to prevent UI breaking
     return NextResponse.json([]);
   }
-}
+});

@@ -41,6 +41,7 @@ import {
 } from '@suba-go/shared-components/components/ui/carousel';
 import { ItemEditModal } from '@/components/items/item-edit-modal';
 import { useToast } from '@suba-go/shared-components/components/ui/toaster';
+import { apiFetch } from '@/lib/api/api-fetch';
 import { useAutoFormat } from '@/hooks/use-auto-format';
 import { useCompanyContextOptional } from '@/contexts/company-context';
 
@@ -89,7 +90,7 @@ export function ItemDetail({ itemId, userRole }: ItemDetailProps) {
   useEffect(() => {
     const fetchItems = async () => {
       try {
-        const response = await fetch(`/api/items/${itemId}`);
+        const response = await apiFetch(`/api/items/${itemId}`);
 
         if (!response.ok) {
           throw new Error('Error al cargar el producto');
@@ -172,7 +173,7 @@ export function ItemDetail({ itemId, userRole }: ItemDetailProps) {
     }
 
     try {
-      const response = await fetch(`/api/items/${itemId}`, {
+      const response = await apiFetch(`/api/items/${itemId}`, {
         method: 'DELETE',
       });
 
@@ -200,7 +201,7 @@ export function ItemDetail({ itemId, userRole }: ItemDetailProps) {
     // Recargar el producto después de editar
     const fetchItem = async () => {
       try {
-        const response = await fetch(`/api/items/${itemId}`);
+        const response = await apiFetch(`/api/items/${itemId}`);
         if (response.ok) {
           const data = await response.json();
           setItem(data);

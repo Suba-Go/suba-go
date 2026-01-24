@@ -53,7 +53,11 @@ export class AuctionItemsController {
     const tenantId = req.user.tenantId;
     return this.auctionItemsService.getAuctionItemsByAuctionId(
       auctionId,
-      tenantId
+      tenantId,
+      {
+        userId: req.user.userId,
+        role: req.user.role,
+      }
     );
   }
 
@@ -74,6 +78,9 @@ export class AuctionItemsController {
     @Request() req: AuthenticatedRequest
   ) {
     const tenantId = req.user.tenantId;
-    return this.auctionItemsService.getAuctionItemById(id, tenantId);
+    return this.auctionItemsService.getAuctionItemById(id, tenantId, {
+      userId: req.user.userId,
+      role: req.user.role,
+    });
   }
 }

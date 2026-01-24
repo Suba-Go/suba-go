@@ -169,7 +169,7 @@ export function ParticipantsList({
                 ? {
                     backgroundColor: primaryColor,
                     borderColor: primaryColor,
-                    color: '#000000',
+                    color: '#ffffff',
                   }
                 : undefined
             }
@@ -179,13 +179,13 @@ export function ParticipantsList({
                   primaryColor,
                   10
                 );
-                e.currentTarget.style.color = '#000000';
+                e.currentTarget.style.color = '#ffffff';
               }
             }}
             onMouseLeave={(e) => {
               if (primaryColor) {
                 e.currentTarget.style.backgroundColor = primaryColor;
-                e.currentTarget.style.color = '#000000';
+                e.currentTarget.style.color = '#ffffff';
               }
             }}
           >
@@ -211,7 +211,7 @@ export function ParticipantsList({
                     ? {
                         backgroundColor: primaryColor,
                         borderColor: primaryColor,
-                        color: '#000000',
+                        color: '#ffffff',
                       }
                     : undefined
                 }
@@ -221,13 +221,13 @@ export function ParticipantsList({
                       primaryColor,
                       10
                     );
-                    e.currentTarget.style.color = '#000000';
+                    e.currentTarget.style.color = '#ffffff';
                   }
                 }}
                 onMouseLeave={(e) => {
                   if (primaryColor) {
                     e.currentTarget.style.backgroundColor = primaryColor;
-                    e.currentTarget.style.color = '#000000';
+                    e.currentTarget.style.color = '#ffffff';
                   }
                 }}
               >

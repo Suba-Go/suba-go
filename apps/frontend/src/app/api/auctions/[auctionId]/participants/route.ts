@@ -2,7 +2,7 @@ import { auth } from '@/auth';
 import { NextRequest, NextResponse } from 'next/server';
 import superjson from 'superjson';
 
-export async function GET(
+export const GET = auth(async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ auctionId: string }> }
 ) {
@@ -12,7 +12,7 @@ export async function GET(
     // Wrap auth() in try-catch to handle any errors
     let session;
     try {
-      session = await auth();
+      session = (request as any).auth;
     } catch (authError) {
       console.error(
         'Auth error in GET /api/auctions/[auctionId]/participants:',
@@ -74,4 +74,4 @@ export async function GET(
     // Return empty array instead of error to prevent UI breaking
     return NextResponse.json([]);
   }
-}
+});

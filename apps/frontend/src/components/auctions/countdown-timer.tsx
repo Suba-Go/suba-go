@@ -16,6 +16,10 @@ interface CountdownTimerProps {
   status: string;
   startTime: string | Date;
   endTime: string | Date;
+  /** Difference between server clock and local clock in ms (server - local). */
+  serverOffsetMs?: number;
+  /** Optional externally-provided nowMs (already server-synced). If provided, timer won't create its own interval. */
+  nowMs?: number;
   variant?: 'card' | 'inline' | 'compact';
   className?: string;
 }
@@ -24,10 +28,12 @@ export function CountdownTimer({
   status,
   startTime,
   endTime,
+  serverOffsetMs = 0,
+  nowMs,
   variant = 'card',
   className = '',
 }: CountdownTimerProps) {
-  const auctionStatus = useAuctionStatus(status, startTime, endTime);
+  const auctionStatus = useAuctionStatus(status, startTime, endTime, { serverOffsetMs, nowMs });
 
   // Don't show timer for completed or cancelled auctions
   if (auctionStatus.isCompleted || auctionStatus.isCanceled) {
@@ -41,7 +47,7 @@ export function CountdownTimer({
 
     return (
       <div
-        className={`flex gap-1 text-sm font-mono font-bold ${color} ${className}`}
+        className={`flex gap-1 text-base sm:text-lg font-mono font-bold ${color} ${className}`}
       >
         <span>{String(hours).padStart(2, '0')}</span>
         <span>:</span>

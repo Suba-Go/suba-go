@@ -77,6 +77,8 @@ export class AuctionsController {
   }
 
   @Get('tenant/:tenantId')
+  @UseGuards(RolesGuard)
+  @Roles(UserRolesEnum.AUCTION_MANAGER, UserRolesEnum.ADMIN)
   @ApiOperation({ summary: 'Obtener subastas por tenant' })
   @ApiParam({ name: 'tenantId', description: 'ID del tenant' })
   @ApiResponse({
@@ -119,6 +121,8 @@ export class AuctionsController {
   }
 
   @Get('active/tenant/:tenantId')
+  @UseGuards(RolesGuard)
+  @Roles(UserRolesEnum.AUCTION_MANAGER, UserRolesEnum.ADMIN)
   @ApiOperation({ summary: 'Obtener subastas activas por tenant' })
   @ApiParam({ name: 'tenantId', description: 'ID del tenant' })
   @ApiResponse({
@@ -182,7 +186,10 @@ export class AuctionsController {
     @Request() req: AuthenticatedRequest
   ) {
     const tenantId = req.user.tenantId;
-    return this.auctionsService.getAuctionById(id, tenantId);
+    return this.auctionsService.getAuctionById(id, tenantId, {
+      userId: req.user.userId,
+      role: req.user.role,
+    });
   }
 
   @Put(':id')

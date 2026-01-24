@@ -7,12 +7,19 @@
 'use client';
 
 import { useEffect, useState, useCallback, useRef } from 'react';
-import { wsClient, getAccessToken } from '@/lib/ws-client';
-import type {
-  WsServerMessage,
-  BidPlacedData,
-  WsConnectionState,
-} from '@suba-go/shared-validation';
+import { useSession } from 'next-auth/react';
+import { wsClient } from '@/lib/ws-client';
+import { WsConnectionState, type WsServerMessage, type BidPlacedData } from '@suba-go/shared-validation';
+
+function createRequestId(): string {
+  // Unique id for correlating PLACE_BID requests with BID_PLACED/BID_REJECTED responses.
+  // (Used by the backend to echo back in realtime messages.)
+  if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) {
+    //  - TS lib may not include randomUUID depending on config
+    return crypto.randomUUID();
+  }
+  return `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+}
 
 interface UseAuctionWebSocketOptions {
   tenantId: string;
@@ -50,6 +57,8 @@ export function useAuctionWebSocket({
   auctionId,
   enabled = true,
 }: UseAuctionWebSocketOptions): UseAuctionWebSocketReturn {
+  const { data: session, status } = useSession();
+
   const [connectionState, setConnectionState] = useState<WsConnectionState>(
     wsClient.getState()
   );
@@ -58,29 +67,35 @@ export function useAuctionWebSocket({
   const [error, setError] = useState<string | null>(null);
   const [hasJoinedRoom, setHasJoinedRoom] = useState(false);
 
-  // Track if we've already connected to prevent duplicate connections
-  const connectionAttempted = useRef(false);
+  // Track an in-flight connect so we don't spam connect() calls.
+  // IMPORTANT: do NOT block reconnects when the access token rotates.
+  // The previous implementation used a boolean "connectionAttempted" which
+  // prevented reconnecting with a *new* token after NextAuth refreshed it.
+  const connectPromiseRef = useRef<Promise<void> | null>(null);
+
+  const accessToken = (session as any)?.tokens?.accessToken as string | undefined;
 
   /**
    * Connect to WebSocket server
    */
   const connect = useCallback(async () => {
-    if (connectionAttempted.current) return;
-    connectionAttempted.current = true;
+    // If we're already trying to connect, reuse that attempt.
+    if (connectPromiseRef.current) return connectPromiseRef.current;
 
     try {
-      const token = getAccessToken();
-      if (!token) {
-        setError('No access token found');
+      if (!accessToken) {
+        setError('No access token found (session not ready)');
         return;
       }
 
-      await wsClient.connect(token);
+      connectPromiseRef.current = wsClient.connect(accessToken);
+      await connectPromiseRef.current;
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Connection failed');
-      connectionAttempted.current = false;
+    } finally {
+      connectPromiseRef.current = null;
     }
-  }, []);
+  }, [accessToken]);
 
   /**
    * Disconnect from WebSocket server
@@ -94,7 +109,7 @@ export function useAuctionWebSocket({
       setHasJoinedRoom(false);
     }
     wsClient.disconnect();
-    connectionAttempted.current = false;
+    connectPromiseRef.current = null;
   }, [tenantId, auctionId, hasJoinedRoom]);
 
   /**
@@ -120,108 +135,100 @@ export function useAuctionWebSocket({
         return;
       }
 
-      const requestId = crypto.randomUUID();
+      const requestId = createRequestId();
+
       wsClient.send({
         event: 'PLACE_BID',
-        data: { tenantId, auctionId, auctionItemId, amount, requestId },
+        data: {
+          tenantId,
+          auctionId,
+          auctionItemId,
+          amount,
+          requestId,
+        },
       });
     },
     [tenantId, auctionId]
   );
 
-  /**
-   * Handle incoming WebSocket messages
-   */
+  // Subscribe to connection state changes
   useEffect(() => {
-    const handleMessage = (message: WsServerMessage) => {
-      switch (message.event) {
-        case 'HELLO_OK':
-          // Authentication complete, join auction room
-          joinAuctionRoom();
-          break;
-
-        case 'JOINED':
-          setParticipantCount(message.data.participantCount);
-          setError(null);
-          break;
-
-        case 'BID_PLACED':
-          // Add new bid to the list
-          setBids((prev) => [message.data, ...prev]);
-          break;
-
-        case 'BID_REJECTED':
-          setError(message.data.reason);
-          break;
-
-        case 'PARTICIPANT_COUNT':
-          if (message.data.auctionId === auctionId) {
-            setParticipantCount(message.data.count);
-          }
-          break;
-
-        case 'AUCTION_STATUS_CHANGED':
-          if (message.data.auctionId === auctionId) {
-            // Handle auction status change (e.g., auction ended)
-          }
-          break;
-
-        case 'ERROR':
-          setError(message.data.message);
-          break;
-      }
-    };
-
-    const unsubscribe = wsClient.onMessage(handleMessage);
-    return unsubscribe;
-  }, [auctionId, joinAuctionRoom]);
-
-  /**
-   * Handle connection state changes
-   */
-  useEffect(() => {
-    const handleStateChange = (state: WsConnectionState) => {
+    const unsubscribe = wsClient.onStateChange((state) => {
       setConnectionState(state);
 
-      // Join room when authenticated
+      // Join room once authenticated
       if (state === 'AUTHENTICATED') {
         joinAuctionRoom();
       }
 
-      // Reset room state when disconnected
-      if (state === 'DISCONNECTED') {
+      // Reset join flag if disconnected
+      if (state === 'DISCONNECTED' || state === 'ERROR') {
         setHasJoinedRoom(false);
       }
-    };
+    });
 
-    const unsubscribe = wsClient.onStateChange(handleStateChange);
     return unsubscribe;
   }, [joinAuctionRoom]);
 
-  /**
-   * Auto-connect when enabled
-   */
+  // Subscribe to messages
   useEffect(() => {
-    if (enabled && !connectionAttempted.current) {
+    const unsubscribe = wsClient.onMessage((message: WsServerMessage) => {
+      switch (message.event) {
+        case 'BID_PLACED': {
+          const data = message.data as BidPlacedData;
+          setBids((prev) => [data, ...prev]);
+          break;
+        }
+
+        case 'PARTICIPANT_COUNT': {
+          setParticipantCount((message.data as any).count || 0);
+          break;
+        }
+
+        case 'ERROR': {
+          setError((message.data as any).message || 'Server error');
+          break;
+        }
+
+        default:
+          break;
+      }
+    });
+
+    return unsubscribe;
+  }, []);
+
+  // Auto-connect when enabled and session is ready
+  useEffect(() => {
+    if (!enabled) {
+      disconnect();
+      return;
+    }
+
+    if (status !== 'authenticated') {
+      // If user is not authenticated, ensure ws is disconnected
+      disconnect();
+      return;
+    }
+
+    // Connect once we have a token
+    if (accessToken) {
       connect();
     }
 
     return () => {
-      // Leave room on unmount
-      if (hasJoinedRoom) {
-        wsClient.send({
-          event: 'LEAVE_AUCTION',
-          data: { tenantId, auctionId },
-        });
-      }
+      // Cleanup on unmount
+      disconnect();
     };
-  }, [enabled, connect, tenantId, auctionId, hasJoinedRoom]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [enabled, status, accessToken, tenantId, auctionId]);
 
   return {
     connectionState,
     isConnected:
-      connectionState === 'CONNECTED' || connectionState === 'AUTHENTICATED',
-    isAuthenticated: connectionState === 'AUTHENTICATED',
+      connectionState === WsConnectionState.CONNECTED ||
+      connectionState === WsConnectionState.AUTHENTICATED,
+    isAuthenticated: connectionState === WsConnectionState.AUTHENTICATED,
     bids,
     participantCount,
     placeBid,

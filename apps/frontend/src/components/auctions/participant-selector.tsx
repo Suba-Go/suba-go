@@ -6,6 +6,7 @@ import { Button } from '@suba-go/shared-components/components/ui/button';
 import { Input } from '@suba-go/shared-components/components/ui/input';
 import { Spinner } from '@suba-go/shared-components/components/ui/spinner';
 import { useToast } from '@suba-go/shared-components/components/ui/toaster';
+import { apiFetch } from '@/lib/api/api-fetch';
 
 interface User {
   id: string;
@@ -41,7 +42,7 @@ export function ParticipantSelector({
   const fetchUsers = React.useCallback(async () => {
     setIsLoading(true);
     try {
-      const response = await fetch('/api/users');
+      const response = await apiFetch('/api/users');
       if (!response.ok) {
         throw new Error('Error al cargar usuarios');
       }

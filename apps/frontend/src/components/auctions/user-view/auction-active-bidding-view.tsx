@@ -5,16 +5,16 @@
  */
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import {useState, useEffect, useCallback, useRef, useMemo} from 'react';
 import {
   Alert,
   AlertDescription,
 } from '@suba-go/shared-components/components/ui/alert';
 import { useToast } from '@suba-go/shared-components/components/ui/toaster';
 import { AlertCircle } from 'lucide-react';
-import { CountdownTimer } from '../countdown-timer';
 import { AuctionItemDetailModal } from '../auction-item-detail-modal';
 import { AuctionHeader } from './auction-header';
+import { AuctionFinalizingOverlay } from '../auction-finalizing-overlay';
 // import { ConnectionStatus } from './connection-status';
 import { AuctionItemCard } from './auction-item-card';
 import { SelfBidWarningDialog, AutoBidConfirmDialog } from './bidding-dialogs';
@@ -39,6 +39,7 @@ interface BidState {
     amount: string;
     isPending: boolean;
     error: string | null;
+    pendingRequestId?: string;
   };
 }
 
@@ -52,6 +53,8 @@ interface ItemBidHistory {
   }>;
 }
 
+type WinnerByItem = Record<string, string | undefined>;
+
 export function AuctionActiveBiddingView({
   auction,
   auctionItems,
@@ -62,6 +65,38 @@ export function AuctionActiveBiddingView({
 }: AuctionActiveBiddingViewProps) {
   const [bidStates, setBidStates] = useState<BidState>({});
   const [bidHistory, setBidHistory] = useState<ItemBidHistory>({});
+
+  // Keep item positions stable during live updates (avoid confusion when bids arrive).
+  // We lock the initial order we see for each item id and sort by that order thereafter.
+  const itemOrderRef = useRef<Map<string, number>>(new Map());
+  const [itemOrderVersion, setItemOrderVersion] = useState(0);
+
+  useEffect(() => {
+    if (!auctionItems) return;
+    let changed = false;
+    for (const ai of auctionItems) {
+      const id = String(ai.id);
+      if (!itemOrderRef.current.has(id)) {
+        itemOrderRef.current.set(id, itemOrderRef.current.size);
+        changed = true;
+      }
+    }
+    if (changed) setItemOrderVersion((v) => v + 1);
+  }, [auctionItems]);
+
+  const stableAuctionItems = useMemo(() => {
+    if (!auctionItems) return [];
+    const order = itemOrderRef.current;
+    return [...auctionItems].sort((a, b) => {
+      const oa = order.get(String(a.id));
+      const ob = order.get(String(b.id));
+      return (oa ?? 0) - (ob ?? 0);
+    });
+  }, [auctionItems, itemOrderVersion]);
+  // Authoritative winner per item, updated from WS events and API snapshots.
+  // This avoids a UX bug where multiple users can see "Ganando" at the same time
+  // if the local bid history is briefly inconsistent.
+  const [winnerByItemId, setWinnerByItemId] = useState<WinnerByItem>({});
   const [selectedItemForDetail, setSelectedItemForDetail] =
     useState<AuctionItemWithItmeAndBidsDto | null>(null);
   const [selfBidWarning, setSelfBidWarning] = useState<{
@@ -73,10 +108,70 @@ export function AuctionActiveBiddingView({
     maxPrice: number;
   } | null>(null);
 
+  const [isFinalizingAuction, setIsFinalizingAuction] = useState(false);
+  const finalizingOnceRef = useRef(false);
+
+  // Per-item clock (independent timers). Each item can be extended (soft-close) without affecting others.
+  const [itemTimes, setItemTimes] = useState<Record<string, { startTime: string | Date; endTime: string | Date }>>({});
+
+  // Derived overall end time (max of item endTimes). Used internally to show a
+  // "finalizando" overlay when the last item reaches 0.
+  const overallEndTime = useMemo(() => {
+    const values = Object.values(itemTimes);
+    if (!values.length) return auction.endTime;
+    let maxMs = new Date(auction.endTime as any).getTime();
+    for (const v of values) {
+      const ms = new Date(v.endTime as any).getTime();
+      if (Number.isFinite(ms) && ms > maxMs) maxMs = ms;
+    }
+    return new Date(maxMs);
+  }, [itemTimes, auction.endTime]);
+
+  // Toast must be initialized before being referenced by callbacks below.
+  const { toast } = useToast();
+
+  const handleAuctionStatusChanged = useCallback(
+    (status: string) => {
+      // If the auction finished while the user was bidding, ensure we don't leave any item
+      // stuck in a "pujando" state and refresh the snapshot so the router swaps to the
+      // completed view for all connected clients.
+      setBidStates((prev) => {
+        const next: BidState = { ...prev };
+        Object.keys(next).forEach((auctionItemId) => {
+          next[auctionItemId] = {
+            ...next[auctionItemId],
+            isPending: false,
+            pendingRequestId: undefined,
+          };
+        });
+        return next;
+      });
+
+      // Optional UX: show a lightweight toast. We avoid declaring winner here because
+      // that depends on backend adjudication.
+      if (status === 'COMPLETADA') {
+        if (!finalizingOnceRef.current) {
+          finalizingOnceRef.current = true;
+          setIsFinalizingAuction(true);
+        }
+        toast({
+          title: 'Subasta finalizada',
+          description: 'Finalizando subasta...',
+        });
+      }
+
+      onRealtimeSnapshot?.();
+    },
+    [onRealtimeSnapshot, toast]
+  );
+
+  // Track pending bid timeouts to avoid stuck loading
+  const pendingBidTimeoutsRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(
+    new Map()
+  );
   // Custom hooks
   const { autoBidSettings, updateAutoBidSetting, removeAutoBidSetting } =
     useAutoBidSettings(auction.id);
-  const { toast } = useToast();
   const getHighestFromApi = (ai: AuctionItemWithItmeAndBidsDto) => {
     const highestApiBid =
       ai.bids && ai.bids.length > 0
@@ -106,6 +201,21 @@ export function AuctionActiveBiddingView({
         timestamp,
       } = data;
 
+      // A successful BID_PLACED implies this bidder is the current highest.
+      // Store winner explicitly so the badge can't be "true" for multiple users.
+      if (auctionItemId && bidderId) {
+        setWinnerByItemId((prev) => ({
+          ...prev,
+          [String(auctionItemId)]: String(bidderId),
+        }));
+      }
+
+      const pending = pendingBidTimeoutsRef.current.get(auctionItemId);
+      if (pending) {
+        clearTimeout(pending);
+        pendingBidTimeoutsRef.current.delete(auctionItemId);
+      }
+
       setBidHistory((prev) => {
         const current = prev[auctionItemId] || [];
         const incoming = {
@@ -132,6 +242,7 @@ export function AuctionActiveBiddingView({
           ...prev[auctionItemId],
           isPending: false,
           error: null,
+          pendingRequestId: undefined,
           amount: (amount + Number(auction.bidIncrement || 50000)).toString(),
         },
       }));
@@ -148,17 +259,48 @@ export function AuctionActiveBiddingView({
     [userId, auction.bidIncrement, toast]
   );
 
-  const handleBidRejected = useCallback((data: any) => {
-    const { auctionItemId, reason } = data;
-    setBidStates((prev) => ({
-      ...prev,
-      [auctionItemId]: {
-        ...prev[auctionItemId],
-        isPending: false,
-        error: reason || 'Puja rechazada',
-      },
-    }));
-  }, []);
+  const handleBidRejected = useCallback(
+    (data: any) => {
+      const { auctionItemId, reason } = data;
+
+      const pending = pendingBidTimeoutsRef.current.get(auctionItemId);
+      if (pending) {
+        clearTimeout(pending);
+        pendingBidTimeoutsRef.current.delete(auctionItemId);
+      }
+
+      // Keep frontend consistent with backend/DB:
+      // when a bid is rejected (often because another bid won the race),
+      // force a snapshot refresh and bump the suggested amount to the
+      // latest minimum according to the freshest data we currently have.
+      const ai = auctionItems?.find((i) => i.id === auctionItemId);
+      const historyHighest = bidHistory?.[auctionItemId]?.[0]?.amount;
+      const apiHighest = ai ? getHighestFromApi(ai as any) : 0;
+      const currentHighest =
+        historyHighest !== undefined ? historyHighest : apiHighest;
+      const bidIncrement = Number(auction.bidIncrement || 50000);
+      const minNextBid = Number(currentHighest) + bidIncrement;
+
+      setBidStates((prev) => {
+        const current = prev[auctionItemId];
+        const currentAmount = Number(current?.amount);
+        const shouldBump = !Number.isFinite(currentAmount) || currentAmount < minNextBid;
+        return {
+          ...prev,
+          [auctionItemId]: {
+            ...current,
+            isPending: false,
+            error: reason || 'Puja rechazada',
+            pendingRequestId: undefined,
+            amount: shouldBump ? String(minNextBid) : current?.amount,
+          },
+        };
+      });
+
+      onRealtimeSnapshot?.();
+    },
+    [auctionItems, bidHistory, auction.bidIncrement, onRealtimeSnapshot]
+  );
 
   useEffect(() => {
     if (!auctionItems) return;
@@ -188,23 +330,141 @@ export function AuctionActiveBiddingView({
       });
       return next;
     });
+
   }, [auctionItems]);
 
-  const handleTimeExtension = useCallback((data: any) => {
-    // TODO: extend auction time
-  }, []);
+  // Seed/refresh the current winner per item from the latest API snapshot.
+  // This prevents multiple clients from showing "Ganando" simultaneously
+  // if their local history temporarily diverges.
+  useEffect(() => {
+    if (!auctionItems) return;
+    setWinnerByItemId((prev) => {
+      const next: WinnerByItem = { ...prev };
+      for (const ai of auctionItems) {
+        const apiHighestBidder = getHighestBidderFromApi(ai);
+        if (apiHighestBidder) next[ai.id] = String(apiHighestBidder);
+      }
+      return next;
+    });
+  }, [auctionItems]);
 
-  const { isJoined, connectionError, sendBid } = useAuctionWebSocketBidding({
+
+// Initialize per-item clocks (fallback to auction-level times when item times are null)
+useEffect(() => {
+  if (!auctionItems) return;
+  setItemTimes((prev) => {
+    const next: Record<string, { startTime: string | Date; endTime: string | Date }> = { ...prev };
+    for (const ai of auctionItems) {
+      next[ai.id] = {
+        startTime: (ai as any).startTime || auction.startTime,
+        endTime: (ai as any).endTime || auction.endTime,
+      };
+    }
+    return next;
+  });
+}, [auctionItems, auction.startTime, auction.endTime]);
+
+  
+  const handleTimeExtension = useCallback(
+    (data: any) => {
+      if (!data?.newEndTime) return;
+
+      // Independent timer per item is REQUIRED. Only update the specific item.
+      // If the payload doesn't include auctionItemId, ignore it to avoid accidentally
+      // extending all items (which mixes timers and breaks the client requirement).
+      if (!data?.auctionItemId) return;
+
+      const itemId = String(data.auctionItemId);
+      setItemTimes((prev) => {
+        const current = prev[itemId];
+        return {
+          ...prev,
+          [itemId]: {
+            startTime: current?.startTime || auction.startTime,
+            endTime: data.newEndTime,
+          },
+        };
+      });
+
+      // Optional: refresh snapshot to keep UI in sync (auction/item endTime persisted)
+      onRealtimeSnapshot?.();
+    },
+    [onRealtimeSnapshot, auction.startTime]
+  );
+
+  const { isJoined, connectionError, sendBid, serverOffsetMs } = useAuctionWebSocketBidding({
     auctionId: auction.id,
     tenantId,
     accessToken,
     onBidPlaced: handleBidPlaced,
     onBidRejected: handleBidRejected,
     onTimeExtension: handleTimeExtension,
+    onStatusChanged: handleAuctionStatusChanged,
     onJoined: onRealtimeSnapshot,
   });
 
-  // Initialize bid states
+  // Shared, server-synced clock for the whole view (prevents per-item timer drift and avoids N intervals).
+  const [nowMs, setNowMs] = useState(() => Date.now() + (serverOffsetMs || 0));
+
+  useEffect(() => {
+    const tick = () => setNowMs(Date.now() + (serverOffsetMs || 0));
+    tick();
+    const id = setInterval(tick, 1000);
+    return () => clearInterval(id);
+  }, [serverOffsetMs]);
+
+  // Show congratulations per item (independent). If an item ends earlier than others,
+  // only the winning user sees the message for that item.
+  const congratulatedItemsRef = useRef<Set<string>>(new Set());
+
+  useEffect(() => {
+    if (!auctionItems || !userId) return;
+
+    for (const ai of auctionItems) {
+      const endTime =
+        itemTimes[ai.id]?.endTime || (ai as any).endTime || auction.endTime;
+      const endMs = new Date(endTime as any).getTime();
+      if (!Number.isFinite(endMs)) continue;
+
+      if (nowMs < endMs) continue;
+      if (congratulatedItemsRef.current.has(ai.id)) continue;
+
+      const history = bidHistory[ai.id] || [];
+      const winnerId = history[0]?.userId ?? getHighestBidderFromApi(ai);
+
+      if (winnerId && winnerId === userId) {
+        const plate = ai.item?.plate || 'este ítem';
+        toast({
+          title: '¡Felicitaciones! 🎉',
+          description: `Ganaste el ítem ${plate}.`,
+        });
+      }
+
+      congratulatedItemsRef.current.add(ai.id);
+    }
+  }, [auctionItems, auction.endTime, bidHistory, itemTimes, nowMs, toast, userId]);
+
+
+
+  // If the overall auction timer reaches 0 but the backend status still hasn't swapped,
+  // show a "finalizando" overlay while the router updates.
+  // We use the shared nowMs (server-synced) to avoid extra intervals.
+  useEffect(() => {
+    if (finalizingOnceRef.current) return;
+
+    const endMs = new Date(overallEndTime as any).getTime();
+    if (!Number.isFinite(endMs)) return;
+
+    if (nowMs >= endMs) {
+      finalizingOnceRef.current = true;
+      setIsFinalizingAuction(true);
+      onRealtimeSnapshot?.();
+    }
+  }, [overallEndTime, nowMs, onRealtimeSnapshot]);
+  
+  
+  
+      // Initialize bid states
   // Rehidrata historial con lo que viene del API
   // Inicializa montos mínimos para cada item cuando llega data
   useEffect(() => {
@@ -256,6 +516,7 @@ export function AuctionActiveBiddingView({
             : next[ai.id]?.amount || minNextBid.toString(),
           isPending: next[ai.id]?.isPending || false,
           error: next[ai.id]?.error || null,
+          pendingRequestId: next[ai.id]?.pendingRequestId,
         };
       });
       return next;
@@ -282,12 +543,63 @@ export function AuctionActiveBiddingView({
       return;
     }
 
+    const requestId = sendBid(auctionItemId, amount);
+
+    // If we couldn't send (WS not connected / not joined), do NOT enter pending state
+    // otherwise the button can get stuck in loading forever.
+    if (!requestId) {
+      setBidStates((prev) => ({
+        ...prev,
+        [auctionItemId]: {
+          ...prev[auctionItemId],
+          isPending: false,
+          error: 'Conexión en tiempo real no disponible. Reintenta en unos segundos.',
+          pendingRequestId: undefined,
+        },
+      }));
+      toast({
+        title: 'No se pudo enviar la puja',
+        description:
+          'Tu conexión en tiempo real no está lista (aún no te uniste a la subasta). Reintenta.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
     setBidStates((prev) => ({
       ...prev,
-      [auctionItemId]: { ...prev[auctionItemId], isPending: true, error: null },
+      [auctionItemId]: {
+        ...prev[auctionItemId],
+        isPending: true,
+        error: null,
+        pendingRequestId: requestId,
+      },
     }));
 
-    sendBid(auctionItemId, amount);
+    // Fallback: clear loading if server doesn't confirm (prevents stuck "pujando")
+    if (requestId) {
+      const existing = pendingBidTimeoutsRef.current.get(auctionItemId);
+      if (existing) clearTimeout(existing);
+
+      const timeout = setTimeout(() => {
+        setBidStates((prev) => {
+          const state = prev[auctionItemId];
+          if (!state?.isPending) return prev;
+          if (state.pendingRequestId && state.pendingRequestId !== requestId) return prev;
+          return {
+            ...prev,
+            [auctionItemId]: {
+              ...state,
+              isPending: false,
+              error: 'No se pudo confirmar tu puja. Reintenta.',
+              pendingRequestId: undefined,
+            },
+          };
+        });
+      }, 8000);
+
+      pendingBidTimeoutsRef.current.set(auctionItemId, timeout);
+    }
   };
 
   const confirmSelfBid = () => {
@@ -353,6 +665,7 @@ export function AuctionActiveBiddingView({
 
   return (
     <div className="space-y-6">
+      <AuctionFinalizingOverlay open={isFinalizingAuction} />
       <AuctionHeader
         title={auction.title}
         description={auction.description || ''}
@@ -372,17 +685,10 @@ export function AuctionActiveBiddingView({
         </Alert>
       )}
 
-      <CountdownTimer
-        status={auction.status}
-        startTime={auction.startTime}
-        endTime={auction.endTime}
-        variant="card"
-      />
-
       {/* Items Grid */}
       {auctionItems && auctionItems.length > 0 ? (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {auctionItems.map((auctionItem) => {
+          {stableAuctionItems.map((auctionItem) => {
             const itemHistory = bidHistory[auctionItem.id] || [];
             const currentHighest = Number(
               itemHistory[0]?.amount ?? getHighestFromApi(auctionItem)
@@ -393,15 +699,21 @@ export function AuctionActiveBiddingView({
               amount: minNextBid.toString(),
               isPending: false,
               error: null,
+              pendingRequestId: undefined,
             };
-            const isUserWinning =
-              itemHistory[0]?.userId === userId ||
-              auctionItem.bids?.[0]?.userId === userId;
+            // Use the explicit winner map first (authoritative), then fallback.
+            const winnerId = winnerByItemId[auctionItem.id] ?? itemHistory[0]?.userId ?? getHighestBidderFromApi(auctionItem);
+            const isUserWinning = winnerId === userId;
 
             return (
               <AuctionItemCard
                 key={auctionItem.id}
                 auctionItem={auctionItem}
+                status={auction.status}
+                startTime={itemTimes[auctionItem.id]?.startTime || auction.startTime}
+                endTime={itemTimes[auctionItem.id]?.endTime || auction.endTime}
+                serverOffsetMs={serverOffsetMs}
+                nowMs={nowMs}
                 currentHighest={currentHighest}
                 minNextBid={minNextBid}
                 bidIncrement={bidIncrement}

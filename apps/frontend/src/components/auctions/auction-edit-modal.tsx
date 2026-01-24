@@ -16,6 +16,7 @@ import { Input } from '@suba-go/shared-components/components/ui/input';
 import { Textarea } from '@suba-go/shared-components/components/ui/textarea';
 import { Label } from '@suba-go/shared-components/components/ui/label';
 import { useToast } from '@suba-go/shared-components/components/ui/toaster';
+import { apiFetch } from '@/lib/api/api-fetch';
 import { Switch } from '@suba-go/shared-components/components/ui/switch';
 import { ItemSelector } from './item-selector';
 import { useCompany } from '@/hooks/use-company';
@@ -102,7 +103,7 @@ export function AuctionEditModal({
 
       const items =
         auctionItems
-          ?.map((item) => item?.id)
+          ?.map((auctionItem) => auctionItem?.itemId)
           .filter((id): id is string => Boolean(id)) || [];
 
       setSelectedItems(items);
@@ -186,7 +187,7 @@ export function AuctionEditModal({
 
     setIsLoading(true);
     try {
-      const response = await fetch(`/api/auctions/${auction.id}`, {
+      const response = await apiFetch(`/api/auctions/${auction.id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -198,7 +199,7 @@ export function AuctionEditModal({
           endTime: data.endTime.toISOString(),
           bidIncrement: data.bidIncrement,
           type: isTestAuction ? AuctionTypeEnum.TEST : data.type,
-          itemIds: data.itemIds,
+          selectedItems: data.itemIds,
         }),
       });
 
@@ -267,7 +268,17 @@ export function AuctionEditModal({
           </DialogDescription>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+        {/*
+          IMPORTANT:
+          This modal contains the ItemSelector, which can open ItemCreateModal.
+          ItemCreateModal uses its own <form>. If we keep a <form> here, the DOM
+          ends up with nested forms (invalid HTML) and some browsers will submit
+          the *outer* form when the user clicks "Crear Producto" (or presses
+          Enter), which triggers the auction update at the same time.
+          We intentionally avoid an outer <form> and trigger react-hook-form
+          submission from the button instead.
+        */}
+        <div className="space-y-6">
           <div className="space-y-4">
             <div>
               <Label htmlFor="title">Titulo de la Subasta *</Label>
@@ -404,11 +415,15 @@ export function AuctionEditModal({
             <Button type="button" variant="outline" onClick={handleClose}>
               Cancelar
             </Button>
-            <Button type="submit" disabled={isLoading}>
+            <Button
+              type="button"
+              disabled={isLoading}
+              onClick={handleSubmit(onSubmit)}
+            >
               {isLoading ? 'Guardando...' : 'Actualizar Subasta'}
             </Button>
           </div>
-        </form>
+        </div>
       </DialogContent>
     </Dialog>
   );
