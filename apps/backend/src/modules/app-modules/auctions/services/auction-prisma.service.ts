@@ -7,6 +7,7 @@ import type {
   Bid as BidModel,
   AuctionTypeEnum,
   AuctionStatusEnum,
+  Auction,
 } from '@prisma/client';
 
 /**
