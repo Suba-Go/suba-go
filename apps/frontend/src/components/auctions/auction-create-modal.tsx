@@ -17,6 +17,7 @@ import { Textarea } from '@suba-go/shared-components/components/ui/textarea';
 import { Label } from '@suba-go/shared-components/components/ui/label';
 import { useToast } from '@suba-go/shared-components/components/ui/toaster';
 import { Switch } from '@suba-go/shared-components/components/ui/switch';
+import { apiFetch } from '@/lib/api/api-fetch';
 import { ItemSelector } from './item-selector';
 import { useCompany } from '@/hooks/use-company';
 import { DateInput } from '@/components/ui/date-input';
@@ -174,7 +175,7 @@ export function AuctionCreateModal({
 
     setIsLoading(true);
     try {
-      const response = await fetch('/api/auctions', {
+      const response = await apiFetch('/api/auctions', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -282,6 +283,7 @@ export function AuctionCreateModal({
               <Input
                 id="title"
                 {...register('title')}
+                maxLength={50}
                 placeholder="Ej: Subasta de Vehiculos Enero 2024"
                 className={
                   errors.title
@@ -303,11 +305,21 @@ export function AuctionCreateModal({
               <Textarea
                 id="description"
                 {...register('description')}
+                maxLength={300}
                 placeholder="Describe los detalles de la subasta..."
                 rows={3}
-                className="focus-visible:ring-1"
-                style={inputFocusStyle}
+                className={
+                  errors.description
+                    ? 'border-red-500 focus-visible:ring-red-500'
+                    : 'focus-visible:ring-1'
+                }
+                style={errors.description ? undefined : inputFocusStyle}
               />
+              {errors.description && (
+                <p className="text-sm text-red-600 mt-1">
+                  {errors.description.message as string}
+                </p>
+              )}
             </div>
           </div>
 

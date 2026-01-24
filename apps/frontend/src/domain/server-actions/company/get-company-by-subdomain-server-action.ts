@@ -7,12 +7,13 @@ export const getCompanyBySubdomainServerAction = async (
   subdomain: string
 ): Promise<ApiResponse<CompanyDto>> => {
   try {
+    console.log(subdomain);
     const result = await fetcher(`/companies/subdomain/${subdomain}`, {
       method: 'GET',
       requireAuth: false,
       cache: 'no-store',
     });
-
+    console.log('result server action', result);
     if (result.success) {
       return {
         success: true,

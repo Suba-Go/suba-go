@@ -1,12 +1,12 @@
 import { auth } from '@/auth';
 import { NextRequest, NextResponse } from 'next/server';
 
-export async function POST(
+export const POST = auth(async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ auctionId: string }> }
 ) {
   try {
-    const session = await auth();
+    const session = (request as any).auth;
     const { auctionId } = await params;
 
     if (!session) {
@@ -52,5 +52,5 @@ export async function POST(
       { status: 500 }
     );
   }
-}
+});
 

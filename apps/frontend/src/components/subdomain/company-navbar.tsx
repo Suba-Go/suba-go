@@ -6,11 +6,12 @@ import { getNodeEnv } from '@suba-go/shared-components';
 
 import { Button } from '@suba-go/shared-components/components/ui/button';
 import { useSession, signOut } from 'next-auth/react';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import {
   User,
   LogOut,
   ChevronDown,
+  Menu,
   Gavel,
   Package,
   Users,
@@ -27,6 +28,8 @@ import {
   isUserAdminOrManager,
 } from '@/utils/subdomain-profile-validation';
 import { useCompany } from '@/hooks/use-company';
+import MobileDrawer from '@/components/layout/mobile-drawer';
+import { usePathname } from 'next/navigation';
 
 interface CompanyNavbarProps {
   company: CompanyDto;
@@ -49,6 +52,14 @@ export default function CompanyNavbar({
   const primaryColor = company.principal_color || '#3B82F6';
   const { data: session, status } = useSession();
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const pathname = usePathname();
+
+  // Close menus on route change
+  useEffect(() => {
+    setIsMobileMenuOpen(false);
+    setIsProfileMenuOpen(false);
+  }, [pathname]);
 
   // Close menu when clicking outside
   useEffect(() => {
@@ -65,6 +76,7 @@ export default function CompanyNavbar({
 
   const handleSignOut = async () => {
     setIsProfileMenuOpen(false);
+    setIsMobileMenuOpen(false);
     await signOut({ redirect: false });
     // Redirect to company login after sign out
     handleLoginRedirect();
@@ -87,16 +99,103 @@ export default function CompanyNavbar({
 
   const handleProfileClick = () => {
     setIsProfileMenuOpen(false);
+    setIsMobileMenuOpen(false);
     window.location.href = `/perfil`;
   };
 
   const handleConfigClick = () => {
     setIsProfileMenuOpen(false);
+    setIsMobileMenuOpen(false);
     window.location.href = `/configuracion`;
   };
 
+  const canShowNav = isUserProfileComplete(session);
+
+  const navItems = (() => {
+    if (!canShowNav) return [];
+    const items: Array<{
+      href: string;
+      label: string;
+      icon: ReactNode;
+      show: boolean;
+      variant?: 'ghost' | 'default';
+    }> = [];
+
+    // Admin/Manager
+    items.push({
+      href: '/subastas',
+      label: 'Subastas',
+      icon: <Gavel className="h-4 w-4" />,
+      show: isUserAdminOrManager(session),
+      variant: 'ghost',
+    });
+
+    // User views
+    items.push({
+      href: '/mis-subastas',
+      label: 'Mis subastas',
+      icon: <Gavel className="h-4 w-4" />,
+      show: session?.user?.role === 'USER',
+      variant: 'ghost',
+    });
+    items.push({
+      href: '/adjudicaciones',
+      label: 'Mis adjudicaciones',
+      icon: <Package className="h-4 w-4" />,
+      show: session?.user?.role === 'USER',
+      variant: 'ghost',
+    });
+
+    // Products
+    items.push({
+      href: '/items',
+      label: 'Productos',
+      icon: <Package className="h-4 w-4" />,
+      show: isUserAdminOrManager(session),
+      variant: 'ghost',
+    });
+
+    // Users
+    items.push({
+      href: '/usuarios',
+      label: 'Usuarios',
+      icon: <Users className="h-4 w-4" />,
+      show: isUserAdminOrManager(session),
+      variant: 'ghost',
+    });
+
+    // Stats
+    items.push({
+      href: '/estadisticas',
+      label: 'Estadísticas',
+      icon: <BarChart3 className="h-4 w-4" />,
+      show: session?.user?.role === 'AUCTION_MANAGER',
+      variant: 'ghost',
+    });
+
+    // Feedback
+    items.push({
+      href: '/feedback',
+      label: 'Feedback',
+      icon: <MessageSquare className="h-4 w-4" />,
+      show: session?.user?.role === 'AUCTION_MANAGER',
+      variant: 'ghost',
+    });
+
+    // Invite
+    items.push({
+      href: '/usuarios/invite',
+      label: 'Invitar usuario',
+      icon: <UserPlus className="h-4 w-4" />,
+      show: session?.user?.role === 'AUCTION_MANAGER',
+      variant: 'default',
+    });
+
+    return items.filter((i) => i.show);
+  })();
+
   return (
-    <header className="bg-white shadow-sm border-b relative z-50">
+    <header className="sticky top-0 z-50 border-b bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/75">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center py-4">
           {/* Company Logo/Name */}
@@ -120,94 +219,37 @@ export default function CompanyNavbar({
             </div>
           </Link>
 
-          {/* Navigation Menu */}
-          {/* check if the profile is complete */}
-          {isUserProfileComplete(session) && (
+          {/* Desktop Navigation */}
+          {canShowNav && (
             <nav className="hidden md:flex flex-wrap items-center gap-3">
-              {isUserAdminOrManager(session) && (
-                <Link href="/subastas">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="text-gray-600 hover:text-gray-900 flex items-center gap-2"
-                  >
-                    <Gavel className="h-4 w-4" />
-                    Subastas
-                  </Button>
-                </Link>
-              )}
-              {/* Products - Only for AUCTION_MANAGER and ADMIN */}
-              {isUserAdminOrManager(session) && (
-                <Link href="/items">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="text-gray-600 hover:text-gray-900 flex items-center gap-2"
-                  >
-                    <Package className="h-4 w-4" />
-                    Productos
-                  </Button>
-                </Link>
-              )}
-              {/* Users - Only for AUCTION_MANAGER and ADMIN */}
-              {isUserAdminOrManager(session) && (
-                <Link href="/usuarios">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="text-gray-600 hover:text-gray-900 flex items-center gap-2"
-                  >
-                    <Users className="h-4 w-4" />
-                    Usuarios
-                  </Button>
-                </Link>
-              )}
-
-              {/* Stats - Only for AUCTION_MANAGER */}
-              {session?.user?.role === 'AUCTION_MANAGER' && (
-                <Link href="/estadisticas">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="text-gray-600 hover:text-gray-900 flex items-center gap-2"
-                  >
-                    <BarChart3 className="h-4 w-4" />
-                    Estadísticas
-                  </Button>
-                </Link>
-              )}
-              {/* Feedback - Only for AUCTION_MANAGER */}
-              {session?.user?.role === 'AUCTION_MANAGER' && (
-                <Link href="/feedback">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="text-gray-600 hover:text-gray-900 flex items-center gap-2"
-                  >
-                    <MessageSquare className="h-4 w-4" />
-                    Feedback
-                  </Button>
-                </Link>
-              )}
-
-              {/* Invite - Only for AUCTION_MANAGER */}
-              {session?.user?.role === 'AUCTION_MANAGER' && (
-                <Link href="/usuarios/invite">
-                  <Button
-                    size="sm"
-                    className="flex items-center gap-2 text-white"
-                    style={{ backgroundColor: primaryColor }}
-                  >
-                    <UserPlus className="h-4 w-4" />
-                    Invitar usuario
-                  </Button>
-                </Link>
-              )}
+              {navItems.map((item) => (
+                <Button
+                  key={item.href}
+                  asChild
+                  variant={item.variant ?? 'ghost'}
+                  size="sm"
+                  className={
+                    item.variant === 'default'
+                      ? 'flex items-center gap-2 text-white'
+                      : 'text-gray-600 hover:text-gray-900 flex items-center gap-2'
+                  }
+                  style={
+                    item.variant === 'default'
+                      ? { backgroundColor: primaryColor }
+                      : undefined
+                  }
+                >
+                  <Link href={item.href}>
+                    {item.icon}
+                    {item.label}
+                  </Link>
+                </Button>
+              ))}
             </nav>
           )}
 
           {/* Right side actions */}
-          <div className="flex items-center space-x-4">
+          <div className="flex items-center space-x-2 md:space-x-4">
             {/* <CustomLink
               href={`${protocol}://${rootDomain}`}
               className="text-gray-600 hover:text-gray-900 text-sm"
@@ -222,7 +264,7 @@ export default function CompanyNavbar({
               </div>
             ) : session ? (
               /* Profile Menu for Authenticated Users */
-              <div className="relative profile-menu-container">
+              <div className="relative profile-menu-container hidden md:block">
                 <button
                   onClick={() => setIsProfileMenuOpen(!isProfileMenuOpen)}
                   className="flex items-center space-x-2 text-gray-700 hover:text-gray-900 focus:outline-none"
@@ -263,10 +305,10 @@ export default function CompanyNavbar({
                       <hr className="border-gray-200" />
                       <button
                         onClick={handleSignOut}
-                        className="flex items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                        className="flex items-center w-full px-4 py-2 text-sm text-red-600 hover:bg-red-50 hover:text-red-700"
                       >
                         <LogOut className="w-4 h-4 mr-3" />
-                        Cerrar Sesión
+                        Cerrar sesión
                       </button>
                     </div>
                   </div>
@@ -283,62 +325,123 @@ export default function CompanyNavbar({
                 Iniciar Sesión
               </Button>
             )}
+
+            {/* Mobile hamburger */}
+            <button
+              type="button"
+              onClick={() => setIsMobileMenuOpen(true)}
+              className="md:hidden inline-flex h-10 w-10 items-center justify-center rounded-md hover:bg-gray-100 active:bg-gray-200"
+              aria-label="Abrir menú"
+            >
+              <Menu className="h-5 w-5" />
+            </button>
           </div>
         </div>
       </div>
 
-      {/* Mobile menu (hidden by default, can be toggled) */}
-      <div className="md:hidden border-t border-gray-200">
-        <div className="px-4 py-2 space-y-1">
-          {isUserAdminOrManager(session) && (
-            <Link href="/subastas">
+      {/* Mobile Drawer */}
+      <MobileDrawer
+        open={isMobileMenuOpen}
+        onOpenChange={setIsMobileMenuOpen}
+        title={company.name}
+        side="right"
+      >
+        <div className="px-4 py-4">
+          {/* User summary */}
+          <div className="rounded-lg border bg-white p-3">
+            <div className="flex items-center gap-3">
+              <div className="h-10 w-10 rounded-full bg-gray-200 flex items-center justify-center">
+                <User className="h-5 w-5 text-gray-700" />
+              </div>
+              <div className="min-w-0">
+                <div className="text-sm font-semibold text-gray-900 truncate">
+                  {session?.user?.name || session?.user?.email?.split('@')[0] || 'Cuenta'}
+                </div>
+                <div className="text-xs text-gray-500 truncate">
+                  {session?.user?.email ?? ''}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Nav */}
+          <div className="mt-4 space-y-1">
+            {navItems.length > 0 ? (
+              navItems.map((item) => (
+                <Button
+                  key={item.href}
+                  asChild
+                  variant={item.variant ?? 'ghost'}
+                  className={
+                    item.variant === 'default'
+                      ? 'w-full justify-start gap-2 text-white'
+                      : 'w-full justify-start gap-2 text-gray-700'
+                  }
+                  style={
+                    item.variant === 'default'
+                      ? { backgroundColor: primaryColor }
+                      : undefined
+                  }
+                >
+                  <Link href={item.href} onClick={() => setIsMobileMenuOpen(false)}>
+                    {item.icon}
+                    {item.label}
+                  </Link>
+                </Button>
+              ))
+            ) : (
+              <div className="text-sm text-gray-500 px-1">
+                Completa tu perfil para ver el menú.
+              </div>
+            )}
+          </div>
+
+          {/* Actions */}
+          <div className="mt-6 border-t pt-4 space-y-1">
+            {session ? (
+              <>
+                <Button
+                  variant="ghost"
+                  className="w-full justify-start gap-2"
+                  onClick={handleProfileClick}
+                >
+                  <User className="h-4 w-4" />
+                  Perfil
+                </Button>
+                {isUserAdminOrManager(session) && (
+                  <Button
+                    variant="ghost"
+                    className="w-full justify-start gap-2"
+                    onClick={handleConfigClick}
+                  >
+                    <Building2 className="h-4 w-4" />
+                    Configuración
+                  </Button>
+                )}
+                <Button
+                  variant="ghost"
+                  className="w-full justify-start gap-2 text-red-600 hover:text-red-700"
+                  onClick={handleSignOut}
+                >
+                  <LogOut className="h-4 w-4" />
+                  Cerrar sesión
+                </Button>
+              </>
+            ) : (
               <Button
-                variant="ghost"
-                className="w-full text-left justify-start text-gray-600 hover:text-gray-900 flex items-center gap-2"
-              >
-                <Gavel className="h-4 w-4" />
-                Subastas
-              </Button>
-            </Link>
-          )}
-          {/* Products - Only for AUCTION_MANAGER and ADMIN */}
-          {isUserAdminOrManager(session) && (
-            <Link href="/items">
-              <Button
-                variant="ghost"
-                className="w-full text-left justify-start text-gray-600 hover:text-gray-900 flex items-center gap-2"
-              >
-                <Package className="h-4 w-4" />
-                Productos
-              </Button>
-            </Link>
-          )}
-          {/* Users - Only for AUCTION_MANAGER and ADMIN */}
-          {isUserAdminOrManager(session) && (
-            <Link href="/usuarios">
-              <Button
-                variant="ghost"
-                className="w-full text-left justify-start text-gray-600 hover:text-gray-900 flex items-center gap-2"
-              >
-                <Users className="h-4 w-4" />
-                Usuarios
-              </Button>
-            </Link>
-          )}
-          {/* Invite - Only for AUCTION_MANAGER */}
-          {session?.user?.role === 'AUCTION_MANAGER' && (
-            <Link href="/usuarios/invite">
-              <Button
-                className="w-full text-left justify-start flex items-center gap-2 text-white"
+                className="w-full"
+                onClick={() => {
+                  setIsMobileMenuOpen(false);
+                  handleLoginRedirect();
+                }}
                 style={{ backgroundColor: primaryColor }}
               >
-                <UserPlus className="h-4 w-4" />
-                Invitar usuario
+                Iniciar sesión
               </Button>
-            </Link>
-          )}
+            )}
+          </div>
         </div>
-      </div>
+      </MobileDrawer>
     </header>
   );
 }

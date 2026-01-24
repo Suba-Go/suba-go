@@ -79,3 +79,40 @@
 .animate-bounce-small {
   animation: bounce-small 0.5s ease-in-out;
 }
+
+
+/* Prevent horizontal overflow on mobile */
+html, body {
+  max-width: 100%;
+  overflow-x: hidden;
+}
+
+/* Long strings should not force layout overflow */
+* {
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+/* ============================
+   Company brand theming
+   ============================ */
+
+/* Page/view titles follow the company primary color */
+.company-theme h1,
+.company-theme h2,
+.company-theme h3 {
+  color: var(--company-primary);
+}
+
+/* Utility helpers (use in components when needed) */
+.company-text {
+  color: var(--company-primary);
+}
+
+.company-border {
+  border-color: rgba(var(--company-primary-rgb), 0.28);
+}
+
+.company-ring {
+  --tw-ring-color: rgba(var(--company-primary-rgb), 0.45);
+}

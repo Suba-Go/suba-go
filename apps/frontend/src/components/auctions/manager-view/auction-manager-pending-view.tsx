@@ -1,10 +1,9 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { ArrowLeft, Calendar, Edit, Trophy } from 'lucide-react';
+import { AlertTriangle, ArrowLeft, Calendar, Edit, Trophy } from 'lucide-react';
 import { Button } from '@suba-go/shared-components/components/ui/button';
-import { useToast } from '@suba-go/shared-components/components/ui/toaster';
 import { Switch } from '@suba-go/shared-components/components/ui/switch';
 import { Label } from '@suba-go/shared-components/components/ui/label';
 import {
@@ -21,6 +20,7 @@ import {
   TabsTrigger,
 } from '@suba-go/shared-components/components/ui/tabs';
 import { useFetchData } from '@/hooks/use-fetch-data';
+import { useAuctionWebSocketBidding } from '@/hooks/use-auction-websocket-bidding';
 import {
   getAuctionBadgeColor,
   getAuctionStatusLabel,
@@ -28,6 +28,8 @@ import {
 import { AuctionEditModal } from '../auction-edit-modal';
 import Image from 'next/image';
 import { useAuctionStatus } from '@/hooks/use-auction-status';
+import { useAuctionCancelToggle } from '@/hooks/use-auction-cancel-toggle';
+import { AuctionStartingOverlay } from '../auction-starting-overlay';
 import {
   AuctionDto,
   AuctionItemWithItmeAndBidsDto,
@@ -36,26 +38,48 @@ import {
   UserSafeDto,
 } from '@suba-go/shared-validation';
 import { ParticipantsList } from '../participants-list';
+
+function formatMsToHhMmSs(ms: number): string {
+  const totalSeconds = Math.max(0, Math.floor(ms / 1000));
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+  return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(
+    2,
+    '0'
+  )}:${String(seconds).padStart(2, '0')}`;
+}
 import { AuctionItemDetailModal } from '../auction-item-detail-modal';
 
 interface AuctionManagerPendingViewProps {
   auction: AuctionDto;
   auctionItems: AuctionItemWithItmeAndBidsDto[];
+  accessToken: string;
+  tenantId: string;
   primaryColor?: string;
+  /**
+   * When the backend status changes (e.g., PENDIENTE -> ACTIVA, ACTIVA -> COMPLETADA),
+   * refetch snapshot data in the parent so the view router can switch components.
+   */
+  onRealtimeSnapshot?: () => void;
 }
 
 export function AuctionManagerPendingView({
   auction,
   auctionItems,
+  accessToken,
+  tenantId,
   primaryColor,
+  onRealtimeSnapshot,
 }: AuctionManagerPendingViewProps) {
   const router = useRouter();
-  const { toast } = useToast();
   const [activeTab, setActiveTab] = useState('items');
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
-  const [isCanceled, setIsCanceled] = useState(false);
   const [selectedItemForDetail, setSelectedItemForDetail] =
     useState<AuctionItemWithItmeAndBidsDto | null>(null);
+
+  // Server/client clock offset (ms). Updated from WebSocket JOINED message.
+  const [serverOffsetMs, setServerOffsetMs] = useState(0);
 
   // Fetch participants data
   const { data: participants, refetch: refetchParticipants } = useFetchData<
@@ -67,50 +91,76 @@ export function AuctionManagerPendingView({
     fallbackData: [],
   });
 
+  const { connectionError, serverOffsetMs: wsServerOffsetMs } = useAuctionWebSocketBidding({
+    auctionId: auction.id,
+    tenantId,
+    accessToken,
+    onStatusChanged: () => {
+      // Status changed on backend; let parent refetch and route to the correct view.
+      onRealtimeSnapshot?.();
+    },
+    onJoined: onRealtimeSnapshot,
+  });
+
+  useEffect(() => {
+    setServerOffsetMs(wsServerOffsetMs);
+  }, [wsServerOffsetMs]);
+
   const auctionStatus = useAuctionStatus(
     auction.status,
     auction.startTime,
-    auction.endTime
+    auction.endTime,
+    { serverOffsetMs }
   );
 
-  const handleCancelToggle = async (checked: boolean) => {
-    try {
-      const endpoint = checked
-        ? `/api/auctions/${auction.id}/cancel`
-        : `/api/auctions/${auction.id}/uncancel`;
+  // NOTE: Edit button blocking depends on the reactivation timer (startTime countdown),
+  // so it is computed after `canUncancel` is derived below.
 
-      const response = await fetch(endpoint, {
-        method: 'POST',
-      });
+  // NOTE: We intentionally do NOT compute a boolean based on Date.now() here, because this component
+  // may not re-render at the exact second needed. The overlay itself runs an internal clock and decides
+  // when to appear.
 
-      if (!response.ok) {
-        throw new Error(
-          checked
-            ? 'Error al cancelar la subasta'
-            : 'Error al descancelar la subasta'
-        );
-      }
+  const {
+    checked: cancelChecked,
+    isMutating: isCancelMutating,
+    toggle: handleCancelToggle,
+  } = useAuctionCancelToggle({
+    auction,
+    // Refresh only the needed snapshot data (fast) instead of router.refresh() (heavy).
+    onUpdated: onRealtimeSnapshot,
+  });
 
-      toast({
-        title: checked ? 'Subasta cancelada' : 'Subasta descancelada',
-        description: checked
-          ? 'La subasta ha sido cancelada exitosamente'
-          : 'La subasta ha sido descancelada exitosamente',
-      });
+  // Reactivation countdown (only relevant when the auction is CANCELADA).
+  const [nowMs, setNowMs] = useState(() => Date.now());
+  const startTimeMs = useMemo(() => {
+    const v = auction.startTime as unknown as string | Date;
+    const ms = typeof v === 'string' ? Date.parse(v) : v?.getTime?.();
+    return Number.isFinite(ms) ? (ms as number) : null;
+  }, [auction.startTime]);
 
-      setIsCanceled(checked);
-      router.refresh();
-    } catch (error) {
-      toast({
-        title: 'Error',
-        description:
-          error instanceof Error
-            ? error.message
-            : 'No se pudo realizar la operación',
-        variant: 'destructive',
-      });
-    }
-  };
+  useEffect(() => {
+    if (!cancelChecked) return;
+    if (auction.type === AuctionTypeEnum.TEST) return;
+    if (!startTimeMs) return;
+    if (startTimeMs <= Date.now()) return;
+
+    const t = setInterval(() => setNowMs(Date.now()), 1000);
+    return () => clearInterval(t);
+  }, [cancelChecked, startTimeMs, auction.type]);
+
+  const reactivateRemainingMs = useMemo(() => {
+    if (!startTimeMs) return null;
+    return Math.max(0, startTimeMs - nowMs);
+  }, [startTimeMs, nowMs]);
+
+  const canUncancel =
+    auction.type === AuctionTypeEnum.TEST ||
+    (reactivateRemainingMs !== null && reactivateRemainingMs > 0);
+
+  // Requirement: when an auction is CANCELADA and the reactivation timer already ended
+  // (i.e. it can no longer be "uncancelled"), the "Editar Subasta" button must be blocked.
+  const isEditBlocked =
+    auction.status === AuctionStatusEnum.CANCELADA && !canUncancel;
 
   const totalItems = auctionItems?.length || 0;
   const totalBids =
@@ -121,20 +171,37 @@ export function AuctionManagerPendingView({
 
   return (
     <div className="space-y-6">
+      <AuctionStartingOverlay
+        enabled={auction.status === 'PENDIENTE'}
+        startTime={auction.startTime}
+        serverOffsetMs={serverOffsetMs}
+        windowMs={10_000}
+        graceMs={5_000}
+        title="Iniciando subasta en vivo"
+        description="La subasta comenzará en instantes…"
+      />
+      {connectionError && (
+        <div className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+          {connectionError}
+        </div>
+      )}
       {/* Header */}
-      <div className="flex items-center gap-4">
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={() => router.back()}
-          className="gap-2"
-        >
-          <ArrowLeft className="h-4 w-4" />
-          Volver
-        </Button>
-        <div className="flex-1">
-          <div className="flex items-center gap-3 mb-2">
-            <h1 className="text-2xl font-bold text-gray-900">
+      <div className="flex flex-col gap-4 md:flex-row md:items-start md:gap-6">
+        <div className="flex items-center gap-4">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => router.back()}
+            className="gap-2"
+          >
+            <ArrowLeft className="h-4 w-4" />
+            Volver
+          </Button>
+        </div>
+
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-3 mb-2 flex-wrap">
+            <h1 className="text-2xl font-bold text-gray-900 break-words">
               {auction.title}
             </h1>
             <Badge
@@ -146,17 +213,23 @@ export function AuctionManagerPendingView({
             </Badge>
           </div>
           {auction.description && (
-            <p className="text-gray-600">{auction.description}</p>
+            <p className="text-gray-600 break-words">{auction.description}</p>
           )}
         </div>
 
-        <div className="flex items-center gap-4">
+        <div className="w-full md:w-auto flex flex-col gap-3 md:flex-row md:items-center md:justify-end">
           {(auction.status === AuctionStatusEnum.PENDIENTE ||
             auction.status === AuctionStatusEnum.CANCELADA) && (
             <Button
               variant="outline"
               onClick={() => setIsEditModalOpen(true)}
-              className="flex items-center gap-2"
+              disabled={isEditBlocked}
+              title={
+                isEditBlocked
+                  ? 'No se puede editar una subasta cancelada cuyo tiempo ya finalizó.'
+                  : undefined
+              }
+              className="flex items-center gap-2 w-full md:w-auto"
             >
               <Edit className="h-4 w-4" />
               Editar Subasta
@@ -166,15 +239,63 @@ export function AuctionManagerPendingView({
           {(auction.status === AuctionStatusEnum.PENDIENTE ||
             auction.status === AuctionStatusEnum.CANCELADA ||
             auction.type === AuctionTypeEnum.TEST) && (
-            <div className="flex items-center gap-2">
-              <Switch
-                id="cancel-auction"
-                checked={auction.status === 'CANCELADA' || isCanceled}
-                onCheckedChange={handleCancelToggle}
-              />
-              <Label htmlFor="cancel-auction" className="cursor-pointer">
-                Cancelar Subasta
-              </Label>
+            <div
+              // When NOT cancelled, make this action easy to spot by using the tenant primary color
+              // (same visual language as primary buttons). When cancelled, keep the red warning style.
+              style={
+                !cancelChecked && primaryColor
+                  ? { backgroundColor: primaryColor }
+                  : undefined
+              }
+              className={`rounded-lg border p-3 w-full md:w-[360px] ${
+                cancelChecked
+                  ? 'border-red-200 bg-red-50'
+                  : primaryColor
+                    ? 'border-white/20 text-white shadow-sm'
+                    : 'border-amber-200 bg-amber-50'
+              }`}
+            >
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex items-start gap-2 min-w-0">
+                  <AlertTriangle
+                    className={`h-4 w-4 mt-0.5 ${
+                      cancelChecked
+                        ? 'text-red-600'
+                        : primaryColor
+                          ? 'text-white/90'
+                          : 'text-amber-600'
+                    }`}
+                  />
+                  <div className="min-w-0">
+                    <Label
+                      htmlFor="cancel-auction"
+                      className={`cursor-pointer font-medium ${
+                        cancelChecked
+                          ? 'text-gray-900'
+                          : primaryColor
+                            ? 'text-white'
+                            : 'text-gray-900'
+                      }`}
+                    >
+                      Cancelar subasta
+                    </Label>
+                    {cancelChecked && auction.type !== AuctionTypeEnum.TEST && (
+                      <p className="text-xs text-gray-600 mt-1">
+                        {canUncancel && reactivateRemainingMs !== null
+                          ? `Puedes reactivarla antes del tiempo inicialmente establecido: ${formatCountdown(reactivateRemainingMs)}`
+                          : 'El tiempo para reactivar la subasta ha finalizado.'}
+                      </p>
+                    )}
+                  </div>
+                </div>
+
+                <Switch
+                  id="cancel-auction"
+                  checked={cancelChecked}
+                  disabled={isCancelMutating || (cancelChecked && !canUncancel)}
+                  onCheckedChange={handleCancelToggle}
+                />
+              </div>
             </div>
           )}
         </div>
@@ -273,12 +394,12 @@ export function AuctionManagerPendingView({
         <TabsList className="grid w-full grid-cols-2 bg-gray-100 p-1 rounded-lg">
           <TabsTrigger
             value="items"
-            className="data-[state=active]:text-black data-[state=active]:shadow-sm font-medium transition-all"
+            className="text-black data-[state=active]:text-white data-[state=active]:shadow-sm font-medium transition-all"
             style={
               activeTab === 'items' && primaryColor
                 ? {
                     backgroundColor: primaryColor,
-                    color: '#000000',
+                    color: '#ffffff',
                   }
                 : undefined
             }
@@ -287,12 +408,12 @@ export function AuctionManagerPendingView({
           </TabsTrigger>
           <TabsTrigger
             value="participants"
-            className="data-[state=active]:text-black data-[state=active]:shadow-sm font-medium transition-all"
+            className="text-black data-[state=active]:text-white data-[state=active]:shadow-sm font-medium transition-all"
             style={
               activeTab === 'participants' && primaryColor
                 ? {
                     backgroundColor: primaryColor,
-                    color: '#000000',
+                    color: '#ffffff',
                   }
                 : undefined
             }
@@ -320,7 +441,10 @@ export function AuctionManagerPendingView({
                             alt={`${auctionItem.item.brand} ${auctionItem.item.model}`}
                             fill
                             className="object-cover"
-                            sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+                            // 1 column on <lg and 2 columns on >=lg.
+                            // 33vw requests a too-small variant on desktop and looks blurry.
+                            sizes="(max-width: 1024px) 100vw, 50vw"
+                            quality={82}
                             onError={(e) => {
                               const target =
                                 e.currentTarget as HTMLImageElement;
@@ -394,7 +518,12 @@ export function AuctionManagerPendingView({
         onClose={() => setIsEditModalOpen(false)}
         onSuccess={() => {
           setIsEditModalOpen(false);
-          router.refresh();
+          // IMPORTANT: do NOT rely on `router.refresh()` here.
+          // The detail view data (auction + auctionItems) is loaded via a client-side
+          // cache (useFetchData/SWR). When the modal updates the auction (e.g., adds
+          // a new product), we must explicitly refetch the snapshot so the "Items de
+          // Subasta" tab reflects the latest backend state.
+          onRealtimeSnapshot?.();
         }}
       />
 
@@ -416,4 +545,14 @@ export function AuctionManagerPendingView({
       )}
     </div>
   );
+}
+
+function formatCountdown(ms: number): string {
+  const totalSeconds = Math.max(0, Math.floor(ms / 1000));
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+
+  // Keep it compact for both web and mobile.
+  return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
 }

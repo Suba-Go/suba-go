@@ -168,18 +168,30 @@ export function FileUpload({
                       URL.createObjectURL(uploadedFile.file);
                     return (
                       <div key={index} className="relative group">
-                        <div className="aspect-video bg-gray-100 rounded-lg overflow-hidden border">
+                        <div className="relative aspect-video bg-gray-100 rounded-lg overflow-hidden border">
                           <Image
                             src={previewUrl}
-                            alt={uploadedFile.file.name}
-                            className="w-full h-full object-cover"
-                            width={100}
-                            height={100}
+                            alt={uploadedFile.originalName ?? uploadedFile.file.name}
+                            fill
+                            sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
+                            className="object-cover"
+                            unoptimized
                             onLoad={() => {
-                              if (!uploadedFile.url)
-                                URL.revokeObjectURL(previewUrl);
+                              if (!uploadedFile.url) URL.revokeObjectURL(previewUrl);
                             }}
                           />
+                          {uploadedFile.imageInfo && (
+                            <div className="absolute left-2 bottom-2 rounded-md bg-white/90 px-2 py-1 text-[11px] text-gray-700 shadow-sm border">
+                              <span className="font-medium">
+                                {uploadedFile.imageInfo.width}×{uploadedFile.imageInfo.height}
+                              </span>
+                              <span className="ml-1 text-gray-500">
+                                ({uploadedFile.imageInfo.megapixels}MP)
+                              </span>
+                              {/* Nota: no mostramos advertencias de resolución en la miniatura para no tapar la vista previa */}
+                            </div>
+                          )}
+
                           {uploadedFile.uploading && (
                             <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
                               <Loader2 className="h-6 w-6 animate-spin text-white" />

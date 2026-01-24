@@ -196,6 +196,7 @@ export function ItemSelector({
                 ? {
                     backgroundColor: primaryColor,
                     borderColor: primaryColor,
+                    color: '#ffffff',
                     opacity: 0.5,
                   }
                 : undefined
@@ -224,12 +225,13 @@ export function ItemSelector({
             variant="outline"
             size="sm"
             onClick={() => setIsCreateModalOpen(true)}
-            className="flex items-center gap-2 text-black"
+            className="flex items-center gap-2"
             style={
               primaryColor
                 ? {
                     backgroundColor: primaryColor,
                     borderColor: primaryColor,
+                    color: '#ffffff',
                   }
                 : undefined
             }
@@ -239,11 +241,13 @@ export function ItemSelector({
                   primaryColor,
                   10
                 );
+                e.currentTarget.style.color = '#ffffff';
               }
             }}
             onMouseLeave={(e) => {
               if (primaryColor) {
                 e.currentTarget.style.backgroundColor = primaryColor;
+                e.currentTarget.style.color = '#ffffff';
               }
             }}
           >
@@ -279,12 +283,13 @@ export function ItemSelector({
             variant="outline"
             size="sm"
             onClick={() => setIsCreateModalOpen(true)}
-            className="flex items-center gap-2 text-black"
+            className="flex items-center gap-2"
             style={
               primaryColor
                 ? {
                     backgroundColor: primaryColor,
                     borderColor: primaryColor,
+                    color: '#ffffff',
                   }
                 : undefined
             }
@@ -294,11 +299,13 @@ export function ItemSelector({
                   primaryColor,
                   10
                 );
+                e.currentTarget.style.color = '#ffffff';
               }
             }}
             onMouseLeave={(e) => {
               if (primaryColor) {
                 e.currentTarget.style.backgroundColor = primaryColor;
+                e.currentTarget.style.color = '#ffffff';
               }
             }}
           >

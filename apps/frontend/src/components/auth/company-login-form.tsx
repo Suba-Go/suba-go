@@ -136,27 +136,42 @@ export default function CompanyLoginForm({
     }
 
     // Clear any existing session cookies before login
+    // NOTE: We clear both legacy Auth.js cookie names and NextAuth v5 cookie names
+    // to avoid stale callback-url/session tokens causing unexpected redirects.
     if (getNodeEnv() === 'local') {
       // Clear cookies for both localhost and .localhost domain
-      document.cookie =
-        'authjs.session-token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
-      document.cookie =
-        'authjs.csrf-token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
-      document.cookie =
-        'authjs.callback-url=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
-      document.cookie =
-        'authjs.session-token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/; domain=.localhost;';
-      document.cookie =
-        'authjs.csrf-token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/; domain=.localhost;';
-      document.cookie =
-        'authjs.callback-url=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/; domain=.localhost;';
+      const expire = 'expires=Thu, 01 Jan 1970 00:00:00 UTC;';
+      const base = `${expire} path=/;`;
+      const baseDomain = `${expire} path=/; domain=.localhost;`;
+
+      const cookieNames = [
+        // Auth.js legacy
+        'authjs.session-token',
+        'authjs.csrf-token',
+        'authjs.callback-url',
+        // NextAuth (common)
+        'next-auth.session-token',
+        'next-auth.csrf-token',
+        'next-auth.callback-url',
+        // Secure variants
+        '__Secure-next-auth.session-token',
+        '__Secure-next-auth.callback-url',
+        '__Host-next-auth.csrf-token',
+      ];
+
+      for (const name of cookieNames) {
+        document.cookie = `${name}=; ${base}`;
+        document.cookie = `${name}=; ${baseDomain}`;
+      }
     }
 
     try {
+      // Force a deterministic post-login landing, independent of any stale callback-url cookie.
       const result = await signIn('credentials', {
         email: formData.email,
         password: formData.password,
         redirect: false,
+        callbackUrl: '/',
       });
 
       if (result?.error) {
@@ -185,6 +200,15 @@ export default function CompanyLoginForm({
           user.rut &&
           user.rut.trim().length > 0;
 
+        // Role-based landing:
+        // - AUCTION_MANAGER / ADMIN -> Estadisticas
+        // - USER -> Home
+        const role = user?.role;
+        const landingPath =
+          role === 'AUCTION_MANAGER' || role === 'ADMIN'
+            ? '/estadisticas'
+            : '/';
+
         // Keep loading state true during redirect to show clear feedback
         if (onLoginSuccess) {
           onLoginSuccess();
@@ -193,9 +217,9 @@ export default function CompanyLoginForm({
           // Redirect based on profile completion status
           // Keep isLoading true to show loading state during redirect
           if (isProfileComplete) {
-            router.push('/');
+            router.replace(landingPath);
           } else {
-            router.push('/onboarding');
+            router.replace('/onboarding');
           }
           // Don't set isLoading to false - let it stay loading during redirect
         }

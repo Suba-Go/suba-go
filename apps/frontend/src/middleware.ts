@@ -1,19 +1,32 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { auth } from './auth';
+import { getToken } from 'next-auth/jwt';
+
 import { getSubdomainFromHost } from '@suba-go/shared-components';
 import { isUserProfileComplete } from './utils/subdomain-profile-validation';
+import { normalizeCompanyName } from './utils/company-normalization';
+import { isAllowedTenantPathForRole } from './utils/rbac';
 
 // Determine ROOT_DOMAIN based on APP_ENV
 const APP_ENV =
   process.env.APP_ENV || process.env.NEXT_PUBLIC_APP_ENV || 'development';
+
 const ROOT_DOMAIN =
   APP_ENV === 'local'
     ? 'localhost:3000'
     : APP_ENV === 'development'
-    ? 'development.subago.cl'
-    : process.env.ROOT_DOMAIN ?? 'subago.cl';
+      ? 'development.subago.cl'
+      : process.env.ROOT_DOMAIN ?? 'subago.cl';
 
-export default auth(async function middleware(request: NextRequest) {
+const AUTH_SECRET = process.env.AUTH_SECRET;
+
+export default async function middleware(request: NextRequest) {
+  const { pathname } = request.nextUrl;
+
+  // ✅ bypass total de NextAuth endpoints
+  if (pathname.startsWith('/api/auth')) {
+    return NextResponse.next();
+  }
+
   const host = request.headers.get('host') ?? '';
   let domain = ROOT_DOMAIN;
 
@@ -22,60 +35,62 @@ export default auth(async function middleware(request: NextRequest) {
   }
 
   const subdomain = getSubdomainFromHost(host, domain);
-  const { pathname } = request.nextUrl;
 
-  // Prevent direct access to internal /s/ routes
+  // Bloquear acceso directo a /s/*
   if (pathname.startsWith('/s/')) {
     return NextResponse.redirect(new URL('/', request.url));
   }
 
-  // rutas públicas (agrega estáticos si los sirves fuera del matcher)
+  // Rutas públicas (no requieren sesión)
   const publicPrefixes = [
     '/api',
     '/_next',
+    '/uploads',
     '/favicon.ico',
+    '/robots.txt',
+    '/sitemap.xml',
     '/login',
     '/invite',
     '/company-invite',
   ];
 
   if (subdomain) {
-    // Clean URL rewrites - transform user-facing URLs to internal s/{subdomain} structure
-    // This hides the internal routing structure from users
-
-    // Root path
+    // Rewrites principales
     if (pathname === '/') {
       return NextResponse.rewrite(new URL(`/s/${subdomain}`, request.url));
     }
-    // Login page
+
     if (pathname === '/login') {
       const u = new URL(`/s/${subdomain}/login`, request.url);
       u.search = request.nextUrl.search;
       return NextResponse.rewrite(u);
     }
 
-    // Profile page
-    if (pathname === '/perfil') {
+    // Mapeos tenant
+    const directMap: Record<string, string> = {
+      '/perfil': '/perfil',
+      '/dashboard': '/dashboard',
+      '/items': '/items',
+      '/usuarios': '/usuarios',
+      '/usuarios/invite': '/usuarios/invite',
+      '/feedback': '/feedback',
+      '/companies/invite': '/companies/invite',
+      '/configuracion': '/configuracion',
+      '/subastas': '/subastas',
+      '/mis-subastas': '/mis-subastas',
+      '/adjudicaciones': '/adjudicaciones',
+      '/estadisticas': '/estadisticas',
+      '/onboarding': '/onboarding',
+      '/invite': '/invite',
+    };
+
+    if (directMap[pathname]) {
       return NextResponse.rewrite(
-        new URL(`/s/${subdomain}/perfil`, request.url)
+        new URL(`/s/${subdomain}${directMap[pathname]}`, request.url)
       );
     }
 
-    //dashboard
-    if (pathname === '/dashboard') {
-      return NextResponse.rewrite(
-        new URL(`/s/${subdomain}/dashboard`, request.url)
-      );
-    }
-
-    // Products page
-    if (pathname === '/items') {
-      return NextResponse.rewrite(
-        new URL(`/s/${subdomain}/items`, request.url)
-      );
-    }
-
-    // Product detail page
+    // Detail pages
     if (pathname.startsWith('/items/') && pathname.split('/').length === 3) {
       const itemId = pathname.split('/')[2];
       return NextResponse.rewrite(
@@ -83,69 +98,6 @@ export default auth(async function middleware(request: NextRequest) {
       );
     }
 
-    // Users page
-    if (pathname === '/usuarios') {
-      return NextResponse.rewrite(
-        new URL(`/s/${subdomain}/usuarios`, request.url)
-      );
-    }
-
-    // Invite accept page (Public)
-    if (pathname === '/invite') {
-      return NextResponse.rewrite(
-        new URL(`/s/${subdomain}/invite`, request.url)
-      );
-    }
-
-    // Invite user page (Manager)
-    if (pathname === '/usuarios/invite') {
-      return NextResponse.rewrite(
-        new URL(`/s/${subdomain}/usuarios/invite`, request.url)
-      );
-    }
-
-    // Feedback page
-    if (pathname === '/feedback') {
-      return NextResponse.rewrite(
-        new URL(`/s/${subdomain}/feedback`, request.url)
-      );
-    }
-
-    // Company invite generation page
-    if (pathname === '/companies/invite') {
-      return NextResponse.rewrite(
-        new URL(`/s/${subdomain}/companies/invite`, request.url)
-      );
-    }
-
-    // Company settings page
-    if (pathname === '/configuracion') {
-      return NextResponse.rewrite(
-        new URL(`/s/${subdomain}/configuracion`, request.url)
-      );
-    }
-
-    // Auctions pages
-    if (pathname === '/subastas') {
-      return NextResponse.rewrite(
-        new URL(`/s/${subdomain}/subastas`, request.url)
-      );
-    }
-    // Stats page
-    if (pathname === '/estadisticas') {
-      return NextResponse.rewrite(
-        new URL(`/s/${subdomain}/estadisticas`, request.url)
-      );
-    }
-
-    // Onboarding page
-    if (pathname === '/onboarding') {
-      return NextResponse.rewrite(
-        new URL(`/s/${subdomain}/onboarding`, request.url)
-      );
-    }
-
-    // Individual auction page
     if (pathname.startsWith('/subastas/') && pathname.split('/').length === 3) {
       const auctionId = pathname.split('/')[2];
       return NextResponse.rewrite(
@@ -153,64 +105,42 @@ export default auth(async function middleware(request: NextRequest) {
       );
     }
 
-    // Check if this is a public route before doing authentication
+    // Permitir públicas
     const isPublic = publicPrefixes.some((p) => pathname.startsWith(p));
+    if (isPublic) return NextResponse.next();
 
-    // If it's a public route in a subdomain, allow it without session check
-    if (isPublic) {
-      return NextResponse.next();
-    }
-
-    // If it's not a public route and not already handled above,
-    // it might be a dynamic route or future route - let it pass through
-    // but still apply authentication logic
-    const session = request.auth;
-
-    if (!session && !isPublic) {
+    // Validar sesión vía JWT (Edge-safe)
+    if (!AUTH_SECRET) {
+      // sin secret no se puede validar token en middleware
       return NextResponse.redirect(new URL('/login', request.url));
     }
 
-    // Validate user belongs to the company (subdomain is company name)
-    if (session && !isPublic) {
-      const userCompanyName = session.user?.company?.name ?? '';
+    const token = await getToken({ req: request, secret: AUTH_SECRET });
 
-      if (userCompanyName !== subdomain) {
-        // Redirect to login if user doesn't belong to this company
-        const login = new URL('/login', request.url);
-        return NextResponse.redirect(login);
-      }
-
-      // Check if user profile is complete - redirect to /onboarding if not
-      if (!isUserProfileComplete(session)) {
-        // redirect to public onboarding route
-        return NextResponse.redirect(new URL(`/onboarding`, request.url));
-      }
-
-      // Restrict access based on role
-      const userRole = session.user?.role;
-      const isManagerOrAdmin =
-        userRole === 'AUCTION_MANAGER' || userRole === 'ADMIN';
-
-      // Restricted paths for regular users
-      const restrictedPaths = [
-        '/subastas',
-        '/items',
-        '/usuarios',
-        '/estadisticas',
-        'feedback',
-        '/configuracion',
-      ];
-
-      // If user is NOT manager/admin and tries to access restricted paths, redirect to dashboard
-      if (
-        !isManagerOrAdmin &&
-        restrictedPaths.some((p) => pathname.startsWith(p))
-      ) {
-        return NextResponse.redirect(new URL('/', request.url));
-      }
+    if (!token) {
+      return NextResponse.redirect(new URL('/login', request.url));
     }
 
-    // bloquea zonas globales desde subdominios
+    // Tus callbacks meten user/tokens en el JWT
+    const t: any = token;
+
+    const userCompanyNameRaw = t?.user?.company?.name ?? '';
+    const userCompanyName = normalizeCompanyName(userCompanyNameRaw);
+
+    if (userCompanyName !== normalizeCompanyName(subdomain)) {
+      return NextResponse.redirect(new URL('/login', request.url));
+    }
+
+    if (!isUserProfileComplete({ user: t.user } as any)) {
+      return NextResponse.redirect(new URL('/onboarding', request.url));
+    }
+
+    const userRole = t?.user?.role;
+    if (!isAllowedTenantPathForRole(userRole as any, pathname)) {
+      return NextResponse.redirect(new URL('/', request.url));
+    }
+
+    // Bloquear zonas globales desde tenant
     if (
       pathname.startsWith('/admin') ||
       pathname.startsWith('/auth') ||
@@ -221,8 +151,14 @@ export default auth(async function middleware(request: NextRequest) {
   }
 
   return NextResponse.next();
-});
+}
 
 export const config = {
-  matcher: ['/((?!api|_next|[\\w-]+\\.\\w+).*)'],
+  matcher: [
+    // Cubre API (para que los route handlers protegidos puedan operar con normalidad)
+    '/api/:path*',
+
+    // Cubre páginas (excluye internals)
+    '/((?!api|_next|uploads|favicon.ico|robots.txt|sitemap.xml).*)',
+  ],
 };

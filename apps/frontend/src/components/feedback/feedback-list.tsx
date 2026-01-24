@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { FeedbackDto, FEEDBACK_CATEGORIES } from '@suba-go/shared-validation';
+import { apiFetch } from '@/lib/api/api-fetch';
 
 export default function FeedbackList({ primaryColor = '#3B82F6' }: { primaryColor?: string }) {
   const [feedbackList, setFeedbackList] = useState<FeedbackDto[]>([]);
@@ -16,7 +17,7 @@ export default function FeedbackList({ primaryColor = '#3B82F6' }: { primaryColo
   const fetchFeedback = async () => {
     try {
       setLoading(true);
-      const res = await fetch('/api/feedback');
+      const res = await apiFetch('/api/feedback');
 
       if (!res.ok) {
         throw new Error('Error al cargar feedback');

@@ -2,11 +2,36 @@ import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import superjson from 'superjson';
 
-export async function GET(request: NextRequest) {
+async function readBackendError(response: Response): Promise<string> {
   try {
-    const session = await auth();
+    const contentType = response.headers.get('content-type') || '';
+    if (contentType.includes('application/json')) {
+      const json: any = await response.json();
+      return (
+        json?.message ||
+        json?.error ||
+        json?.details ||
+        `Backend responded with status: ${response.status}`
+      );
+    }
+    const text = await response.text();
+    return text || `Backend responded with status: ${response.status}`;
+  } catch {
+    return `Backend responded with status: ${response.status}`;
+  }
+}
+
+export const GET = auth(async function GET(request: NextRequest) {
+  try {
+    const session = (request as any).auth;
 
     if (!session) {
+      return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
+    }
+
+    const accessToken = session.tokens?.accessToken;
+    if (!accessToken) {
+      // Evita enviar "Bearer undefined" al backend y convertir el 401 en 500
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
     }
 
@@ -26,12 +51,14 @@ export async function GET(request: NextRequest) {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',
-        Authorization: `Bearer ${session.tokens.accessToken}`,
+        Authorization: `Bearer ${accessToken}`,
       },
+      cache: 'no-store',
     });
 
     if (!response.ok) {
-      throw new Error(`Backend responded with status: ${response.status}`);
+      const message = await readBackendError(response);
+      return NextResponse.json({ error: message }, { status: response.status });
     }
 
     const data = await response.json();
@@ -55,4 +82,4 @@ export async function GET(request: NextRequest) {
       { status: 500 }
     );
   }
-}
+});

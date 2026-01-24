@@ -5,6 +5,7 @@ import { useSession } from 'next-auth/react';
 import type { CompanyDto } from '@suba-go/shared-validation';
 import { Button } from '@suba-go/shared-components/components/ui/button';
 import { useToast } from '@suba-go/shared-components/components/ui/toaster';
+import { apiFetch } from '@/lib/api/api-fetch';
 import { Upload } from 'lucide-react';
 import {
   Card,
@@ -14,6 +15,7 @@ import {
   CardDescription,
 } from '@suba-go/shared-components/components/ui/card';
 import { Input } from '@suba-go/shared-components/components/ui/input';
+import { getTenantKeyFromLocation } from '@/lib/tenant-utils';
 
 type Props = {
   initialData: CompanyDto;
@@ -58,10 +60,16 @@ export default function CompanySettingsForm({ initialData }: Props) {
 
     setIsUploading(true);
     try {
+      const tenantId = getTenantKeyFromLocation();
       const response = await fetch(
-        `/api/upload?filename=${encodeURIComponent(file.name)}`,
+        `/api/upload?filename=${encodeURIComponent(file.name)}&tenantId=${encodeURIComponent(
+          tenantId
+        )}`,
         {
           method: 'POST',
+          headers: {
+            'x-tenant-id': tenantId,
+          },
           body: file,
         }
       );
@@ -102,7 +110,7 @@ export default function CompanySettingsForm({ initialData }: Props) {
 
     setStatus({ type: 'saving' });
     try {
-      const res = await fetch('/api/company', {
+      const res = await apiFetch('/api/company', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(form),

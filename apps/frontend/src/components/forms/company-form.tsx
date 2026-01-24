@@ -12,6 +12,7 @@ import {
 } from '@suba-go/shared-validation';
 import { useEffect } from 'react';
 
+
 // Cache keys for localStorage
 const CACHE_KEYS = {
   COMPANY_FORM: 'multiStepForm_companyData',
@@ -116,7 +117,6 @@ export default function CompanyForm({
     saveToCache(currentData);
     onBack();
   };
-
   const onFormSubmit = (data: CompanyCreateCompactDto) => {
     const companyData: CompanyCreateCompactDto = {
       name: data.name,
@@ -160,6 +160,11 @@ export default function CompanyForm({
               Este color se usará como color principal de tu empresa
             </p>
           </div>
+          {errors.principal_color && (
+            <p className="text-sm text-red-600 mt-1">
+              {errors.principal_color.message as string}
+            </p>
+          )}
         </div>
       </div>
 

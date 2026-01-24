@@ -23,9 +23,20 @@ const validateEmail = (email: string): string | null => {
 };
 
 const validateName = (name: string): string | null => {
-  if (!name.trim()) return 'El nombre es obligatorio';
-  if (name.trim().length < 3)
-    return 'El nombre debe tener al menos 3 caracteres';
+  const normalized = name.replace(/\s+/g, ' ').trim();
+  if (!normalized) return 'El nombre completo es obligatorio';
+
+  // Must contain at least 2 words (e.g., nombre + apellido)
+  const parts = normalized.split(' ').filter(Boolean);
+  if (parts.length < 2) {
+    return 'Debes ingresar tu nombre completo (nombre y apellido)';
+  }
+
+  // Avoid very short words like "A B"
+  if (parts.some((p) => p.length < 2)) {
+    return 'Debes ingresar tu nombre completo (nombre y apellido)';
+  }
+
   return null;
 };
 
@@ -364,7 +375,7 @@ export default function ProfileFormWithUserData({
       <div className="space-y-4">
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">
-            Nombre <span className="text-red-500">*</span>
+            Nombre Completo <span className="text-red-500">*</span>
           </label>
           {isEditing ? (
             <div>
@@ -378,7 +389,7 @@ export default function ProfileFormWithUserData({
                     : inputStyles.className
                 }`}
                 style={validationErrors.name ? {} : inputStyles.style}
-                placeholder="Tu nombre"
+                placeholder="Ingresa tu nombre completo"
               />
               {validationErrors.name && (
                 <p className="mt-1 text-sm text-red-600">

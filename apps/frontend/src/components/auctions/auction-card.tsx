@@ -1,8 +1,9 @@
 'use client';
 
 import Link from 'next/link';
-import { Clock, Users, Car, MoreVertical, Edit, Trash2 } from 'lucide-react';
-import { useState } from 'react';
+import Image from 'next/image';
+import { Clock, Users, Car, MoreVertical, Edit } from 'lucide-react';
+import { useMemo, useState } from 'react';
 import { useCompanyContextOptional } from '@/contexts/company-context';
 import { darkenColor } from '@/utils/color-utils';
 import {
@@ -43,13 +44,51 @@ import {
 } from '@suba-go/shared-validation';
 import { useFetchData } from '@/hooks/use-fetch-data';
 
-interface AuctionCardProps {
-  auction: AuctionDto;
-  onUpdate: () => void;
-  onEdit?: (auction: AuctionCardProps['auction']) => void;
+function getPrimaryPhoto(photos?: string | null): string | null {
+  if (!photos) return null;
+  const raw = photos.trim();
+  if (!raw) return null;
+
+  // Supports either JSON array string or comma-separated list
+  try {
+    if (raw.startsWith('[')) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        const url = String(parsed[0] ?? '').trim();
+        return url || null;
+      }
+    }
+  } catch {
+    // ignore
+  }
+
+  const first = raw.split(',')[0]?.trim();
+  return first || null;
 }
 
-export function AuctionCard({ auction, onUpdate, onEdit }: AuctionCardProps) {
+interface AuctionCardProps {
+  auction: AuctionDto | any; // accepts AuctionWithItemsAndBidsDto as well
+  onUpdate: () => void;
+  onEdit?: (auction: AuctionCardProps['auction']) => void;
+  /**
+   * Responsive image sizes string for Next/Image.
+   * Pass per-view to avoid requesting an image that's too small (blurry)
+   * or too large (wasted bandwidth).
+   */
+  imageSizes?: string;
+  /**
+   * Next/Image quality (0-100). Defaults to 82 for a good balance.
+   */
+  imageQuality?: number;
+}
+
+export function AuctionCard({
+  auction,
+  onUpdate,
+  onEdit,
+  imageSizes,
+  imageQuality,
+}: AuctionCardProps) {
   const companyContext = useCompanyContextOptional();
   const primaryColor = companyContext?.company?.principal_color;
   const startTime = new Date(auction.startTime);
@@ -62,12 +101,30 @@ export function AuctionCard({ auction, onUpdate, onEdit }: AuctionCardProps) {
     auction.startTime,
     auction.endTime
   );
+  const showActionsMenu = auctionStatus.isCompleted || auctionStatus.isPending;
 
-  const { data: auctionItems } = useFetchData<AuctionItemWithItmeAndBidsDto[]>({
+
+  // If auctions were fetched with their items (e.g. dashboard), avoid N+1 requests.
+  const preloadedItems = (auction as any)?.items as
+    | AuctionItemWithItmeAndBidsDto[]
+    | null
+    | undefined;
+  const shouldFetchItems = !preloadedItems;
+
+  const { data: fetchedItems } = useFetchData<AuctionItemWithItmeAndBidsDto[]>({
     url: `/api/auction-items/${auction.id}`,
     key: ['auctionItems', auction.id],
     revalidateOnMount: true,
+    condition: shouldFetchItems,
   });
+
+  const auctionItems = preloadedItems ?? fetchedItems;
+
+  const coverImage = useMemo(() => {
+    const firstItem = auctionItems?.[0]?.item;
+    const url = getPrimaryPhoto(firstItem?.photos as any);
+    return url || '/placeholder-car.png';
+  }, [auctionItems]);
 
   const getStatusBadge = () => {
     return (
@@ -123,7 +180,7 @@ export function AuctionCard({ auction, onUpdate, onEdit }: AuctionCardProps) {
     }
 
     try {
-      // TODO: Implement other auction actions (delete, etc.)
+      // TODO: Implement other auction actions (etc.)
       onUpdate();
     } catch (error) {
       console.error('Error performing action:', error);
@@ -131,7 +188,22 @@ export function AuctionCard({ auction, onUpdate, onEdit }: AuctionCardProps) {
   };
 
   return (
-    <Card className="hover:shadow-lg transition-shadow">
+    <Card className="hover:shadow-lg transition-shadow overflow-hidden">
+      {/* Product preview (main image) */}
+      <div className="relative aspect-video w-full bg-gray-100">
+        <Image
+          src={coverImage}
+          alt={auction.title || 'Subasta'}
+          fill
+          className="object-cover"
+          sizes={
+            imageSizes ??
+            '(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw'
+          }
+          quality={imageQuality ?? 82}
+          priority={false}
+        />
+      </div>
       <CardHeader className="pb-3">
         <div className="flex justify-between items-start">
           <div className="flex-1">
@@ -147,6 +219,7 @@ export function AuctionCard({ auction, onUpdate, onEdit }: AuctionCardProps) {
                 Prueba
               </Badge>
             )}
+            {showActionsMenu && (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
@@ -154,31 +227,13 @@ export function AuctionCard({ auction, onUpdate, onEdit }: AuctionCardProps) {
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
-                {auctionStatus.isCompleted ? (
-                  <DropdownMenuItem onClick={() => handleAction('edit')}>
-                    <Edit className="h-4 w-4 mr-2" />
-                    Editar
-                  </DropdownMenuItem>
-                ) : (
-                  <>
-                    {auctionStatus.isPending && (
-                      <DropdownMenuItem onClick={() => handleAction('edit')}>
-                        <Edit className="h-4 w-4 mr-2" />
-                        Editar
-                      </DropdownMenuItem>
-                    )}
-                    <DropdownMenuItem
-                      onClick={() => handleAction('delete')}
-                      className="text-red-600"
-                    >
-                      <Trash2 className="h-4 w-4 mr-2" />
-                      Eliminar
-                    </DropdownMenuItem>
-                  </>
-                )}
+                <DropdownMenuItem onClick={() => handleAction('edit')}>
+                  <Edit className="h-4 w-4 mr-2" />
+                  Editar
+                </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
-          </div>
+          )}</div>
         </div>
       </CardHeader>
 
@@ -216,21 +271,22 @@ export function AuctionCard({ auction, onUpdate, onEdit }: AuctionCardProps) {
         {/* Schedule */}
         <div className="text-xs text-gray-500 space-y-1 pb-4">
           <div>
-            Inicio: {format(startTime, 'dd/mm/yyyy HH:mm', { locale: es })}
+            Inicio: {format(startTime, 'dd/MM/yyyy HH:mm', { locale: es })}
           </div>
-          <div>Fin: {format(endTime, 'dd/mm/yyyy HH:mm', { locale: es })}</div>
+          <div>Fin: {format(endTime, 'dd/MM/yyyy HH:mm', { locale: es })}</div>
         </div>
 
         {/* Action Button */}
         <Link href={`/subastas/${auction.id}`}>
           <Button
-            className={`w-full ${auctionStatus.isActive ? 'text-black' : ''}`}
+            className="w-full"
             variant={auctionStatus.isActive ? 'default' : 'outline'}
             style={
               auctionStatus.isActive && primaryColor
                 ? {
                     backgroundColor: primaryColor,
                     borderColor: primaryColor,
+                    color: '#ffffff',
                   }
                 : undefined
             }
@@ -240,11 +296,13 @@ export function AuctionCard({ auction, onUpdate, onEdit }: AuctionCardProps) {
                   primaryColor,
                   10
                 );
+                e.currentTarget.style.color = '#ffffff';
               }
             }}
             onMouseLeave={(e) => {
               if (auctionStatus.isActive && primaryColor) {
                 e.currentTarget.style.backgroundColor = primaryColor;
+                e.currentTarget.style.color = '#ffffff';
               }
             }}
           >

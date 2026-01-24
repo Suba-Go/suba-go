@@ -1,32 +1,33 @@
 /**
  * @file auction-view-router.tsx
- * @description Routes to appropriate auction view based on user role and auction status
- * @author Suba&Go
+ * @description Routes to the appropriate auction view based on role and backend status.
+ * IMPORTANT: We do NOT override status using the client's clock (prevents desync).
  */
 'use client';
 
 import { useCallback } from 'react';
-import { useFetchData } from '@/hooks/use-fetch-data';
-import { useCompany } from '@/hooks/use-company';
-import { AuctionDetail } from './auction-detail';
-import { AuctionActiveBiddingView } from './user-view/auction-active-bidding-view';
-import { AuctionPendingView } from './user-view/auction-pending-view';
-import { AuctionCompletedView } from './user-view/auction-completed-view';
-import { AuctionManagerActiveView } from './manager-view/auction-manager-active-view';
-import { AuctionManagerPendingView } from './manager-view/auction-manager-pending-view';
-import { AuctionManagerCompletedView } from './manager-view/auction-manager-completed-view';
-import { AuctionDetailSkeleton } from './auction-detail-skeleton';
-import {
-  Alert,
-  AlertDescription,
-} from '@suba-go/shared-components/components/ui/alert';
+import { Alert, AlertDescription } from '@suba-go/shared-components/components/ui/alert';
 import { AlertCircle } from 'lucide-react';
+
 import {
   AuctionDto,
   AuctionItemWithItmeAndBidsDto,
   AuctionStatusEnum,
   UserRolesEnum,
 } from '@suba-go/shared-validation';
+
+import { useFetchData } from '@/hooks/use-fetch-data';
+import { useCompany } from '@/hooks/use-company';
+
+import { AuctionDetailSkeleton } from './auction-detail-skeleton';
+
+import { AuctionManagerActiveView } from './manager-view/auction-manager-active-view';
+import { AuctionManagerPendingView } from './manager-view/auction-manager-pending-view';
+import { AuctionManagerCompletedView } from './manager-view/auction-manager-completed-view';
+
+import { AuctionActiveBiddingView } from './user-view/auction-active-bidding-view';
+import { AuctionPendingView } from './user-view/auction-pending-view';
+import { AuctionCompletedView } from './user-view/auction-completed-view';
 
 interface AuctionViewRouterProps {
   auctionId: string;
@@ -43,11 +44,9 @@ export function AuctionViewRouter({
   accessToken,
   tenantId,
 }: AuctionViewRouterProps) {
-  // Get company primary color once
   const { company } = useCompany();
   const primaryColor = company?.principal_color;
 
-  // Fetch auction data
   const {
     data: auction,
     isLoading: isLoadingAuction,
@@ -57,8 +56,9 @@ export function AuctionViewRouter({
     url: `/api/auctions/${auctionId}`,
     key: ['auction', auctionId],
     revalidateOnMount: true,
-    refreshInterval: 600,
-    dedupingInterval: 0,
+    // With WebSocket, we can reduce polling; still keep a small safety net.
+    refreshInterval: 5000,
+    dedupingInterval: 1000,
   });
 
   const {
@@ -70,8 +70,8 @@ export function AuctionViewRouter({
     url: `/api/auction-items/${auctionId}`,
     key: ['auctionItems', auctionId],
     revalidateOnMount: true,
-    refreshInterval: 600,
-    dedupingInterval: 0,
+    refreshInterval: 5000,
+    dedupingInterval: 1000,
   });
 
   const handleRealtimeSnapshot = useCallback(() => {
@@ -92,30 +92,9 @@ export function AuctionViewRouter({
     );
   }
 
-  // AUCTION_MANAGER always sees the management view
+  // AUCTION_MANAGER view
   if (userRole === UserRolesEnum.AUCTION_MANAGER) {
-    // Determine actual status based on time (same logic as user)
-    const now = new Date();
-    const startTime = new Date(auction.startTime);
-    const endTime = new Date(auction.endTime);
-
-    let actualStatus = auction.status;
-
-    // Override status based on time if not cancelled/deleted
-    if (
-      auction.status !== AuctionStatusEnum.CANCELADA &&
-      auction.status !== AuctionStatusEnum.ELIMINADA
-    ) {
-      if (now < startTime) {
-        actualStatus = AuctionStatusEnum.PENDIENTE;
-      } else if (now >= startTime && now < endTime) {
-        actualStatus = AuctionStatusEnum.ACTIVA;
-      } else {
-        actualStatus = AuctionStatusEnum.COMPLETADA;
-      }
-    }
-
-    switch (actualStatus) {
+    switch (auction.status) {
       case AuctionStatusEnum.ACTIVA:
         return (
           <AuctionManagerActiveView
@@ -127,14 +106,7 @@ export function AuctionViewRouter({
             primaryColor={primaryColor}
           />
         );
-      case AuctionStatusEnum.PENDIENTE:
-        return (
-          <AuctionManagerPendingView
-            auction={auction}
-            auctionItems={auctionItems}
-            primaryColor={primaryColor}
-          />
-        );
+
       case AuctionStatusEnum.COMPLETADA:
         return (
           <AuctionManagerCompletedView
@@ -143,50 +115,26 @@ export function AuctionViewRouter({
             primaryColor={primaryColor}
           />
         );
+
       case AuctionStatusEnum.CANCELADA:
-        return (
-          <AuctionManagerPendingView
-            auction={auction}
-            auctionItems={auctionItems}
-            primaryColor={primaryColor}
-          />
-        );
+      case AuctionStatusEnum.PENDIENTE:
       default:
         return (
           <AuctionManagerPendingView
             auction={auction}
             auctionItems={auctionItems}
+            accessToken={accessToken}
+            tenantId={tenantId}
+            onRealtimeSnapshot={handleRealtimeSnapshot}
             primaryColor={primaryColor}
           />
         );
     }
   }
 
-  // USER sees different views based on auction status
+  // USER view
   if (userRole === UserRolesEnum.USER) {
-    // Determine actual status based on time
-    const now = new Date();
-    const startTime = new Date(auction.startTime);
-    const endTime = new Date(auction.endTime);
-
-    let actualStatus = auction.status;
-
-    // Override status based on time if not cancelled/deleted
-    if (
-      auction.status !== AuctionStatusEnum.CANCELADA &&
-      auction.status !== AuctionStatusEnum.ELIMINADA
-    ) {
-      if (now < startTime) {
-        actualStatus = AuctionStatusEnum.PENDIENTE;
-      } else if (now >= startTime && now < endTime) {
-        actualStatus = AuctionStatusEnum.ACTIVA;
-      } else {
-        actualStatus = AuctionStatusEnum.COMPLETADA;
-      }
-    }
-
-    // Route to appropriate view
-    switch (actualStatus) {
+    switch (auction.status) {
       case AuctionStatusEnum.ACTIVA:
         return (
           <AuctionActiveBiddingView
@@ -199,11 +147,6 @@ export function AuctionViewRouter({
           />
         );
 
-      case AuctionStatusEnum.PENDIENTE:
-        return (
-          <AuctionPendingView auction={auction} auctionItems={auctionItems} />
-        );
-
       case AuctionStatusEnum.COMPLETADA:
         return (
           <AuctionCompletedView
@@ -214,40 +157,27 @@ export function AuctionViewRouter({
         );
 
       case AuctionStatusEnum.CANCELADA:
-        return (
-          <Alert>
-            <AlertCircle className="h-4 w-4" />
-            <AlertDescription>Esta subasta ha sido cancelada</AlertDescription>
-          </Alert>
-        );
-
+      case AuctionStatusEnum.PENDIENTE:
       default:
         return (
-          <AuctionDetail
+          <AuctionPendingView
             auction={auction}
             auctionItems={auctionItems}
-            userRole={userRole}
-            userId={userId}
             accessToken={accessToken}
             tenantId={tenantId}
             onRealtimeSnapshot={handleRealtimeSnapshot}
-            primaryColor={primaryColor}
           />
         );
     }
   }
 
-  // Fallback to default view
+  // Fallback
   return (
-    <AuctionDetail
-      auction={auction}
-      auctionItems={auctionItems}
-      userRole={userRole}
-      userId={userId}
-      accessToken={accessToken}
-      tenantId={tenantId}
-      onRealtimeSnapshot={handleRealtimeSnapshot}
-      primaryColor={primaryColor}
-    />
+    <Alert variant="destructive">
+      <AlertCircle className="h-4 w-4" />
+      <AlertDescription>
+        No tienes permisos para ver esta subasta.
+      </AlertDescription>
+    </Alert>
   );
 }

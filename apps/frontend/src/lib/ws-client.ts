@@ -34,9 +34,14 @@ class WebSocketClient {
    */
   connect(token: string): Promise<void> {
     return new Promise((resolve, reject) => {
+      // If already connected with the same token, keep the connection.
+      // If the token changed (e.g. rotated), reconnect so the server can re-auth.
       if (this.socket?.readyState === WebSocket.OPEN) {
-        resolve();
-        return;
+        if (this.token && this.token === token) {
+          resolve();
+          return;
+        }
+        this.disconnect();
       }
 
       this.token = token;
@@ -163,7 +168,7 @@ class WebSocketClient {
    */
   isReady(): boolean {
     return (
-      this.state === 'AUTHENTICATED' &&
+      this.state === WsConnectionState.AUTHENTICATED &&
       this.socket?.readyState === WebSocket.OPEN
     );
   }
@@ -250,25 +255,11 @@ class WebSocketClient {
 export const wsClient = new WebSocketClient();
 
 /**
- * Helper to get access token from session/cookie
- * This should be adapted to your auth implementation
+ * 
+ * Access tokens are stored in the NextAuth JWT cookie (encrypted) and are not readable
+ * from document.cookie. Use `useSession()` (next-auth/react) and read `session.tokens.accessToken`.
  */
 export function getAccessToken(): string | null {
-  // Try to get from cookie
-  if (typeof document !== 'undefined') {
-    const cookies = document.cookie.split(';');
-    for (const cookie of cookies) {
-      const [name, value] = cookie.trim().split('=');
-      if (name === 'accessToken' || name === 'token') {
-        return value;
-      }
-    }
-  }
-
-  // Try to get from localStorage
-  if (typeof window !== 'undefined' && window.localStorage) {
-    return window.localStorage.getItem('accessToken');
-  }
-
   return null;
 }
+

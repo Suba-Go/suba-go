@@ -9,6 +9,10 @@ import {
   UseGuards,
   Request,
   Query,
+  BadRequestException,
+  UnauthorizedException,
+  NotFoundException,
+  ConflictException,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
@@ -62,18 +66,26 @@ export class UsersController {
   ) {
     const { email, role } = body;
     if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-      throw new Error('Email inválido');
+      throw new BadRequestException('Email inválido');
     }
 
     if (!req.user || !req.user.userId) {
-      throw new Error('Usuario no autenticado o ID de usuario no disponible');
+      throw new UnauthorizedException(
+        'Usuario no autenticado o ID de usuario no disponible'
+      );
     }
 
     const currentUser = await this.userGettersService.getUserById(
       req.user.userId
     );
     if (!currentUser) {
-      throw new Error('Usuario actual no encontrado');
+      throw new NotFoundException('Usuario actual no encontrado');
+    }
+
+    // Validation: prevent inviting an email already associated to any tenant
+    const existing = await this.userGettersService.findByEmail(email);
+    if (existing?.tenantId) {
+      throw new ConflictException('Este correo ya existe asociado a un tenant');
     }
 
     // 100 years expiration (effectively never expires)
@@ -126,12 +138,18 @@ export class UsersController {
   ) {
     const { email, role } = body;
     if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-      throw new Error('Email inválido');
+      throw new BadRequestException('Email inválido');
     }
 
     const existing = await this.userGettersService.findByEmail(email);
     if (existing) {
-      throw new Error('El usuario ya existe');
+      // If it already belongs to a tenant, surface the specific message the UI expects.
+      if (existing.tenantId) {
+        throw new ConflictException(
+          'Este correo ya existe asociado a un tenant'
+        );
+      }
+      throw new ConflictException('El usuario ya existe');
     }
 
     const manager = await this.userGettersService.getUserById(req.user.userId);

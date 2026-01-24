@@ -28,7 +28,7 @@ export function AuctionHeader({
     },
     COMPLETADA: {
       label: 'Completada',
-      className: 'bg-gray-100 text-gray-800 border-gray-300',
+      className: 'bg-blue-600 text-white border-blue-600',
     },
     CANCELADA: {
       label: 'Cancelada',
@@ -39,12 +39,21 @@ export function AuctionHeader({
   const config = statusConfig[status] || statusConfig.ACTIVA;
 
   return (
-    <div className="flex items-center justify-between">
-      <div>
-        <h1 className="text-3xl font-bold text-gray-900">{title}</h1>
-        {description && <p className="text-gray-600 mt-2">{description}</p>}
+    // Always keep the status badge on the right (especially important on mobile)
+    <div className="flex flex-row items-start justify-between gap-3">
+      <div className="min-w-0">
+        <h1 className="text-xl sm:text-3xl font-bold text-gray-900 break-words">
+          {title}
+        </h1>
+        {description ? (
+          <p className="text-sm sm:text-base text-gray-600 mt-1 sm:mt-2 break-words">
+            {description}
+          </p>
+        ) : null}
       </div>
-      <Badge className={config.className}>{config.label}</Badge>
+      <div className="shrink-0 pt-1 sm:pt-0">
+        <Badge className={`${config.className} text-xs sm:text-sm`}>{config.label}</Badge>
+      </div>
     </div>
   );
 }

@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { apiFetch } from '@/lib/api/api-fetch';
 
 export interface User {
   id: string;
@@ -34,7 +35,7 @@ export function useUsers() {
       setLoading(true);
       setError(null);
       
-      const response = await fetch('/api/users/company');
+      const response = await apiFetch('/api/users/company');
       
       if (!response.ok) {
         throw new Error('Error al obtener usuarios');

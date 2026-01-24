@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { FEEDBACK_CATEGORIES } from '@suba-go/shared-validation';
+import { apiFetch } from '@/lib/api/api-fetch';
 
 export default function FeedbackForm({
   onSuccess,
@@ -26,7 +27,7 @@ export default function FeedbackForm({
     setStatus({ type: 'submitting' });
 
     try {
-      const res = await fetch('/api/feedback', {
+      const res = await apiFetch('/api/feedback', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(form),

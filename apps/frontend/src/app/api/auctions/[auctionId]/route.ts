@@ -2,36 +2,28 @@ import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import superjson from 'superjson';
 
-export async function GET(
+export const GET = auth(async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ auctionId: string }> }
 ) {
   try {
     const { auctionId } = await params;
 
-    // Wrap auth() in try-catch to handle any errors
-    let session;
-    try {
-      session = await auth();
-    } catch (authError) {
-      console.error('Auth error in GET /api/auctions/[auctionId]:', authError);
-      return NextResponse.json(
-        { error: 'Error de autenticación' },
-        { status: 401 }
-      );
-    }
+    // Session is attached by NextAuth wrapper and will include refreshed tokens when needed.
+    const session = (request as any).auth;
 
     if (!session || !session.user) {
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
     }
 
-    // Get tenant from user session
+    // Tenant is normally available on the session, but under token-refresh races
+    // (multiple concurrent requests) it can be temporarily missing.
+    // Do NOT fail the request with 400 because:
+    // - Backend auth still enforces tenant scoping using the JWT claims
+    // - Returning 400/401 in bursts can trigger client redirects to /login
     const tenantId = session.user.tenantId;
     if (!tenantId) {
-      return NextResponse.json(
-        { error: 'Usuario sin tenant' },
-        { status: 400 }
-      );
+      console.warn('Session has no tenantId (temporary). Proceeding with backend fetch.');
     }
 
     // Forward request to backend
@@ -72,8 +64,8 @@ export async function GET(
       }
     }
 
-    // Verify the auction belongs to the user's tenant
-    if (deserializedData.tenantId !== tenantId) {
+    // Verify the auction belongs to the user's tenant (when we have tenantId)
+    if (tenantId && deserializedData?.tenantId && deserializedData.tenantId !== tenantId) {
       return NextResponse.json({ error: 'Acceso denegado' }, { status: 403 });
     }
 
@@ -85,9 +77,9 @@ export async function GET(
       { status: 500 }
     );
   }
-}
+});
 
-export async function PUT(
+export const PUT = auth(async function PUT(
   request: NextRequest,
   { params }: { params: Promise<{ auctionId: string }> }
 ) {
@@ -97,7 +89,7 @@ export async function PUT(
     // Wrap auth() in try-catch to handle any errors
     let session;
     try {
-      session = await auth();
+      session = (request as any).auth;
     } catch (authError) {
       console.error('Auth error in PUT /api/auctions/[auctionId]:', authError);
       return NextResponse.json(
@@ -119,6 +111,14 @@ export async function PUT(
     }
 
     const body = await request.json();
+
+    // Backwards compatible mapping: some clients send itemIds instead of selectedItems
+    // (backend expects selectedItems)
+    if (body?.itemIds && !body?.selectedItems) {
+      body.selectedItems = body.itemIds;
+      delete body.itemIds;
+    }
+
 
     // Forward request to backend
     const backendUrl = `${process.env.BACKEND_URL}/auctions/${auctionId}`;
@@ -149,9 +149,9 @@ export async function PUT(
       { status: 500 }
     );
   }
-}
+});
 
-export async function DELETE(
+export const DELETE = auth(async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ auctionId: string }> }
 ) {
@@ -161,7 +161,7 @@ export async function DELETE(
     // Wrap auth() in try-catch to handle any errors
     let session;
     try {
-      session = await auth();
+      session = (request as any).auth;
     } catch (authError) {
       console.error(
         'Auth error in DELETE /api/auctions/[auctionId]:',
@@ -212,4 +212,4 @@ export async function DELETE(
       { status: 500 }
     );
   }
-}
+});

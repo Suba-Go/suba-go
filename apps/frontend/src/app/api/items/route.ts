@@ -2,21 +2,51 @@ import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import superjson from 'superjson';
 
-export async function GET() {
+async function readBackendError(response: Response): Promise<string> {
   try {
-    const session = await auth();
+    const contentType = response.headers.get('content-type') || '';
+    if (contentType.includes('application/json')) {
+      const json: any = await response.json();
+      return (
+        json?.message ||
+        json?.error ||
+        json?.details ||
+        `Backend responded with status: ${response.status}`
+      );
+    }
+    const text = await response.text();
+    return text || `Backend responded with status: ${response.status}`;
+  } catch {
+    return `Backend responded with status: ${response.status}`;
+  }
+}
+
+export const GET = auth(async function GET(request: any) {
+  try {
+    const session = (request as any).auth;
 
     if (!session) {
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
     }
 
+    const accessToken = session.tokens?.accessToken;
+    if (!accessToken) {
+      return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
+    }
+
+    // USER should not be able to list all tenant items
+    // (they can only see items through their registered auctions or their awards)
+    if (session.user.role === 'USER') {
+      return NextResponse.json(
+        { error: 'Permisos insuficientes' },
+        { status: 403 }
+      );
+    }
+
     // Get tenant from user session
     const tenantId = session.user.tenantId;
     if (!tenantId) {
-      return NextResponse.json(
-        { error: 'Usuario sin tenant' },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: 'Usuario sin tenant' }, { status: 400 });
     }
 
     // Forward request to backend
@@ -26,12 +56,14 @@ export async function GET() {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',
-        Authorization: `Bearer ${session.tokens.accessToken}`,
+        Authorization: `Bearer ${accessToken}`,
       },
+      cache: 'no-store',
     });
 
     if (!response.ok) {
-      throw new Error(`Backend responded with status: ${response.status}`);
+      const message = await readBackendError(response);
+      return NextResponse.json({ error: message }, { status: response.status });
     }
 
     const data = await response.json();
@@ -55,13 +87,18 @@ export async function GET() {
       { status: 500 }
     );
   }
-}
+});
 
-export async function POST(request: NextRequest) {
+export const POST = auth(async function POST(request: NextRequest) {
   try {
-    const session = await auth();
+    const session = (request as any).auth;
 
     if (!session) {
+      return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
+    }
+
+    const accessToken = session.tokens?.accessToken;
+    if (!accessToken) {
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
     }
 
@@ -76,10 +113,7 @@ export async function POST(request: NextRequest) {
     // Get tenant from user session
     const tenantId = session.user.tenantId;
     if (!tenantId) {
-      return NextResponse.json(
-        { error: 'Usuario sin tenant' },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: 'Usuario sin tenant' }, { status: 400 });
     }
 
     const body = await request.json();
@@ -91,7 +125,7 @@ export async function POST(request: NextRequest) {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        Authorization: `Bearer ${session.tokens.accessToken}`,
+        Authorization: `Bearer ${accessToken}`,
       },
       body: JSON.stringify({
         ...body,
@@ -100,7 +134,7 @@ export async function POST(request: NextRequest) {
     });
 
     if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
+      const errorData = await response.json().catch(() => ({} as any));
       return NextResponse.json(
         { error: errorData.message || 'Error al crear el item' },
         { status: response.status }
@@ -128,4 +162,4 @@ export async function POST(request: NextRequest) {
       { status: 500 }
     );
   }
-}
+});

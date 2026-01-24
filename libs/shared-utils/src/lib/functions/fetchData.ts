@@ -30,6 +30,12 @@ export const fetchData = async <T>(
   if (response.success && response.data !== undefined) {
     return response.data;
   } else {
+    // If the caller marks auth errors explicitly, avoid spamming toast + logs
+    // (common when refreshInterval polling is enabled and a user signs out).
+    if (response.error === 'UNAUTHORIZED') {
+      throw new Error('UNAUTHORIZED');
+    }
+
     console.error('Error fetching data for key:', key);
     console.error('Response:', response);
     toast({
