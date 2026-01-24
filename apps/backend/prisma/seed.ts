@@ -17,6 +17,7 @@ async function main() {
       name: 'The Growth',
       nameLowercase: 'thegrowth',
       tenantId: tenantGrowth.id,
+      principal_color: '#566E20',
     },
   });
 
@@ -95,6 +96,7 @@ async function main() {
       name: 'Nico Dev',
       nameLowercase: 'nico dev',
       tenantId: tenantNico.id,
+      principal_color: '#566E20',
     },
   });
 

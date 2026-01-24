@@ -7,8 +7,7 @@ generator client {
 
 datasource db {
   provider = "postgresql"
-  url      = env("DATABASE_URL")
-
+  url      = "postgresql://postgres:pasword@localhost:5433/local_subago"
 }
 
 // Enums matching TypeORM enums

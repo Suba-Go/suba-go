@@ -82,10 +82,13 @@ const isDisallowedPrincipalColor = (value?: string | null) => {
 
   // Contrast rule
   const ratio = contrastRatioWithWhite(rgb);
-  return ratio < 4.5;
+  // Relaxed from 4.5 to 3.0 to allow vibrant colors like brand blue (#3B82F6 ratio is ~3.6)
+  // while still preventing very light pastels/whites invisible on white background.
+  return ratio < 3.0;
 };
 
-const PRINCIPAL_COLOR_TOO_LIGHT_MSG = 'No se puede asignar un color blanco';
+const PRINCIPAL_COLOR_TOO_LIGHT_MSG =
+  'El color es demasiado claro y no tiene suficiente contraste con el blanco.';
 
 export const companySchema = baseSchema
   .extend({
@@ -108,20 +111,33 @@ export const companyWithTenantSchema = companySchema.extend({
   },
 });
 
-export const companyCompactCreateSchema = companySchema.omit({
-  id: true,
-  isDeleted: true,
-  createdAt: true,
-  updatedAt: true,
-  deletedAt: true,
-  nameLowercase: true,
-  logo: true,
-  principal_color2: true,
-  secondary_color: true,
-  secondary_color2: true,
-  secondary_color3: true,
-  tenantId: true,
-}).strict();
+export const companyCompactCreateSchema = companySchema
+  .omit({
+    id: true,
+    isDeleted: true,
+    createdAt: true,
+    updatedAt: true,
+    deletedAt: true,
+    nameLowercase: true,
+    logo: true,
+    principal_color2: true,
+    secondary_color: true,
+    secondary_color2: true,
+    secondary_color3: true,
+    tenantId: true,
+  })
+  .strict()
+  .superRefine((data, ctx) => {
+    // Only validate when the client is trying to change the color.
+    if (typeof data.principal_color === 'undefined') return;
+    if (isDisallowedPrincipalColor(data.principal_color)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['principal_color'],
+        message: PRINCIPAL_COLOR_TOO_LIGHT_MSG,
+      });
+    }
+  });
 
 export const companyCreateSchema = companySchema
   .omit({
@@ -137,7 +153,17 @@ export const companyCreateSchema = companySchema
     secondary_color3: true,
     tenantId: true,
   })
-  .strict();
+  .strict()
+  .superRefine((data, ctx) => {
+    if (typeof data.principal_color === 'undefined') return;
+    if (isDisallowedPrincipalColor(data.principal_color)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['principal_color'],
+        message: PRINCIPAL_COLOR_TOO_LIGHT_MSG,
+      });
+    }
+  });
 
 export type CompanyDto = z.infer<typeof companySchema>;
 export type CompanyWithTenantDto = z.infer<typeof companyWithTenantSchema>;
