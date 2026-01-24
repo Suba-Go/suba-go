@@ -8,6 +8,7 @@ import { useCompany } from '@/hooks/use-company';
 import { Copy, Check } from 'lucide-react';
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
+import { apiFetch } from '@/lib/api/api-fetch';
 
 export default function ManagerInvitePage() {
   const { data: session, status } = useSession();
@@ -55,7 +56,7 @@ export default function ManagerInvitePage() {
     setCopied(false);
 
     try {
-      const res = await fetch('/api/users/invite', {
+      const res = await apiFetch('/api/users/invite', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email }),

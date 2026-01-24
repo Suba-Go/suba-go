@@ -13,7 +13,7 @@ import {
   CardHeader,
   CardTitle,
 } from '@suba-go/shared-components/components/ui/card';
-import { Badge } from '@suba-go/shared-components/components/ui/badge';
+import { AuctionHeader } from './auction-header';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 
@@ -41,18 +41,11 @@ export function AuctionCanceledView({ auction }: AuctionCanceledViewProps) {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900">{auction.title}</h1>
-          {auction.description && (
-            <p className="text-gray-600 mt-2">{auction.description}</p>
-          )}
-        </div>
-        <Badge className="bg-red-100 text-red-800 border-red-300">
-          Cancelada
-        </Badge>
-      </div>
+      <AuctionHeader
+        title={auction.title}
+        description={auction.description || ''}
+        status="CANCELADA"
+      />
 
       {/* Status Card */}
       <Card className="border-red-200 bg-red-50">

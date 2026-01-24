@@ -27,6 +27,11 @@ interface ItemBidHistoryProps {
   maxItems?: number;
   title?: string;
   maxHeight?: string;
+  /**
+   * When true, prefer real user names (AUCTION_MANAGER / ADMIN views).
+   * When false, show only pseudonyms (USER view).
+   */
+  showRealNames?: boolean;
 }
 
 const formatCurrency = (amount: number) => {
@@ -43,6 +48,7 @@ export function ItemBidHistory({
   maxItems,
   title = 'Historial de Pujas',
   maxHeight = 'max-h-40',
+  showRealNames = false,
 }: ItemBidHistoryProps) {
   if (!bids || bids.length === 0) {
     return null;
@@ -95,11 +101,15 @@ export function ItemBidHistory({
         <div className="space-y-2">
           {displayBids.map((bid, index) => {
             const amount = bid.amount ?? bid.offered_price ?? 0;
-            const userName =
-              bid.user?.public_name ||
-              bid.user?.email ||
-              bid.userName ||
-              'Usuario';
+            // USER view: show only pseudonym
+            // Manager/Admin view: show real name (or email fallback)
+            const userName = showRealNames
+              ? (bid.user as any)?.name ||
+                bid.user?.email ||
+                bid.user?.public_name ||
+                bid.userName ||
+                'Usuario'
+              : bid.user?.public_name || bid.userName || 'Usuario';
             const isCurrentUser = bid.userId === currentUserId;
             const isWinning = index === 0;
 

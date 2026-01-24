@@ -15,6 +15,7 @@ import { UserPlus } from 'lucide-react';
 import { ParticipantSelector } from './participant-selector';
 import { AuctionDto } from '@suba-go/shared-validation';
 import { darkenColor } from '@/utils/color-utils';
+import { apiFetch } from '@/lib/api/api-fetch';
 
 interface AddParticipantModalProps {
   auction: AuctionDto;
@@ -56,7 +57,7 @@ export function AddParticipantModal({
     try {
       // Register each participant
       const promises = selectedParticipants.map((userId) =>
-        fetch(`/api/auctions/${auction.id}/register`, {
+        apiFetch(`/api/auctions/${auction.id}/register`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -146,7 +147,7 @@ export function AddParticipantModal({
                   ? {
                       backgroundColor: primaryColor,
                       borderColor: primaryColor,
-                      color: '#000000',
+                      color: '#ffffff',
                     }
                   : undefined
               }
@@ -156,13 +157,13 @@ export function AddParticipantModal({
                     primaryColor,
                     10
                   );
-                  e.currentTarget.style.color = '#000000';
+                  e.currentTarget.style.color = '#ffffff';
                 }
               }}
               onMouseLeave={(e) => {
                 if (primaryColor) {
                   e.currentTarget.style.backgroundColor = primaryColor;
-                  e.currentTarget.style.color = '#000000';
+                  e.currentTarget.style.color = '#ffffff';
                 }
               }}
             >

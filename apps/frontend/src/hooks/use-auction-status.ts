@@ -1,130 +1,171 @@
-import { useState, useEffect } from 'react';
-import { AuctionStatusEnum } from '@suba-go/shared-validation';
+'use client';
 
-interface AuctionStatusResult {
-  displayStatus: string;
-  isActive: boolean;
-  isPending: boolean;
-  isCompleted: boolean;
-  isCanceled: boolean;
-  timeRemaining: string | null;
-  timeRemainingDetailed: {
-    hours: number;
-    minutes: number;
-    seconds: number;
-  } | null;
+import { useEffect, useMemo, useState } from 'react';
+import { formatDistanceStrict } from 'date-fns';
+import { es } from 'date-fns/locale';
+
+export type AuctionDisplayStatus =
+  | 'PENDIENTE'
+  | 'ACTIVA'
+  | 'COMPLETADA'
+  | 'CANCELADA'
+  | string;
+
+export interface TimeRemainingDetailed {
+  totalSeconds: number;
+  hours: number;
+  minutes: number;
+  seconds: number;
 }
 
-/**
- * Hook to automatically determine and update auction status based on current time
- * @param status - The auction status from the database
- * @param startTime - The auction start time
- * @param endTime - The auction end time
- * @returns Object with display status and time information
- */
-export function useAuctionStatus(
-  status: string,
-  startTime: string | Date,
-  endTime: string | Date
-): AuctionStatusResult {
-  const [currentTime, setCurrentTime] = useState(new Date());
+export interface AuctionStatusResult {
+  displayStatus: AuctionDisplayStatus;
+  isPending: boolean;
+  isActive: boolean;
+  isCompleted: boolean;
+  isCanceled: boolean;
+  timeRemaining?: string;
+  timeRemainingDetailed?: TimeRemainingDetailed;
+  nowMs: number;
+  startMs: number;
+  endMs: number;
+}
 
-  // Update current time every second
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setCurrentTime(new Date());
-    }, 1000);
-
-    return () => clearInterval(interval);
-  }, []);
-
-  const start = new Date(startTime);
-  const end = new Date(endTime);
-  const now = currentTime;
-
-  // Determine actual status based on time and database status
-  let displayStatus = status;
-  let isActive = false;
-  let isPending = false;
-  let isCompleted = false;
-  let isCanceled = false;
-  let timeRemaining: string | null = null;
-  let timeRemainingDetailed: {
-    hours: number;
-    minutes: number;
-    seconds: number;
-  } | null = null;
-
-  // If auction is CANCELADA or ELIMINADA, respect that status
-  if (status === AuctionStatusEnum.CANCELADA) {
-    isCanceled = true;
-    displayStatus = AuctionStatusEnum.CANCELADA;
-  } else if (status === AuctionStatusEnum.ELIMINADA) {
-    displayStatus = AuctionStatusEnum.ELIMINADA;
-  } else {
-    // Auto-determine status based on time
-    if (now < start) {
-      // Auction hasn't started yet
-      isPending = true;
-      displayStatus = AuctionStatusEnum.PENDIENTE;
-
-      // Calculate time until start
-      const diff = start.getTime() - now.getTime();
-      const days = Math.floor(diff / (1000 * 60 * 60 * 24));
-      const hours = Math.floor(
-        (diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60)
-      );
-      const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
-      const seconds = Math.floor((diff % (1000 * 60)) / 1000);
-
-      // Detailed time for countdown (hours includes days)
-      timeRemainingDetailed = { hours: hours + days * 24, minutes, seconds };
-
-      if (days > 0) {
-        timeRemaining = `${days} día${days > 1 ? 's' : ''}`;
-      } else if (hours > 0) {
-        timeRemaining = `${hours} hora${hours > 1 ? 's' : ''}`;
-      } else {
-        timeRemaining = `${minutes} minuto${minutes > 1 ? 's' : ''}`;
-      }
-    } else if (now >= start && now < end) {
-      // Auction is currently active
-      isActive = true;
-      displayStatus = AuctionStatusEnum.ACTIVA;
-
-      // Calculate time until end
-      const diff = end.getTime() - now.getTime();
-      const days = Math.floor(diff / (1000 * 60 * 60 * 24));
-      const hours = Math.floor(
-        (diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60)
-      );
-      const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
-      const seconds = Math.floor((diff % (1000 * 60)) / 1000);
-
-      // Detailed time for countdown (hours includes days)
-      timeRemainingDetailed = { hours: hours + days * 24, minutes, seconds };
-
-      if (days > 0) {
-        timeRemaining = `${days} día${days > 1 ? 's' : ''}`;
-      } else if (hours > 0) {
-        timeRemaining = `${hours} hora${hours > 1 ? 's' : ''}`;
-      } else {
-        timeRemaining = `${minutes} minuto${minutes > 1 ? 's' : ''}`;
-      }
-    } else {
-      // Auction has ended
-      isCompleted = true;
-      displayStatus = AuctionStatusEnum.COMPLETADA;
-    }
+function toMs(value: string | Date): number {
+  if (value instanceof Date) {
+    const ms = value.getTime();
+    return Number.isFinite(ms) ? ms : 0;
   }
+
+  const raw = String(value ?? '').trim();
+  if (!raw) return 0;
+
+  // Prefer strict-ish ISO parsing, but tolerate common DB formats like:
+  // "YYYY-MM-DD HH:mm:ss" or "YYYY-MM-DD HH:mm:ss.SSS".
+  // Some browsers treat those as invalid unless we convert to ISO-like "T".
+  let candidate = raw;
+  if (/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}(:\d{2}(\.\d{1,3})?)?$/.test(raw)) {
+    candidate = raw.replace(' ', 'T');
+  }
+
+  const parsed = Date.parse(candidate);
+  if (Number.isFinite(parsed)) return parsed;
+
+  // Fallback to Date constructor parsing (covers some additional formats)
+  const d = new Date(raw);
+  const ms = d.getTime();
+  return Number.isFinite(ms) ? ms : 0;
+}
+
+export function computeDisplayStatus(
+  backendStatus: string,
+  startMs: number,
+  endMs: number,
+  nowMs: number
+): AuctionDisplayStatus {
+  // Terminal states always win
+  if (backendStatus === 'CANCELADA') return 'CANCELADA';
+  if (backendStatus === 'COMPLETADA') return 'COMPLETADA';
+
+  if (!startMs || !endMs) return backendStatus;
+
+  // If backend says ACTIVE, trust it (unless already ended)
+  if (backendStatus === 'ACTIVA') {
+    if (nowMs >= endMs) return 'COMPLETADA';
+    return 'ACTIVA';
+  }
+
+  // Time-driven transition (UI realtime)
+  if (nowMs >= endMs) return 'COMPLETADA';
+  if (nowMs >= startMs) return 'ACTIVA';
+
+  if (backendStatus === 'PENDIENTE') return 'PENDIENTE';
+  return backendStatus;
+}
+
+function buildDetailed(deltaMs: number): TimeRemainingDetailed {
+  const totalSeconds = Math.max(0, Math.floor(deltaMs / 1000));
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+  return { totalSeconds, hours, minutes, seconds };
+}
+
+export function useAuctionStatus(
+  backendStatus: string,
+  startTime: string | Date,
+  endTime: string | Date,
+  opts?: {
+    /** serverTime - clientTime */
+    serverOffsetMs?: number;
+    /** default 1000ms */
+    tickMs?: number;
+    /** Optional externally-provided nowMs (already server-synced). If provided, the hook won't create its own interval. */
+    nowMs?: number;
+  }
+): AuctionStatusResult {
+  const serverOffsetMs = opts?.serverOffsetMs ?? 0;
+  const tickMs = opts?.tickMs ?? 1000;
+
+  const startMs = useMemo(() => toMs(startTime), [startTime]);
+  const endMs = useMemo(() => toMs(endTime), [endTime]);
+
+  const [nowMs, setNowMs] = useState(() => (typeof opts?.nowMs === 'number' ? opts!.nowMs : Date.now() + serverOffsetMs));
+
+  // Recompute time-based status each tick
+  useEffect(() => {
+    // If a parent provides a server-synced clock, just mirror it (no per-timer intervals).
+    if (typeof opts?.nowMs === 'number') {
+      setNowMs(opts.nowMs);
+      return;
+    }
+
+    if (!tickMs || tickMs <= 0) return;
+
+    const id = setInterval(() => {
+      setNowMs(Date.now() + serverOffsetMs);
+    }, tickMs);
+
+    return () => clearInterval(id);
+  }, [serverOffsetMs, tickMs, opts?.nowMs]);
+
+  const displayStatus = useMemo(
+    () => computeDisplayStatus(backendStatus, startMs, endMs, nowMs),
+    [backendStatus, startMs, endMs, nowMs]
+  );
+
+  const isPending = displayStatus === 'PENDIENTE';
+  const isActive = displayStatus === 'ACTIVA';
+  const isCompleted = displayStatus === 'COMPLETADA';
+  const isCanceled = displayStatus === 'CANCELADA';
+
+  const timeTargetMs = isPending ? startMs : isActive ? endMs : undefined;
+
+  const timeRemainingDetailed = useMemo(() => {
+    if (!timeTargetMs) return undefined;
+    return buildDetailed(timeTargetMs - nowMs);
+  }, [timeTargetMs, nowMs]);
+
+  const timeRemaining = useMemo(() => {
+    if (!timeTargetMs) return undefined;
+
+    // Convert to a date relative to the client clock for correct wording
+    const clientNow = Date.now();
+    const clientTarget = new Date(clientNow + (timeTargetMs - (clientNow + serverOffsetMs)));
+
+    return formatDistanceStrict(new Date(clientNow), clientTarget, { locale: es });
+  }, [timeTargetMs, serverOffsetMs, nowMs]);
 
   return {
     displayStatus,
-    isActive,
     isPending,
+    isActive,
     isCompleted,
     isCanceled,
     timeRemaining,
     timeRemainingDetailed,
+    nowMs,
+    startMs,
+    endMs,
   };
 }

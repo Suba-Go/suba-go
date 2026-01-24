@@ -43,12 +43,41 @@ export type WsServerMessage =
     }
   | {
       event: 'JOINED';
-      data: { room: string; auctionId: string; participantCount: number };
+      data: {
+        room: string;
+        auctionId: string;
+        participantCount: number;
+        /** Server time used by the client to compute a clock offset */
+        serverTimeMs?: number;
+        /** Optional snapshot of the auction to avoid extra roundtrips */
+        auction?: {
+          id: string;
+          status: string;
+          startTime: string;
+          endTime: string;
+        };
+        /** Optional snapshot of auction item clocks so late joiners / reconnects sync immediately */
+        auctionItems?: Array<{
+          id: string;
+          startTime: string;
+          endTime: string;
+        }>;
+      };
     }
   | { event: 'LEFT'; data: { room: string; auctionId: string } }
   | { event: 'KICKED_DUPLICATE'; data: { room: string; reason: string } }
   | { event: 'BID_PLACED'; data: BidPlacedData }
-  | { event: 'BID_REJECTED'; data: { reason: string; code: string } }
+  | {
+      event: 'BID_REJECTED';
+      data: {
+        reason: string;
+        code: string;
+        /** Optional correlation id so the UI can stop loading states */
+        requestId?: string;
+        /** Optional item id when the rejection is tied to a specific item */
+        auctionItemId?: string;
+      };
+    }
   | { event: 'AUCTION_STATUS_CHANGED'; data: AuctionStatusData }
   | { event: 'AUCTION_TIME_EXTENDED'; data: AuctionTimeExtendedData }
   | { event: 'AUCTION_ENDED'; data: { auctionId: string; tenantId: string } }
@@ -96,8 +125,12 @@ export interface AuctionStatusData {
  */
 export interface AuctionTimeExtendedData {
   auctionId: string;
+  /** Optional item id when the extension is tied to a specific auction item (independent timers) */
+  auctionItemId?: string;
   newEndTime: string;
   extensionSeconds: number;
+  /** Server time used by the client to compute a clock offset */
+  serverTimeMs?: number;
 }
 
 /**

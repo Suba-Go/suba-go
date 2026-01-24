@@ -3,6 +3,7 @@ import { auth } from '@/auth';
 import { redirect } from 'next/navigation';
 import { ItemDetailSkeleton } from '@/components/items/item-detail-skeleton';
 import { ItemDetail } from '@/components/items/item-detail';
+import { PageContainer } from '@/components/layout/page-container';
 
 export default async function ItemDetailPage({
   params,
@@ -18,10 +19,10 @@ export default async function ItemDetailPage({
 
   // All authenticated users can view products
   return (
-    <div className="container mx-auto px-4 py-8">
+    <PageContainer>
       <Suspense fallback={<ItemDetailSkeleton />}>
         <ItemDetail itemId={itemId} userRole={session.user.role || 'USER'} />
       </Suspense>
-    </div>
+    </PageContainer>
   );
 }

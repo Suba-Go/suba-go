@@ -1,12 +1,16 @@
 'use client';
 
 import { useState } from 'react';
+import { optimizeImageFile, readImageInfo, ImageInfo } from '../lib/image-utils';
+import { getTenantKeyFromLocation } from '@/lib/tenant-utils';
 
 interface UploadedFile {
   file: File;
   url: string;
   uploading: boolean;
   error?: string;
+  imageInfo?: ImageInfo;
+  originalName?: string;
 }
 
 interface UseFileUploadOptions {
@@ -28,8 +32,18 @@ export function useFileUpload(options: UseFileUploadOptions = {}) {
   const validateFile = (file: File): string | null => {
     // Check file size
     const maxSizeInBytes = maxSizeInMB * 1024 * 1024;
-    if (file.size > maxSizeInBytes) {
-      return `El archivo es muy grande. Máximo ${maxSizeInMB}MB permitido.`;
+
+    // Para imágenes, permitimos un tamaño mayor de entrada (cámara), porque se optimizan antes de subir.
+    // Igual ponemos un límite duro para evitar archivos excesivos.
+    const hardLimitForImages = 20 * 1024 * 1024; // 20MB
+    if (file.type.startsWith('image/')) {
+      if (file.size > hardLimitForImages) {
+        return `La imagen es muy grande. Máximo 20MB permitido antes de optimizar.`;
+      }
+    } else {
+      if (file.size > maxSizeInBytes) {
+        return `El archivo es muy grande. Máximo ${maxSizeInMB}MB permitido.`;
+      }
     }
 
     // Check file type
@@ -51,11 +65,17 @@ export function useFileUpload(options: UseFileUploadOptions = {}) {
   };
 
   const uploadFile = async (file: File): Promise<string> => {
-    // Upload file to Vercel Blob via API route
+    // Upload file to local provider via API route
+    const tenantId = getTenantKeyFromLocation();
     const response = await fetch(
-      `/api/upload?filename=${encodeURIComponent(file.name)}`,
+      `/api/upload?filename=${encodeURIComponent(file.name)}&tenantId=${encodeURIComponent(
+        tenantId
+      )}`,
       {
         method: 'POST',
+        headers: {
+          'x-tenant-id': tenantId,
+        },
         body: file,
       }
     );
@@ -85,12 +105,31 @@ export function useFileUpload(options: UseFileUploadOptions = {}) {
       }
     }
 
-    // Add files with uploading state
-    const newUploadedFiles: UploadedFile[] = fileArray.map((file) => ({
-      file,
-      url: '',
-      uploading: true,
-    }));
+    // Add files with uploading state (optimizando imágenes para mejor rendimiento)
+    const newUploadedFiles: UploadedFile[] = [];
+    for (const originalFile of fileArray) {
+      const imageInfo = originalFile.type.startsWith('image/')
+        ? await readImageInfo(originalFile).catch(() => undefined)
+        : undefined;
+
+      const processedFile = originalFile.type.startsWith('image/')
+        ? await optimizeImageFile(originalFile, { maxDimension: 1600, quality: 0.82, preferWebp: true })
+        : originalFile;
+
+      // Luego de optimizar, aplicamos el máximo real configurado (p.ej. 5MB)
+      const maxSizeInBytes = maxSizeInMB * 1024 * 1024;
+      if (processedFile.size > maxSizeInBytes) {
+        throw new Error(`La imagen optimizada supera el máximo permitido (${maxSizeInMB}MB). Prueba con otra imagen o reduce su tamaño.`);
+      }
+
+      newUploadedFiles.push({
+        file: processedFile,
+        originalName: originalFile.name,
+        imageInfo,
+        url: '',
+        uploading: true,
+      });
+    }
 
     setFiles((prev) => [...prev, ...newUploadedFiles]);
     setIsUploading(true);

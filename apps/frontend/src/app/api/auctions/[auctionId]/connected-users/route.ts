@@ -1,16 +1,21 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/auth';
 
-export async function GET(
+export const GET = auth(async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ auctionId: string }> }
 ) {
   try {
     const { auctionId } = await params;
-    const session = await auth();
+    const session = (request as any).auth;
 
     if (!session?.user || !session?.tokens?.accessToken) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    // Only AUCTION_MANAGER/ADMIN can see live connected users for an auction
+    if (session.user.role !== 'AUCTION_MANAGER' && session.user.role !== 'ADMIN') {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
     const backendUrl = process.env.BACKEND_URL || 'http://localhost:3001';
@@ -40,4 +45,4 @@ export async function GET(
       { status: 500 }
     );
   }
-}
+});

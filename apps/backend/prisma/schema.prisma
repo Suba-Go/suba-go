@@ -94,6 +94,7 @@ model User {
   itemsPurchased       Item[]                @relation("ItemSales")
   feedback             Feedback[]
   sentInvitations      Invitation[]          @relation("SentInvitations")
+  refreshTokens        RefreshToken[]
 
   // Unique constraints matching TypeORM indexes
   @@unique([email], map: "IDX_user_email_unique")
@@ -107,6 +108,9 @@ model Tenant {
   updatedAt DateTime  @updatedAt
   isDeleted Boolean   @default(false)
   deletedAt DateTime?
+
+  // ADMIN can block a tenant (users should be denied access when blocked)
+  isBlocked Boolean   @default(false)
 
   // Relations
   users        User[]
@@ -223,6 +227,10 @@ model AuctionItem {
   isDeleted Boolean   @default(false)
   deletedAt DateTime?
 
+  // Per-item clock (independent timers / soft-close)
+  startTime DateTime?
+  endTime   DateTime?
+
   startingBid Int
 
   // Relations
@@ -231,6 +239,9 @@ model AuctionItem {
   itemId    String
   item      Item    @relation(fields: [itemId], references: [id], onDelete: Cascade)
   bids      Bid[]
+
+  // Prevent duplicate associations inside the same auction.
+  @@unique([auctionId, itemId])
 
   @@map("auction_item")
 }
@@ -357,4 +368,31 @@ model Invitation {
   @@index([email])
   @@index([token])
   @@map("invitation")
+}
+model RefreshToken {
+  id        String   @id @default(uuid())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Security fields
+  hashedToken        String
+  expiresAt          DateTime
+  revokedAt          DateTime?
+  replacedByTokenId  String?  @unique
+
+  // Optional client metadata (useful for audits and multi-device sessions)
+  userAgent String?
+  ip        String?
+
+  // Relations
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  replacedByToken RefreshToken? @relation("RefreshTokenReplacedBy", fields: [replacedByTokenId], references: [id])
+  replacedToken   RefreshToken? @relation("RefreshTokenReplacedBy")
+
+  @@index([userId])
+  @@index([expiresAt])
+  @@index([hashedToken])
+  @@map("refresh_token")
 }

@@ -271,11 +271,7 @@ export class AuctionsGateway
       }
     } else if (isAuctionManager && meta.tenantId !== tenantId) {
       // Auction managers can only access their own tenant's auctions
-      this.sendError(
-        client,
-        WsErrorCode.FORBIDDEN,
-        'No tienes acceso a esta subasta'
-      );
+      this.sendError(client, WsErrorCode.FORBIDDEN, 'No tienes acceso a esta subasta');
       return;
     }
 
@@ -307,6 +303,15 @@ export class AuctionsGateway
             },
           });
           this.leaveRoom(dup, roomKey);
+
+          // IMPORTANT: The old connection must be closed. Otherwise we end up with
+          // zombie sockets that keep the heartbeat count growing and can cause
+          // bid flow issues (clients remain connected but not joined).
+          try {
+            dup.close(4000, 'Duplicate connection');
+          } catch {
+            // ignore
+          }
         }
       }
     }
@@ -328,14 +333,33 @@ export class AuctionsGateway
     this.logger.log(
       `${meta.email} joined auction ${auctionId} (${participantCount} participants)`
     );
+    // Snapshot of per-item clocks so reconnecting/late-joining clients sync immediately.
+    const auctionItems = await this.prisma.auctionItem.findMany({
+      where: { auctionId },
+      select: { id: true, startTime: true, endTime: true },
+    });
 
-    // Send confirmation to client
+
+    // Send confirmation + server time sync to client
+    // NOTE: keep payload compatible with shared WS contract.
     this.sendMessage(client, {
       event: 'JOINED',
       data: {
         room: roomKey,
         auctionId,
         participantCount,
+        serverTimeMs: Date.now(),
+        auction: {
+          id: auction.id,
+          status: auction.status,
+          startTime: auction.startTime.toISOString(),
+          endTime: auction.endTime.toISOString(),
+        },
+        auctionItems: auctionItems.map((ai) => ({
+          id: ai.id,
+          startTime: (ai.startTime ?? auction.startTime).toISOString(),
+          endTime: (ai.endTime ?? auction.endTime).toISOString(),
+        })),
       },
     });
 
@@ -417,38 +441,26 @@ export class AuctionsGateway
 
     // Validate user role (only USER can place bids)
     if (meta.role !== 'USER') {
-      this.sendError(
-        client,
-        WsErrorCode.FORBIDDEN,
-        'Solo los usuarios pueden realizar pujas'
-      );
+      this.sendBidRejected(client, data.auctionItemId, 'Solo los usuarios pueden realizar pujas', data.requestId);
       return;
     }
 
     // Validate tenant access (USER must match tenant)
     if (meta.tenantId !== data.tenantId) {
-      this.sendError(
-        client,
-        WsErrorCode.FORBIDDEN,
-        'No tienes acceso a esta subasta'
-      );
+      this.sendBidRejected(client, data.auctionItemId, 'No tienes acceso a esta subasta', data.requestId);
       return;
     }
 
     // Validate client is in the auction room
     const roomKey = this.getRoomKey(data.tenantId, data.auctionId);
     if (!meta.rooms.has(roomKey)) {
-      this.sendError(
-        client,
-        WsErrorCode.FORBIDDEN,
-        'Debes unirte a la subasta antes de pujar'
-      );
+      this.sendBidRejected(client, data.auctionItemId, 'Debes unirte a la subasta antes de pujar', data.requestId);
       return;
     }
 
     // Validate requestId for idempotency
     if (!data.requestId) {
-      this.sendError(client, WsErrorCode.INVALID_BID, 'requestId requerido');
+      this.sendBidRejected(client, data.auctionItemId, 'requestId requerido');
       return;
     }
 
@@ -470,7 +482,7 @@ export class AuctionsGateway
         return;
       }
 
-      await this.bidRealtimeService.placeBid(
+      const result = await this.bidRealtimeService.placeBid(
         data.auctionItemId,
         data.amount,
         meta.userId,
@@ -482,12 +494,23 @@ export class AuctionsGateway
         `[${this.instanceId}] Bid accepted req=${data.requestId} for item ${data.auctionItemId} amount=$${data.amount}`
       );
 
-      // Success: BidRealtimeService will broadcast BID_PLACED to all room participants
+      // Success:
+      // - When createdNow=true, the service already broadcasted BID_PLACED to the room.
+      // - When createdNow=false (duplicate requestId), we must still ACK the bidder so the UI stops loading.
+      if (result && result.createdNow === false) {
+        this.sendMessage(client, { event: 'BID_PLACED', data: result.bidPlacedData });
+      }
     } catch (error: unknown) {
       const message =
         error instanceof Error ? error.message : 'Error al procesar la puja';
       this.logger.error(`Bid placement failed: ${message}`);
-      this.sendError(client, WsErrorCode.INVALID_BID, message);
+
+      // IMPORTANT: reply with BID_REJECTED so the frontend can stop the loading state.
+      if (data?.auctionItemId) {
+        this.sendBidRejected(client, data.auctionItemId, message, data.requestId);
+      } else {
+        this.sendError(client, WsErrorCode.INVALID_BID, message);
+      }
     }
   }
 
@@ -503,6 +526,34 @@ export class AuctionsGateway
         // 1 = OPEN
         this.sendMessage(client, message);
       }
+    });
+  }
+
+  /**
+   * Broadcast a BID_PLACED event with role-based masking.
+   *
+   * Client requirement:
+   * - USER must see only the pseudonym (public_name)
+   * - AUCTION_MANAGER/ADMIN must see the real user name (or email fallback)
+   *
+   * We cannot broadcast the same payload to everyone because it would leak
+   * the real identity of bidders to other USERS.
+   */
+  broadcastBidPlaced(roomKey: string, data: any, names: { userDisplayName: string; managerDisplayName: string }) {
+    const room = this.rooms.get(roomKey);
+    if (!room) return;
+
+    room.clients.forEach((client) => {
+      if (client.readyState !== 1) return; // OPEN
+      const meta = this.clients.get(client);
+      const isUser = meta?.role === 'USER';
+      this.sendMessage(client, {
+        event: 'BID_PLACED',
+        data: {
+          ...data,
+          userName: isUser ? names.userDisplayName : names.managerDisplayName,
+        },
+      });
     });
   }
 
@@ -626,6 +677,26 @@ export class AuctionsGateway
       data: {
         code,
         message,
+      },
+    });
+  }
+
+  /**
+   * Send a BID_REJECTED message (used to ensure the UI can recover from bid errors)
+   */
+  private sendBidRejected(
+    client: WebSocket,
+    auctionItemId: string,
+    reason: string,
+    requestId?: string
+  ) {
+    this.sendMessage(client, {
+      event: 'BID_REJECTED',
+      data: {
+        code: WsErrorCode.INVALID_BID,
+        reason,
+        auctionItemId,
+        requestId,
       },
     });
   }

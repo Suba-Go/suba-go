@@ -15,6 +15,11 @@ type ItemWithRelations = Item & {
   })[];
 };
 
+// Prisma "Item" type does NOT include relation fields (like auctionItems) unless you
+// explicitly model it in the service layer. We use this alias to safely access relations
+// when the repository includes them.
+
+
 @Injectable()
 export class ItemsService {
   constructor(private readonly itemRepository: ItemPrismaRepository) {}
@@ -111,8 +116,16 @@ export class ItemsService {
     return this.itemRepository.findAvailableItems(tenantId);
   }
 
-  async getItemById(id: string, tenantId: string): Promise<ItemWithRelations> {
-    const item = await this.itemRepository.findById(id);
+  async getItemById(
+    id: string,
+    tenantId: string,
+    access?: { role?: string; userId?: string }
+  ): Promise<ItemWithRelations> {
+    // Repository includes auctionItems + auction, but its TS signature is scalar Item.
+    // Cast here to keep service-level typing correct.
+    const item = (await this.itemRepository.findById(id)) as unknown as
+      | ItemWithRelations
+      | null;
 
     if (!item) {
       throw new NotFoundException('Item no encontrado');
@@ -120,6 +133,38 @@ export class ItemsService {
 
     if (item.tenantId !== tenantId) {
       throw new ForbiddenException('No tienes acceso a este item');
+    }
+
+    // Additional guard for USER role: only allow access if the user either
+    // 1) won this item (soldToUserId), or
+    // 2) is registered/invited to at least one auction that contains this item.
+    if (access?.role === 'USER') {
+      const userId = access.userId;
+      if (!userId) {
+        throw new ForbiddenException('No tienes acceso a este item');
+      }
+
+      // Winner can always see their awarded item.
+      if (item.soldToUserId && item.soldToUserId === userId) {
+        return item;
+      }
+
+      const auctionIds = Array.from(
+        new Set(
+          (item.auctionItems ?? [])
+            .map((ai) => ai.auctionId ?? ai.auction?.id)
+            .filter(Boolean)
+        )
+      ) as string[];
+
+      const registered = await this.itemRepository.isUserRegisteredForAuctions(
+        userId,
+        auctionIds
+      );
+
+      if (!registered) {
+        throw new ForbiddenException('No tienes acceso a este item');
+      }
     }
 
     return item;

@@ -6,63 +6,62 @@
  */
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../../providers-modules/prisma/prisma.service';
-import type { Bid, Prisma } from '@prisma/client';
+import { Prisma } from '@prisma/client';
+import type { Bid as BidModel } from '@prisma/client';
+
+/**
+ * Use Prisma payload types for queries that include relations.
+ * This prevents TypeScript errors like "Property 'user' does not exist on type 'Bid'"
+ * when the query uses `include` / `select`.
+ */
+const bidWithDetailsArgs = Prisma.validator<Prisma.BidDefaultArgs>()({
+  include: {
+    user: {
+      select: {
+        id: true,
+        email: true,
+        name: true,
+        public_name: true,
+      },
+    },
+    auctionItem: {
+      include: {
+        item: true,
+        auction: true,
+      },
+    },
+  },
+});
+
+export type BidWithDetails = Prisma.BidGetPayload<typeof bidWithDetailsArgs>;
 
 @Injectable()
 export class BidPrismaService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async createBid(data: Prisma.BidCreateInput): Promise<Bid> {
+  async createBid(data: Prisma.BidCreateInput): Promise<BidWithDetails> {
     return this.prisma.bid.create({
       data,
-      include: {
-        user: {
-          select: {
-            id: true,
-            email: true,
-            name: true,
-            public_name: true,
-          },
-        },
-        auctionItem: {
-          include: {
-            item: true,
-            auction: true,
-          },
-        },
-      },
+      ...bidWithDetailsArgs,
     });
   }
 
-  async findBidsByAuctionItem(auctionItemId: string): Promise<Bid[]> {
+  async findBidsByAuctionItem(
+    auctionItemId: string,
+  ): Promise<BidWithDetails[]> {
     return this.prisma.bid.findMany({
       where: {
         auctionItemId,
         isDeleted: false,
       },
-      include: {
-        user: {
-          select: {
-            id: true,
-            email: true,
-            name: true,
-            public_name: true,
-          },
-        },
-        auctionItem: {
-          include: {
-            item: true,
-            auction: true,
-          },
-        },
-      },
+      ...bidWithDetailsArgs,
       orderBy: {
         offered_price: 'desc',
       },
     });
   }
 
-  async findBidsByAuction(auctionId: string): Promise<Bid[]> {
+  async findBidsByAuction(auctionId: string): Promise<BidWithDetails[]> {
     return this.prisma.bid.findMany({
       where: {
         auctionItem: {
@@ -70,131 +69,64 @@ export class BidPrismaService {
         },
         isDeleted: false,
       },
-      include: {
-        user: {
-          select: {
-            id: true,
-            email: true,
-            name: true,
-            public_name: true,
-          },
-        },
-        auctionItem: {
-          include: {
-            item: true,
-            auction: true,
-          },
-        },
-      },
+      ...bidWithDetailsArgs,
       orderBy: {
         offered_price: 'desc',
       },
     });
   }
 
-  async findBidsByUser(userId: string, tenantId: string): Promise<Bid[]> {
+  async findBidsByUser(
+    userId: string,
+    tenantId: string,
+  ): Promise<BidWithDetails[]> {
     return this.prisma.bid.findMany({
       where: {
         userId,
         tenantId,
         isDeleted: false,
       },
-      include: {
-        user: {
-          select: {
-            id: true,
-            email: true,
-            name: true,
-            public_name: true,
-          },
-        },
-        auctionItem: {
-          include: {
-            item: true,
-            auction: true,
-          },
-        },
-      },
+      ...bidWithDetailsArgs,
       orderBy: {
         createdAt: 'desc',
       },
     });
   }
 
-  async findHighestBidForItem(auctionItemId: string): Promise<Bid | null> {
+  async findHighestBidForItem(
+    auctionItemId: string,
+  ): Promise<BidWithDetails | null> {
     return this.prisma.bid.findFirst({
       where: {
         auctionItemId,
         isDeleted: false,
       },
-      include: {
-        user: {
-          select: {
-            id: true,
-            email: true,
-            name: true,
-            public_name: true,
-          },
-        },
-        auctionItem: {
-          include: {
-            item: true,
-            auction: true,
-          },
-        },
-      },
+      ...bidWithDetailsArgs,
       orderBy: {
         offered_price: 'desc',
       },
     });
   }
 
-  async findBidById(id: string): Promise<Bid | null> {
+  async findBidById(id: string): Promise<BidWithDetails | null> {
     return this.prisma.bid.findUnique({
       where: { id },
-      include: {
-        user: {
-          select: {
-            id: true,
-            email: true,
-            name: true,
-            public_name: true,
-          },
-        },
-        auctionItem: {
-          include: {
-            item: true,
-            auction: true,
-          },
-        },
-      },
+      ...bidWithDetailsArgs,
     });
   }
 
-  async updateBid(id: string, data: Prisma.BidUpdateInput): Promise<Bid> {
+  async updateBid(
+    id: string,
+    data: Prisma.BidUpdateInput,
+  ): Promise<BidWithDetails> {
     return this.prisma.bid.update({
       where: { id },
       data,
-      include: {
-        user: {
-          select: {
-            id: true,
-            email: true,
-            name: true,
-            public_name: true,
-          },
-        },
-        auctionItem: {
-          include: {
-            item: true,
-            auction: true,
-          },
-        },
-      },
+      ...bidWithDetailsArgs,
     });
   }
 
-  async deleteBid(id: string): Promise<Bid> {
+  async deleteBid(id: string): Promise<BidModel> {
     return this.prisma.bid.update({
       where: { id },
       data: {
@@ -271,7 +203,7 @@ export class BidPrismaService {
     };
   }
 
-  async getWinningBids(auctionId: string): Promise<Bid[]> {
+  async getWinningBids(auctionId: string): Promise<BidWithDetails[]> {
     // Get the highest bid for each item in the auction
     const auctionItems = await this.prisma.auctionItem.findMany({
       where: {
@@ -283,7 +215,7 @@ export class BidPrismaService {
       },
     });
 
-    const winningBids = [];
+    const winningBids: BidWithDetails[] = [];
     for (const item of auctionItems) {
       const highestBid = await this.findHighestBidForItem(item.id);
       if (highestBid) {

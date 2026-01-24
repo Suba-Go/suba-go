@@ -5,6 +5,7 @@ import { AuctionViewRouter } from '@/components/auctions/auction-view-router';
 import { AuctionDetailSkeleton } from '@/components/auctions/auction-detail-skeleton';
 import { isUserRole } from '@/lib/auction-utils';
 import { UserRolesEnum } from '@suba-go/shared-validation';
+import { PageContainer } from '@/components/layout/page-container';
 
 export default async function AuctionDetailPage({
   params,
@@ -31,16 +32,16 @@ export default async function AuctionDetailPage({
 
   if (!tenantId) {
     return (
-      <div className="container mx-auto px-4 py-8">
+      <PageContainer>
         <div className="text-center text-red-600">
           Error: Usuario sin tenant asignado
         </div>
-      </div>
+      </PageContainer>
     );
   }
 
   return (
-    <div className="container mx-auto px-4 py-8">
+    <PageContainer>
       <Suspense fallback={<AuctionDetailSkeleton />}>
         <AuctionViewRouter
           auctionId={auctionId}
@@ -50,6 +51,6 @@ export default async function AuctionDetailPage({
           tenantId={tenantId}
         />
       </Suspense>
-    </div>
+    </PageContainer>
   );
 }

@@ -1,12 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import superjson from 'superjson';
+import { readBackendError } from '@/lib/read-backend-error';
 
-export async function POST(request: NextRequest) {
+export const POST = auth(async function POST(request: NextRequest) {
   try {
-    const session = await auth();
+    const session = (request as any).auth;
 
     if (!session) {
+      return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
+    }
+
+    const accessToken = session.tokens?.accessToken;
+    if (!accessToken) {
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
     }
 
@@ -25,17 +31,14 @@ export async function POST(request: NextRequest) {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        Authorization: `Bearer ${session.tokens.accessToken}`,
+        Authorization: `Bearer ${accessToken}`,
       },
       body: JSON.stringify(body),
     });
 
     if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      return NextResponse.json(
-        { error: errorData.message || 'Error al crear feedback' },
-        { status: response.status }
-      );
+      const message = await readBackendError(response);
+      return NextResponse.json({ error: message }, { status: response.status });
     }
 
     const data = await response.json();
@@ -47,13 +50,18 @@ export async function POST(request: NextRequest) {
       { status: 500 }
     );
   }
-}
+});
 
-export async function GET() {
+export const GET = auth(async function GET(request: any) {
   try {
-    const session = await auth();
+    const session = (request as any).auth;
 
     if (!session) {
+      return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
+    }
+
+    const accessToken = session.tokens?.accessToken;
+    if (!accessToken) {
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
     }
 
@@ -73,12 +81,13 @@ export async function GET() {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',
-        Authorization: `Bearer ${session.tokens.accessToken}`,
+        Authorization: `Bearer ${accessToken}`,
       },
     });
 
     if (!response.ok) {
-      throw new Error(`Backend responded with status: ${response.status}`);
+      const message = await readBackendError(response);
+      return NextResponse.json({ error: message }, { status: response.status });
     }
 
     const data = await response.json();
@@ -99,4 +108,4 @@ export async function GET() {
       { status: 500 }
     );
   }
-}
+});

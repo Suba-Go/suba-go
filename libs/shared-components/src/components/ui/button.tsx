@@ -10,7 +10,10 @@ const buttonVariants = cva(
     variants: {
       variant: {
         default:
-          "bg-primary text-primary-foreground shadow hover:bg-primary/90",
+          // NOTE: We intentionally use CSS variables so buttons can be branded per-tenant
+          // (company principal_color) without rebuilding Tailwind.
+          // Fallbacks keep the original Suba&Go yellow as default.
+          "bg-[var(--company-primary,#ECC218)] text-[var(--company-primary-foreground,#16191b)] shadow hover:bg-[var(--company-primary-dark,#d6b116)] focus-visible:ring-[rgba(var(--company-primary-rgb,236_194_24),0.45)]",
         destructive:
           "bg-destructive text-destructive-foreground shadow-sm hover:bg-destructive/90",
         outline:
@@ -18,7 +21,7 @@ const buttonVariants = cva(
         secondary:
           "bg-secondary text-secondary-foreground shadow-sm hover:bg-secondary/80",
         ghost: "hover:bg-accent hover:text-accent-foreground",
-        link: "text-primary underline-offset-4 hover:underline",
+        link: "text-[var(--company-primary,#ECC218)] underline-offset-4 hover:underline",
       },
       size: {
         default: "h-9 px-4 py-2",

@@ -4,6 +4,7 @@
  */
 'use client';
 
+import Image from 'next/image';
 import {
   Card,
   CardContent,
@@ -29,11 +30,24 @@ const formatCurrency = (amount: number) => {
   }).format(amount);
 };
 
+const FALLBACK_IMAGE_DATA_URL =
+  'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgdmlld0JveD0iMCAwIDIwMCAyMDAiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxyZWN0IHdpZHRoPSIyMDAiIGhlaWdodD0iMjAwIiBmaWxsPSIjRjNGNEY2Ii8+CjxwYXRoIGQ9Ik04MCA2MEgxMjBWODBIODBWNjBaIiBmaWxsPSIjOUI5QkEwIi8+CjxwYXRoIGQ9Ik02MCA4MEgxNDBWMTQwSDYwVjgwWiIgZmlsbD0iIzlCOUJBMCIvPgo8L3N2Zz4K';
+
+function getPrimaryPhoto(photos?: string | null): string | null {
+  if (!photos) return null;
+  const first = photos
+    .split(',')
+    .map((u) => u.trim())
+    .find(Boolean);
+  return first || null;
+}
+
 export function AuctionCompletedItemCard({
   auctionItem,
   isWon,
   onViewDetails,
 }: AuctionCompletedItemCardProps) {
+  const photoUrl = getPrimaryPhoto((auctionItem.item as any)?.photos ?? null);
   const highBid = auctionItem.bids?.[0];
   const hasWinner = highBid && Number(highBid.offered_price) > 0;
   const finalPrice = hasWinner
@@ -73,6 +87,22 @@ export function AuctionCompletedItemCard({
         </div>
       </CardHeader>
 
+      {/* Product photo */}
+      <div className="relative h-44 sm:h-52 w-full overflow-hidden bg-gray-100">
+        <Image
+          src={photoUrl || FALLBACK_IMAGE_DATA_URL}
+          alt={`${auctionItem.item?.brand ?? 'Producto'} ${auctionItem.item?.model ?? ''}`.trim()}
+          fill
+          className={photoUrl ? 'object-cover' : 'object-contain p-8 opacity-80'}
+          sizes="(max-width: 1024px) 100vw, 50vw"
+          quality={photoUrl ? 82 : 60}
+          onError={(e) => {
+            const target = e.currentTarget as HTMLImageElement;
+            target.src = FALLBACK_IMAGE_DATA_URL;
+          }}
+        />
+      </div>
+
       <CardContent className="space-y-4 pt-6">
         {/* Price Info */}
         <div className="p-3 rounded-lg bg-gray-50">
@@ -99,7 +129,7 @@ export function AuctionCompletedItemCard({
         )}
 
         {/* View Details Button */}
-        <Button variant="outline" className="w-full" onClick={onViewDetails}>
+        <Button className="w-full" onClick={onViewDetails}>
           <Eye className="h-4 w-4 mr-2" />
           Ver Detalles
         </Button>

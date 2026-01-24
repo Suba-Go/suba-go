@@ -8,6 +8,7 @@ import { Spinner } from '@suba-go/shared-components/components/ui/spinner';
 import { useCompanyContextOptional } from '@/contexts/company-context';
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
+import { PageContainer } from '@/components/layout/page-container';
 
 export default function SubastasPage({
   params,
@@ -28,22 +29,65 @@ export default function SubastasPage({
     }
   }, [session, status, router]);
 
+  const canAccess =
+    status === 'authenticated' &&
+    !!session &&
+    (session.user.role === 'AUCTION_MANAGER' || session.user.role === 'ADMIN');
+
   // TODO: un refresh que se gatille despues de crear una subasta
   const {
-    data: auctions,
+    data: auctions = [],
     isLoading,
     error,
+    refetch,
   } = useFetchData<AuctionWithItemsAndBidsDto[]>({
     url: `/api/auctions`,
     key: ['auctions', subdomain],
     revalidateOnMount: true,
     refreshInterval: 3,
+    fallbackData: [],
+    condition: canAccess,
+    errorMessage: 'No se pudieron cargar las subastas',
+    maxRetries: 3,
+    retryDelayMs: 300,
+    retryStatuses: [401, 503],
   });
+  if (status === 'loading') {
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-gray-50">
+        <div className="text-center">
+          <Spinner className="size-4" />
+        </div>
+      </div>
+    );
+  }
+
+  // While redirecting (or if not allowed), don't crash the render.
+  if (!canAccess) {
+    return null;
+  }
+
+  if (error) {
+    return (
+      <PageContainer>
+        <div className="w-full min-h-[60vh] flex flex-col items-center justify-center gap-3">
+          <p className="text-sm text-red-600">No se pudo cargar la subasta</p>
+          <button
+            className="px-4 py-2 rounded-md border"
+            onClick={() => refetch()}
+            type="button"
+          >
+            Reintentar
+          </button>
+        </div>
+      </PageContainer>
+    );
+  }
+
   // Use company from context (loaded once in conditional-layout)
   const companyContext = useCompanyContextOptional();
   const primaryColor = companyContext?.company?.principal_color;
 
-  if (!auctions || error) return;
 
   if (isLoading) {
     return (
@@ -55,18 +99,7 @@ export default function SubastasPage({
     );
   }
   return (
-    <div className="container mx-auto px-4 py-8">
-      <div className="flex justify-between items-center mb-8">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900">
-            Gestión de Subastas
-          </h1>
-          <p className="text-gray-600 mt-2">
-            Administra y monitorea todas las subastas de tu empresa
-          </p>
-        </div>
-      </div>
-
+    <PageContainer>
       <Suspense fallback={<AuctionDashboardSkeleton />}>
         <AuctionDashboard
           auctions={auctions}
@@ -76,6 +109,6 @@ export default function SubastasPage({
           subdomain={subdomain}
         />
       </Suspense>
-    </div>
+    </PageContainer>
   );
 }

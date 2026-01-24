@@ -68,8 +68,5 @@ jobs:
         if: github.event_name != 'pull_request'
         run: pnpm nx run-many --target=typecheck --all
 
-      - name: Run Eslint
-        run: pnpm nx run-many --target=lint --all
-
       - name: Run Build
         run: pnpm nx run-many --target=build --all

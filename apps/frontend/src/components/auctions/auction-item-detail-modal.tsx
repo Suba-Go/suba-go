@@ -11,8 +11,11 @@ import {
   DollarSign,
   Shield,
   Package,
+  ChevronLeft,
+  ChevronRight,
 } from 'lucide-react';
 import Image from 'next/image';
+import { useRouter } from 'next/navigation';
 import { Button } from '@suba-go/shared-components/components/ui/button';
 import { Badge } from '@suba-go/shared-components/components/ui/badge';
 import {
@@ -59,6 +62,22 @@ interface AuctionItemDetailModalProps {
   userId?: string;
   bidHistory?: SimpleBidHistory[] | BidDto[];
   showBidHistory?: boolean;
+
+  /**
+   * Client requirement:
+   * - AUCTION_MANAGER/ADMIN must see real bidder names
+   * - USER must see only pseudonyms
+   */
+  showBidderRealNames?: boolean;
+
+  /** Optional navigation between items (used for browsing in pending auctions) */
+  onPrevItem?: () => void;
+  onNextItem?: () => void;
+  hasPrevItem?: boolean;
+  hasNextItem?: boolean;
+
+  /** Optional link to full item detail page */
+  fullItemHref?: string;
 }
 
 export function AuctionItemDetailModal({
@@ -72,7 +91,14 @@ export function AuctionItemDetailModal({
   userId,
   bidHistory = [],
   showBidHistory = true,
+  showBidderRealNames = false,
+  onPrevItem,
+  onNextItem,
+  hasPrevItem,
+  hasNextItem,
+  fullItemHref,
 }: AuctionItemDetailModalProps) {
+  const router = useRouter();
   const { formatPrice } = useAutoFormat();
   const companyContext = useCompanyContextOptional();
   const primaryColor = companyContext?.company?.principal_color;
@@ -219,23 +245,87 @@ export function AuctionItemDetailModal({
     ? item.docs.split(',').map((url: string) => url.trim())
     : [];
 
-  const isUserWinning =
-    auctionItem.bids?.[0]?.userId === userId &&
-    (auctionItem.bids?.length || 0) > 0;
+  // Determine winner by highest bid amount (not array order).
+  // This prevents cases where multiple clients incorrectly see "Ganando".
+  const highestBidderId = (() => {
+    // Prefer realtime bidHistory (already normalized by the live view)
+    if (Array.isArray(bidHistory) && bidHistory.length > 0) {
+      const normalized = bidHistory
+        .map((b: any) => {
+          const amount = Number((b as any).amount ?? (b as any).offered_price ?? 0);
+          const ts =
+            Number((b as any).timestamp ?? 0) ||
+            ((b as any).bid_time ? new Date((b as any).bid_time).getTime() : 0) ||
+            ((b as any).createdAt ? new Date((b as any).createdAt).getTime() : 0);
+          return { userId: (b as any).userId, amount, ts };
+        })
+        .filter((b) => !!b.userId);
+      normalized.sort((a, b) => b.amount - a.amount || b.ts - a.ts);
+      return normalized[0]?.userId as string | undefined;
+    }
+
+    // Fallback to API bids (sort by offered_price)
+    const bids = auctionItem.bids || [];
+    if (!bids.length) return undefined;
+    const sorted = [...bids].sort(
+      (a, b) => Number(b.offered_price || 0) - Number(a.offered_price || 0)
+    );
+    return sorted[0]?.userId as string | undefined;
+  })();
+
+  const isUserWinning = !!userId && !!highestBidderId && highestBidderId === userId;
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="text-2xl flex items-center justify-between">
-            <span>
+            <span className="min-w-0 truncate">
               {item.brand} {item.model} {item.year}
             </span>
-            {item.plate && (
-              <Badge variant="outline" className="text-lg">
-                {item.plate}
-              </Badge>
-            )}
+
+            <span className="flex items-center gap-2">
+              {fullItemHref && (
+                <Button
+                  variant="outline"
+                  onClick={() => router.push(fullItemHref)}
+                  className="hidden sm:inline-flex"
+                >
+                  Ver ficha
+                </Button>
+              )}
+
+              {(onPrevItem || onNextItem) && (
+                <span className="flex items-center gap-1">
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    onClick={onPrevItem}
+                    disabled={!hasPrevItem}
+                    aria-label="Producto anterior"
+                    title="Anterior"
+                  >
+                    <ChevronLeft className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    onClick={onNextItem}
+                    disabled={!hasNextItem}
+                    aria-label="Siguiente producto"
+                    title="Siguiente"
+                  >
+                    <ChevronRight className="h-4 w-4" />
+                  </Button>
+                </span>
+              )}
+
+              {item.plate && (
+                <Badge variant="outline" className="text-lg whitespace-nowrap">
+                  {item.plate}
+                </Badge>
+              )}
+            </span>
           </DialogTitle>
         </DialogHeader>
 
@@ -507,6 +597,7 @@ export function AuctionItemDetailModal({
                     : auctionItem.bids || []) as BidWithUserDto[]
                 }
                 currentUserId={userId}
+                showRealNames={showBidderRealNames}
                 title={
                   bidHistory.length > 0
                     ? 'Historial de Pujas'

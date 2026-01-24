@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { apiFetch } from '@/lib/api/api-fetch';
 
 interface Item {
   id: string;
@@ -28,7 +29,7 @@ export function useItems() {
       setIsLoading(true);
       setError(null);
       
-      const response = await fetch('/api/items');
+      const response = await apiFetch('/api/items');
       
       if (!response.ok) {
         throw new Error('Error al cargar los items');
@@ -69,7 +70,7 @@ export function useAvailableItems() {
       setIsLoading(true);
       setError(null);
       
-      const response = await fetch('/api/items/available');
+      const response = await apiFetch('/api/items/available');
       
       if (!response.ok) {
         throw new Error('Error al cargar los items disponibles');

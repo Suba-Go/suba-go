@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/auth';
 
-export async function POST(req: NextRequest) {
+export const POST = auth(async function POST(req: NextRequest) {
   try {
-    const session = await auth();
+    const session = (req as any).auth;
     if (!session?.user || !session?.tokens?.accessToken) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
@@ -23,4 +23,4 @@ export async function POST(req: NextRequest) {
   } catch (error) {
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
-}
+});

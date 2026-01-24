@@ -50,6 +50,14 @@ export function AuctionManagerCompletedView({
   const [selectedItemForDetail, setSelectedItemForDetail] =
     useState<AuctionItemWithItmeAndBidsDto | null>(null);
 
+  // AUCTION_MANAGER / ADMIN requirement: show real user name (fallback to email),
+  // while USER views keep using public_name. This view is manager-only.
+  const getRealUserLabel = (u?: {
+    name?: string | null;
+    email?: string | null;
+    public_name?: string | null;
+  } | null) => u?.name || u?.email || u?.public_name || 'Usuario';
+
   // Fetch participants data
   const { data: participants, refetch: refetchParticipants } = useFetchData<
     UserSafeDto[]
@@ -73,29 +81,30 @@ export function AuctionManagerCompletedView({
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center gap-4">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:gap-4">
         <Button
           variant="ghost"
           size="sm"
           onClick={() => router.back()}
-          className="gap-2"
+          className="gap-2 w-fit"
         >
           <ArrowLeft className="h-4 w-4" />
           Volver
         </Button>
-        <div className="flex-1">
-          <div className="flex items-center gap-3 mb-2">
-            <h1 className="text-2xl font-bold text-gray-900">
+
+        <div className="flex-1 min-w-0">
+          <div className="flex flex-wrap items-center gap-2 mb-2">
+            <h1 className="text-xl sm:text-2xl font-bold text-gray-900 break-words">
               {auction.title}
             </h1>
             <Badge
-              className={`${getAuctionBadgeColor(auction.status)} text-sm`}
+              className={`${getAuctionBadgeColor(auction.status)} text-xs sm:text-sm`}
             >
               {getAuctionStatusLabel(auction.status)}
             </Badge>
           </div>
           {auction.description && (
-            <p className="text-gray-600">{auction.description}</p>
+            <p className="text-gray-600 break-words">{auction.description}</p>
           )}
         </div>
       </div>
@@ -143,12 +152,12 @@ export function AuctionManagerCompletedView({
         <TabsList className="grid w-full grid-cols-2 bg-gray-100 p-1 rounded-lg">
           <TabsTrigger
             value="items"
-            className="data-[state=active]:text-black data-[state=active]:shadow-sm font-medium transition-all"
+            className="text-black data-[state=active]:text-white data-[state=active]:shadow-sm font-medium transition-all"
             style={
               activeTab === 'items' && primaryColor
                 ? {
                     backgroundColor: primaryColor,
-                    color: '#000000',
+                    color: '#ffffff',
                   }
                 : undefined
             }
@@ -157,12 +166,12 @@ export function AuctionManagerCompletedView({
           </TabsTrigger>
           <TabsTrigger
             value="participants"
-            className="data-[state=active]:text-black data-[state=active]:shadow-sm font-medium transition-all"
+            className="text-black data-[state=active]:text-white data-[state=active]:shadow-sm font-medium transition-all"
             style={
               activeTab === 'participants' && primaryColor
                 ? {
                     backgroundColor: primaryColor,
-                    color: '#000000',
+                    color: '#ffffff',
                   }
                 : undefined
             }
@@ -203,7 +212,10 @@ export function AuctionManagerCompletedView({
                             alt={`${auctionItem.item.brand} ${auctionItem.item.model}`}
                             fill
                             className="object-cover"
-                            sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+                            // 1 column on <lg and 2 columns on >=lg.
+                            // 33vw requests a too-small variant on desktop and looks blurry.
+                            sizes="(max-width: 1024px) 100vw, 50vw"
+                            quality={82}
                             onError={(e) => {
                               const target =
                                 e.currentTarget as HTMLImageElement;
@@ -253,13 +265,15 @@ export function AuctionManagerCompletedView({
                                     ).toLocaleString()}
                                   </p>
                                   {topBid && (
-                                    <p className="text-xs text-gray-600 mt-1">
-                                      Ganando:{' '}
-                                      <span className="font-medium text-gray-900">
-                                        {topBid.user?.public_name || 'Usuario'}
-                                      </span>
-                                    </p>
-                                  )}
+                                      <p className="text-xs text-gray-600 mt-1">
+                                        {auctionItem.item?.state === ItemStateEnum.VENDIDO
+                                          ? 'Ganador/a:'
+                                          : 'Ganando:'}{' '}
+                                        <span className="font-medium text-gray-900">
+                                          {getRealUserLabel(topBid.user as any)}
+                                        </span>
+                                      </p>
+                                    )}
                                 </div>
                               )}
                           </div>
@@ -272,6 +286,7 @@ export function AuctionManagerCompletedView({
                               <ItemBidHistory
                                 bids={auctionItem.bids || []}
                                 maxItems={5}
+                                showRealNames
                               />
                             </>
                           )}
@@ -299,8 +314,9 @@ export function AuctionManagerCompletedView({
                                     <p className="text-gray-600">
                                       Comprador:{' '}
                                       <span className="font-semibold text-gray-900">
-                                        {auctionItem.item.soldToUser
-                                          .public_name || 'Usuario'}
+                                        {getRealUserLabel(
+                                          auctionItem.item.soldToUser as any
+                                        )}
                                       </span>
                                     </p>
                                   )}
@@ -354,6 +370,7 @@ export function AuctionManagerCompletedView({
           bidIncrement={Number(auction.bidIncrement || 50000)}
           isUserView={false}
           showBidHistory={true}
+          showBidderRealNames={true}
         />
       )}
     </div>

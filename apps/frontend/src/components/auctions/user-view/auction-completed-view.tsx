@@ -7,6 +7,7 @@
 'use client';
 
 import { useState } from 'react';
+import Image from 'next/image';
 import { Trophy, TrendingUp, XCircle } from 'lucide-react';
 import {
   Card,
@@ -14,7 +15,7 @@ import {
   CardHeader,
   CardTitle,
 } from '@suba-go/shared-components/components/ui/card';
-import { Badge } from '@suba-go/shared-components/components/ui/badge';
+import { AuctionHeader } from './auction-header';
 import {
   Alert,
   AlertDescription,
@@ -26,6 +27,18 @@ import {
 import { AuctionCompletedItemCard } from './auction-completed-item-card';
 import { AuctionItemDetailModal } from '../auction-item-detail-modal';
 import { useCompany } from '@/hooks/use-company';
+
+const FALLBACK_IMAGE_DATA_URL =
+  'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgdmlld0JveD0iMCAwIDIwMCAyMDAiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxyZWN0IHdpZHRoPSIyMDAiIGhlaWdodD0iMjAwIiBmaWxsPSIjRjNGNEY2Ii8+CjxwYXRoIGQ9Ik04MCA2MEgxMjBWODBIODBWNjBaIiBmaWxsPSIjOUI5QkEwIi8+CjxwYXRoIGQ9Ik02MCA4MEgxNDBWMTQwSDYwVjgwWiIgZmlsbD0iIzlCOUJBMCIvPgo8L3N2Zz4K';
+
+function getPrimaryPhoto(photos?: string | null): string | null {
+  if (!photos) return null;
+  const first = photos
+    .split(',')
+    .map((u) => u.trim())
+    .find(Boolean);
+  return first || null;
+}
 
 interface AuctionCompletedViewProps {
   auction: AuctionDto;
@@ -52,20 +65,50 @@ export function AuctionCompletedView({
   // Determine if user is winner or loser
   const isWinner = itemsWonByUser > 0;
 
+  // Pick an item to highlight in the "felicitaciones"/result banner (show product image)
+  const getBidderId = (bid: any): string | undefined =>
+    bid?.userId || bid?.user_id || bid?.user?.id || bid?.user?.user_id;
+
+  const itemsWon = userId
+    ? auctionItems?.filter((it) => it.item?.soldToUserId === userId) || []
+    : [];
+
+  const itemsBidByUser = userId
+    ? auctionItems?.filter((it) =>
+        (it.bids || []).some((b: any) => getBidderId(b) === userId)
+      ) || []
+    : [];
+
+  const highlightItem: AuctionItemWithItmeAndBidsDto | undefined = isWinner
+    ? itemsWon[0]
+    : itemsBidByUser
+        .slice()
+        .sort((a, b) => {
+          const aMax = Math.max(
+            0,
+            ...(a.bids || [])
+              .filter((x: any) => getBidderId(x) === userId)
+              .map((x: any) => Number(x.offered_price) || 0)
+          );
+          const bMax = Math.max(
+            0,
+            ...(b.bids || [])
+              .filter((x: any) => getBidderId(x) === userId)
+              .map((x: any) => Number(x.offered_price) || 0)
+          );
+          return bMax - aMax;
+        })[0]
+    ?? auctionItems?.[0];
+
+  const highlightPhotoUrl = getPrimaryPhoto((highlightItem?.item as any)?.photos ?? null);
+
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900">{auction.title}</h1>
-          {auction.description && (
-            <p className="text-gray-600 mt-2">{auction.description}</p>
-          )}
-        </div>
-        <Badge className="bg-green-100 text-green-800 border-green-300">
-          Completada
-        </Badge>
-      </div>
+      <AuctionHeader
+        title={auction.title}
+        description={auction.description || ''}
+        status="COMPLETADA"
+      />
 
       {/* Winner/Loser Alert */}
       {userId && (
@@ -80,16 +123,32 @@ export function AuctionCompletedView({
             <>
               <Trophy className="h-5 w-5 text-green-600" />
               <AlertDescription className="text-green-900">
-                <div className="space-y-2">
-                  <p className="text-xl font-bold">
-                    ¡Felicitaciones! Has ganado {itemsWonByUser} de {totalItems}{' '}
-                    {itemsWonByUser === 1 ? 'producto' : 'productos'} en esta
-                    subasta.
-                  </p>
-                  <p className="text-sm">
-                    Vas a ser contactado dentro de los próximos días por{' '}
-                    {company?.name}.
-                  </p>
+                <div className="flex gap-4 items-start">
+                  <div className="relative h-16 w-24 shrink-0 overflow-hidden rounded-md bg-white/60 border border-green-200">
+                    <Image
+                      src={highlightPhotoUrl || FALLBACK_IMAGE_DATA_URL}
+                      alt="Producto"
+                      fill
+                      className={highlightPhotoUrl ? 'object-cover' : 'object-contain p-2 opacity-80'}
+                      sizes="96px"
+                      quality={highlightPhotoUrl ? 82 : 60}
+                      onError={(e) => {
+                        const target = e.currentTarget as HTMLImageElement;
+                        target.src = FALLBACK_IMAGE_DATA_URL;
+                      }}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <p className="text-xl font-bold">
+                      ¡Felicitaciones! Has ganado {itemsWonByUser} de {totalItems}{' '}
+                      {itemsWonByUser === 1 ? 'producto' : 'productos'} en esta
+                      subasta.
+                    </p>
+                    <p className="text-sm">
+                      Vas a ser contactado dentro de los próximos días por{' '}
+                      {company?.name}.
+                    </p>
+                  </div>
                 </div>
               </AlertDescription>
             </>
@@ -97,14 +156,30 @@ export function AuctionCompletedView({
             <>
               <XCircle className="h-5 w-5 text-orange-600" />
               <AlertDescription className="text-orange-900">
-                <div className="space-y-2">
-                  <p className="text-xl font-bold">
-                    No ganaste ningún producto en esta subasta.
-                  </p>
-                  <p className="text-sm">
-                    Puedes ver los detalles de todos los productos a
-                    continuación.
-                  </p>
+                <div className="flex gap-4 items-start">
+                  <div className="relative h-16 w-24 shrink-0 overflow-hidden rounded-md bg-white/60 border border-orange-200">
+                    <Image
+                      src={highlightPhotoUrl || FALLBACK_IMAGE_DATA_URL}
+                      alt="Producto"
+                      fill
+                      className={highlightPhotoUrl ? 'object-cover' : 'object-contain p-2 opacity-80'}
+                      sizes="96px"
+                      quality={highlightPhotoUrl ? 82 : 60}
+                      onError={(e) => {
+                        const target = e.currentTarget as HTMLImageElement;
+                        target.src = FALLBACK_IMAGE_DATA_URL;
+                      }}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <p className="text-xl font-bold">
+                      No ganaste ningún producto en esta subasta.
+                    </p>
+                    <p className="text-sm">
+                      Puedes ver los detalles de todos los productos a
+                      continuación.
+                    </p>
+                  </div>
                 </div>
               </AlertDescription>
             </>

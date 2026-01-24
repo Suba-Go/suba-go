@@ -20,6 +20,7 @@ import {
 import { Button } from '@suba-go/shared-components/components/ui/button';
 import { Label } from '@suba-go/shared-components/components/ui/label';
 import { useToast } from '@suba-go/shared-components/components/ui/toaster';
+import { apiFetch } from '@/lib/api/api-fetch';
 import { FileUpload } from '@/components/ui/file-upload';
 import { FormattedInput } from '@/components/ui/formatted-input';
 import { useCompany } from '@/hooks/use-company';
@@ -81,7 +82,7 @@ export function ItemCreateModal({
         docs: docUrls.length > 0 ? docUrls.join(',') : undefined,
       };
 
-      const response = await fetch('/api/items', {
+      const response = await apiFetch('/api/items', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -251,13 +252,20 @@ export function ItemCreateModal({
                 id="kilometraje"
                 formatType="number"
                 placeholder="Ej: 50.000"
+                inputMode="numeric"
+                maxLength={7} // 👈 NO deja más de 6 caracteres en el textbox
                 className={
                   errors.kilometraje
                     ? 'border-red-500 focus-visible:ring-red-500'
                     : ''
                 }
                 style={errors.kilometraje ? undefined : inputFocusStyle}
-                onChange={(value) => setValue('kilometraje', value as number)}
+                onChange={(value) => {
+                  // esto queda como respaldo por si pegan con separadores
+                  const digits = String(value ?? '').replace(/\D/g, '').slice(0, 7);
+                  const next = digits ? Number(digits) : 0;
+                  setValue('kilometraje', next, { shouldValidate: true, shouldDirty: true });
+                }}
               />
               {errors.kilometraje && (
                 <p className="text-sm text-red-600 mt-1">
