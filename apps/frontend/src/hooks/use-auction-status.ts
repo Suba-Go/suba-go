@@ -22,6 +22,13 @@ export interface AuctionStatusResult {
   displayStatus: AuctionDisplayStatus;
   isPending: boolean;
   isActive: boolean;
+  /**
+   * Backend still reports PENDIENTE, but the client clock (server-synced) has
+   * reached startTime. This usually means the auction is about to flip to ACTIVA
+   * (scheduler / broadcast lag) and the UI should show "iniciando" instead of
+   * "activa" to avoid desync/confusion.
+   */
+  isStarting: boolean;
   isCompleted: boolean;
   isCanceled: boolean;
   timeRemaining?: string;
@@ -75,7 +82,16 @@ export function computeDisplayStatus(
     return 'ACTIVA';
   }
 
-  // Time-driven transition (UI realtime)
+  // If backend still says PENDIENTE, do NOT force ACTIVA in the UI.
+  // We instead expose isStarting=true so the UI can show "Iniciando...".
+  // This prevents a confusing state where the timer says "activa" but the user
+  // still can't bid because the backend hasn't flipped yet.
+  if (backendStatus === 'PENDIENTE') {
+    if (nowMs >= endMs) return 'COMPLETADA';
+    return 'PENDIENTE';
+  }
+
+  // Time-driven transition (UI realtime) for unknown/other intermediate states
   if (nowMs >= endMs) return 'COMPLETADA';
   if (nowMs >= startMs) return 'ACTIVA';
 
@@ -139,6 +155,13 @@ export function useAuctionStatus(
   const isCompleted = displayStatus === 'COMPLETADA';
   const isCanceled = displayStatus === 'CANCELADA';
 
+  const isStarting =
+    backendStatus === 'PENDIENTE' &&
+    !!startMs &&
+    !!endMs &&
+    nowMs >= startMs &&
+    nowMs < endMs;
+
   const timeTargetMs = isPending ? startMs : isActive ? endMs : undefined;
 
   const timeRemainingDetailed = useMemo(() => {
@@ -160,6 +183,7 @@ export function useAuctionStatus(
     displayStatus,
     isPending,
     isActive,
+    isStarting,
     isCompleted,
     isCanceled,
     timeRemaining,
