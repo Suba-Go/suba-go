@@ -15,9 +15,10 @@ import { AuctionsGateway } from '../../../providers-modules/realtime/auctions.ga
 import { AuctionStatusEnum } from '@prisma/client';
 
 interface SchedulerConfig {
-  defaultInterval: number; // 30 seconds
-  urgentInterval: number; // 5 seconds
-  urgentThreshold: number; // 1 minutes - check more frequently if auction starts/ends within this time
+  /** Max wait between checks when there are no imminent events. */
+  defaultInterval: number;
+  /** Minimum wait between checks to avoid tight loops. */
+  minInterval: number;
 }
 
 @Injectable()
@@ -29,9 +30,11 @@ export class AuctionStatusSchedulerService
   private isRunning = false;
 
   private readonly config: SchedulerConfig = {
-    defaultInterval: 300000, // 5 minutes
-    urgentInterval: 5000, // 5 seconds
-    urgentThreshold: 60000, // 1 minutes
+    // In production, we still want a safety net even if there are no upcoming events.
+    // 30s keeps UI reasonably fresh without stressing the DB.
+    defaultInterval: 30_000,
+    // Prevents busy looping if the next event is extremely close.
+    minInterval: 500,
   };
 
   constructor(
@@ -89,7 +92,7 @@ export class AuctionStatusSchedulerService
 
       // Schedule next check
       this.schedulerInterval = setTimeout(() => {
-        this.scheduleNextCheck();
+        void this.scheduleNextCheck();
       }, nextInterval);
 
       this.logger.debug(`Next check in ${nextInterval / 1000}s`);
@@ -97,7 +100,7 @@ export class AuctionStatusSchedulerService
       this.logger.error('Error in scheduler:', error);
       // Retry with default interval on error
       this.schedulerInterval = setTimeout(() => {
-        this.scheduleNextCheck();
+        void this.scheduleNextCheck();
       }, this.config.defaultInterval);
     }
   }
@@ -108,40 +111,55 @@ export class AuctionStatusSchedulerService
    */
   private async calculateNextInterval(): Promise<number> {
     const now = new Date();
-    const urgentThresholdTime = new Date(
-      now.getTime() + this.config.urgentThreshold
-    );
 
-    // Check if any auctions are starting or ending soon
-    const urgentAuctions = await this.prisma.auction.count({
+    // Find the next known "event" (an auction start or end) and schedule the next wake-up close to it.
+    // This avoids a common bug where a long default interval causes auctions to remain "PENDIENTE"
+    // for minutes after their startTime (user sees "iniciando" and gets stuck).
+
+    const nextStart = await this.prisma.auction.findFirst({
       where: {
         isDeleted: false,
-        OR: [
-          // Auctions starting soon
-          {
-            status: AuctionStatusEnum.PENDIENTE,
-            startTime: {
-              gte: now,
-              lte: urgentThresholdTime,
-            },
-          },
-          // Auctions ending soon
-          {
-            status: AuctionStatusEnum.ACTIVA,
-            endTime: {
-              gte: now,
-              lte: urgentThresholdTime,
-            },
-          },
-        ],
+        status: AuctionStatusEnum.PENDIENTE,
+        startTime: { gt: now },
       },
+      orderBy: { startTime: 'asc' },
+      select: { startTime: true },
     });
 
-    if (urgentAuctions > 0) {
-      this.logger.debug(
-        `⚡ ${urgentAuctions} urgent auction(s) - using fast polling`
-      );
-      return this.config.urgentInterval;
+    const nextEnd = await this.prisma.auction.findFirst({
+      where: {
+        isDeleted: false,
+        status: AuctionStatusEnum.ACTIVA,
+        endTime: { gt: now },
+      },
+      orderBy: { endTime: 'asc' },
+      select: { endTime: true },
+    });
+
+    const nextStartMs = nextStart?.startTime?.getTime();
+    const nextEndMs = nextEnd?.endTime?.getTime();
+
+    const nextEventMs =
+      typeof nextStartMs === 'number' && typeof nextEndMs === 'number'
+        ? Math.min(nextStartMs, nextEndMs)
+        : typeof nextStartMs === 'number'
+          ? nextStartMs
+          : typeof nextEndMs === 'number'
+            ? nextEndMs
+            : null;
+
+    if (!nextEventMs) return this.config.defaultInterval;
+
+    const deltaMs = nextEventMs - now.getTime();
+    if (deltaMs <= 0) return this.config.minInterval;
+
+    // Prefer to wake up exactly at the next event when it's reasonably close.
+    // This is what prevents the UI from getting stuck on "Iniciando..." after startTime.
+    // We still keep a periodic defaultInterval as a safety net to detect newly-created auctions.
+    const eventWindowMs = 5 * 60 * 1000; // 5 minutes
+
+    if (deltaMs <= eventWindowMs) {
+      return Math.max(this.config.minInterval, deltaMs);
     }
 
     return this.config.defaultInterval;

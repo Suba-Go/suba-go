@@ -21,6 +21,7 @@ import { CountdownTimer } from '../countdown-timer';
 import { AuctionStartingOverlay } from '../auction-starting-overlay';
 import { AuctionItemDetailModal } from '../auction-item-detail-modal';
 import { useAuctionWebSocketBidding } from '@/hooks/use-auction-websocket-bidding';
+import { useAuctionStatus } from '@/hooks/use-auction-status';
 
 interface AuctionPendingViewProps {
   auction: AuctionDto;
@@ -50,6 +51,16 @@ export function AuctionPendingView({
     },
     onJoined: onRealtimeSnapshot,
   });
+
+  // Use a single, server-synced notion of time for all status/timer UI.
+  // IMPORTANT: we do not allow bidding until the backend flips the status,
+  // but we show a friendly "iniciando" state if startTime already passed.
+  const auctionStatus = useAuctionStatus(
+    auction.status,
+    auction.startTime,
+    auction.endTime,
+    { serverOffsetMs }
+  );
 
   const filteredItems = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -124,11 +135,15 @@ export function AuctionPendingView({
       <div className="bg-white rounded-lg shadow-md p-6 mb-8">
         <div className="flex items-center mb-4">
           <Clock className="h-6 w-6 text-gray-500 mr-2" />
-          <h2 className="text-xl font-semibold">Subasta pendiente</h2>
+          <h2 className="text-xl font-semibold">
+            {auctionStatus.isStarting ? 'Iniciando subasta…' : 'Subasta pendiente'}
+          </h2>
         </div>
 
         <p className="text-gray-600 mb-6">
-          Esta subasta aún no comienza. Podrás ofertar cuando se active.
+          {auctionStatus.isStarting
+            ? 'La subasta está iniciando. En un momento se habilitarán las pujas.'
+            : 'Esta subasta aún no comienza. Podrás ofertar cuando se active.'}
         </p>
 
         <CountdownTimer

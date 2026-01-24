@@ -45,6 +45,12 @@ interface RoomMeta {
   clients: Set<WebSocket>;
 }
 
+/** Simple token bucket used for WS rate-limits */
+interface TokenBucket {
+  tokens: number;
+  lastRefillMs: number;
+}
+
 /**
  * Auctions WebSocket Gateway
  *
@@ -66,6 +72,27 @@ export class AuctionsGateway
   private readonly rooms = new Map<string, RoomMeta>(); // Key: "tenantId:auctionId"
   private heartbeatInterval?: NodeJS.Timeout;
   private readonly instanceId = randomUUID();
+
+  // --- WS anti-spam / rate limits for bidding (in-memory per instance) ---
+  // User-level: prevents a single client from flooding.
+  private readonly userBidBuckets = new Map<string, TokenBucket>();
+  // Item-level: prevents global spikes on the same item.
+  private readonly itemBidBuckets = new Map<string, TokenBucket>();
+  // requestId de-dup for a short window (so retries don't get rate-limited)
+  private readonly recentBidRequestIds = new Map<string, number>();
+
+  // Tunables (env)
+  private readonly wsBidUserRatePerSec = Number(
+    process.env.WS_BID_USER_RATE_PER_SEC ?? 4
+  );
+  private readonly wsBidUserBurst = Number(process.env.WS_BID_USER_BURST ?? 4);
+  private readonly wsBidItemRatePerSec = Number(
+    process.env.WS_BID_ITEM_RATE_PER_SEC ?? 20
+  );
+  private readonly wsBidItemBurst = Number(process.env.WS_BID_ITEM_BURST ?? 30);
+  private readonly wsBidRequestIdTtlMs = Number(
+    process.env.WS_BID_REQUESTID_TTL_MS ?? 2 * 60 * 1000
+  );
 
   constructor(
     private readonly prisma: PrismaService,
@@ -464,6 +491,52 @@ export class AuctionsGateway
       return;
     }
 
+    // Rate-limit (USER + ITEM) to avoid flooding and weird edge-case overloads.
+    // IMPORTANT: don't punish idempotent retries -> if we already saw this requestId recently,
+    // skip rate-limits and forward to the service (which is idempotent by requestId).
+    const nowMs = Date.now();
+    this.pruneRateLimitState(nowMs);
+    if (!this.recentBidRequestIds.has(data.requestId)) {
+      this.recentBidRequestIds.set(data.requestId, nowMs);
+
+      const userKey = `${meta.tenantId ?? data.tenantId}:${meta.userId}`;
+      const itemKey = `${data.tenantId}:${data.auctionItemId}`;
+
+      const userOk = this.consumeToken(
+        this.userBidBuckets,
+        userKey,
+        this.wsBidUserRatePerSec,
+        this.wsBidUserBurst,
+        nowMs
+      );
+      if (!userOk) {
+        this.sendBidRejected(
+          client,
+          data.auctionItemId,
+          'Estás pujando muy rápido. Intenta nuevamente en un momento.',
+          data.requestId
+        );
+        return;
+      }
+
+      const itemOk = this.consumeToken(
+        this.itemBidBuckets,
+        itemKey,
+        this.wsBidItemRatePerSec,
+        this.wsBidItemBurst,
+        nowMs
+      );
+      if (!itemOk) {
+        this.sendBidRejected(
+          client,
+          data.auctionItemId,
+          'Hay muchas pujas para este ítem. Intenta nuevamente en un momento.',
+          data.requestId
+        );
+        return;
+      }
+    }
+
     // Log the bid attempt with instance identifier
     this.logger.log(
       `[${this.instanceId}] Bid attempt req=${data.requestId}: ${meta.email} - $${data.amount} on item ${data.auctionItemId}`
@@ -656,6 +729,59 @@ export class AuctionsGateway
    */
   private getRoomKey(tenantId: string, auctionId: string): string {
     return `${tenantId}:${auctionId}`;
+  }
+
+  /**
+   * Token bucket consumption helper for in-memory WS rate limits.
+   * Returns true if a token was consumed (allowed) or false if rate-limited.
+   */
+  private consumeToken(
+    map: Map<string, TokenBucket>,
+    key: string,
+    ratePerSec: number,
+    burst: number,
+    nowMs: number
+  ): boolean {
+    const safeRate = Number.isFinite(ratePerSec) && ratePerSec > 0 ? ratePerSec : 1;
+    const safeBurst = Number.isFinite(burst) && burst > 0 ? burst : 1;
+
+    const bucket = map.get(key) ?? { tokens: safeBurst, lastRefillMs: nowMs };
+
+    const elapsedMs = Math.max(0, nowMs - bucket.lastRefillMs);
+    const refill = (elapsedMs * safeRate) / 1000;
+    bucket.tokens = Math.min(safeBurst, bucket.tokens + refill);
+    bucket.lastRefillMs = nowMs;
+
+    if (bucket.tokens < 1) {
+      map.set(key, bucket);
+      return false;
+    }
+
+    bucket.tokens -= 1;
+    map.set(key, bucket);
+    return true;
+  }
+
+  /**
+   * Keep in-memory limiter maps bounded.
+   * Called opportunistically (no strict schedule needed).
+   */
+  private pruneRateLimitState(nowMs: number) {
+    const cutoff = nowMs - Math.max(this.wsBidRequestIdTtlMs, 60_000);
+
+    // requestId TTL cleanup
+    for (const [reqId, ts] of this.recentBidRequestIds) {
+      if (ts < cutoff) this.recentBidRequestIds.delete(reqId);
+    }
+
+    // bucket cleanup (inactive keys)
+    const bucketCutoff = nowMs - 5 * 60 * 1000;
+    for (const [k, b] of this.userBidBuckets) {
+      if (b.lastRefillMs < bucketCutoff) this.userBidBuckets.delete(k);
+    }
+    for (const [k, b] of this.itemBidBuckets) {
+      if (b.lastRefillMs < bucketCutoff) this.itemBidBuckets.delete(k);
+    }
   }
 
   /**
