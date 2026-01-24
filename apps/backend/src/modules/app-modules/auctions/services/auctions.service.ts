@@ -91,7 +91,17 @@ async createAuction(
     return this.auctionRepository.getUserAuctionRegistrations(userId);
   }
 
-  async getAuctionById(
+  async getUserActiveRegisteredAuctions(
+    userId: string,
+    tenantId: string
+  ): Promise<Auction[]> {
+    return this.auctionRepository.getUserActiveRegisteredAuctions(
+      userId,
+      tenantId
+    );
+  }
+
+    async getAuctionById(
     id: string,
     tenantId: string,
     requester?: { userId?: string; role?: string }

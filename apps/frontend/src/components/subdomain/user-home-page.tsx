@@ -63,6 +63,8 @@ function getPageNumbers(totalPages: number, currentPage: number) {
   return out;
 }
 
+import Image from 'next/image';
+
 interface SoldItem {
   id: string;
   plate: string;
@@ -323,6 +325,14 @@ useEffect(() => {
     return (
       <div className="w-full min-h-[50vh] flex items-center justify-center">
         <Spinner />
+      </div>
+    );
+  }
+
+  if (auctionsError || soldItemsError) {
+    return (
+      <div className="text-center py-8 text-red-500">
+        Error al cargar los datos. Por favor recarga la página.
       </div>
     );
   }

@@ -33,17 +33,6 @@ export class UserCreatorService {
       throw new ConflictException('El usuario con este email ya existe');
     }
 
-    // Check if RUT already exists (if provided)
-    if (userData.rut) {
-      const existingUserByRut = await this.userRepository.findByRut(
-        userData.rut
-      );
-
-      if (existingUserByRut) {
-        throw new ConflictException('El usuario con este RUT ya existe');
-      }
-    }
-
     // Validate tenant exists if provided
     let tenant = null;
     if (tenantId) {
@@ -73,6 +62,18 @@ export class UserCreatorService {
       // If only company is provided, use its tenant
       if (!tenant) {
         tenant = company.tenant;
+      }
+    }
+
+    // Check if RUT already exists (if provided)
+    if (userData.rut) {
+      const existingUserByRut = await this.userRepository.findByRutAndTenant(
+        userData.rut,
+        tenant ? tenant.id : null
+      );
+
+      if (existingUserByRut) {
+        throw new ConflictException('El usuario con este RUT ya existe');
       }
     }
 

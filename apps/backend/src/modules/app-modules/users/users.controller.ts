@@ -5,6 +5,7 @@ import {
   Param,
   Get,
   Patch,
+  Delete,
   UseGuards,
   Request,
   Query,
@@ -87,9 +88,9 @@ export class UsersController {
       throw new ConflictException('Este correo ya existe asociado a un tenant');
     }
 
-    // 7 days expiration
+    // 100 years expiration (effectively never expires)
     const expiryDate = new Date();
-    expiryDate.setDate(expiryDate.getDate() + 7);
+    expiryDate.setDate(expiryDate.getDate() + 36500);
 
     // Invalidate previous pending invitations for this email
     await this.userRepository.invalidatePendingInvitations(email);
@@ -105,7 +106,7 @@ export class UsersController {
       },
       {
         secret: this.configService.get<string>('JWT_SECRET'),
-        expiresIn: '7d',
+        expiresIn: '36500d',
       }
     );
 
@@ -168,7 +169,7 @@ export class UsersController {
     } as any);
 
     const expires =
-      this.configService.get<string>('INVITE_EXPIRY_TIME') || '7d';
+      this.configService.get<string>('INVITE_EXPIRY_TIME') || '36500d';
     const token = this.jwtService.sign(
       {
         email,
@@ -355,5 +356,19 @@ export class UsersController {
   @Roles(UserRolesEnum.ADMIN, UserRolesEnum.AUCTION_MANAGER)
   async getUsersByCompany(@Param('companyId') companyId: string) {
     return await this.userGettersService.getUsersByCompany(companyId);
+  }
+
+  @Post(':id/delete')
+  @UseGuards(RolesGuard)
+  @Roles(UserRolesEnum.ADMIN, UserRolesEnum.AUCTION_MANAGER)
+  async deleteUser(@Param('id') id: string) {
+    return await this.userRepository.softDelete(id);
+  }
+
+  @Delete(':id')
+  @UseGuards(RolesGuard)
+  @Roles(UserRolesEnum.ADMIN, UserRolesEnum.AUCTION_MANAGER)
+  async deleteUserRest(@Param('id') id: string) {
+    return await this.userRepository.softDelete(id);
   }
 }

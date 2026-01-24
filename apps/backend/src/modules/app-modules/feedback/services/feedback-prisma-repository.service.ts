@@ -21,8 +21,16 @@ export class FeedbackPrismaRepository {
         category: data.category,
         title: data.title,
         message: data.message,
-        userId: data.userId,
-        tenantId: data.tenantId,
+        user: {
+          connect: {
+            id: data.userId,
+          },
+        },
+        tenant: {
+          connect: {
+            id: data.tenantId,
+          },
+        },
         status: 'PENDING',
       },
       include: {

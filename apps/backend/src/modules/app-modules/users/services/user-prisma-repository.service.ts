@@ -66,8 +66,24 @@ export class UserPrismaRepository {
   }
 
   async findByRut(rut: string): Promise<User | null> {
-    return this.prisma.user.findUnique({
+    return this.prisma.user.findFirst({
       where: { rut },
+      include: {
+        tenant: true,
+        company: true,
+      },
+    });
+  }
+
+  async findByRutAndTenant(
+    rut: string,
+    tenantId: string | null
+  ): Promise<User | null> {
+    return this.prisma.user.findFirst({
+      where: {
+        rut,
+        tenantId,
+      },
       include: {
         tenant: true,
         company: true,

@@ -220,16 +220,35 @@ export function AuctionManagerActiveView({
         };
       });
 
+      // Find the item details from the auctionItems list
+      const item = auctionItems.find((i) => i.id === auctionItemId)?.item;
+      const itemDescription = item
+        ? `${item.brand} ${item.model || ''} - ${item.plate}`.trim()
+        : `Item #${auctionItemId.slice(-4)}`;
+
       toast({
         title: 'Nueva puja recibida',
-        description: `${
-          userName || 'Usuario'
-        } pujó $${amount.toLocaleString()}`,
+        description: (
+          <div className="flex flex-col gap-1">
+            <span className="font-semibold">{userName || 'Usuario'}</span>
+            <span>
+              ofertó{' '}
+              {amount.toLocaleString('es-CL', {
+                style: 'currency',
+                currency: 'CLP',
+              })}
+            </span>
+            <span className="text-xs text-muted-foreground">
+              por {itemDescription}
+            </span>
+          </div>
+        ),
+        duration: 6000,
       });
 
       refetchParticipants();
     },
-    [refetchParticipants, toast]
+    [refetchParticipants, toast, auctionItems]
   );
 
   const handleTimeExtension = useCallback(

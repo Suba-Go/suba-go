@@ -359,14 +359,84 @@ export class AuctionPrismaService {
         tenantId,
         isDeleted: false,
       },
-      ...auctionsByTenantArgs,
+      include: {
+        registeredUsers: {
+          select: {
+            userId: true,
+          },
+        },
+        items: {
+          include: {
+            item: {
+              include: {
+                soldToUser: {
+                  select: {
+                    id: true,
+                    email: true,
+                    public_name: true,
+                    name: true,
+                  },
+                },
+              },
+            },
+            bids: {
+              orderBy: {
+                offered_price: 'desc',
+              },
+            },
+          },
+        },
+      },
       orderBy: {
         createdAt: 'desc',
       },
     });
   }
 
-  // Get user's auction registrations
+  // Get active auctions where user is registered
+  async getUserActiveRegisteredAuctions(
+    userId: string,
+    tenantId: string
+  ): Promise<Auction[]> {
+    const now = new Date();
+
+    return this.prisma.auction.findMany({
+      where: {
+        tenantId,
+        // Active or pending/about to start
+        OR: [
+          { status: 'ACTIVA' },
+          { status: 'PENDIENTE', startTime: { lte: now } },
+        ],
+        endTime: { gte: now },
+        isDeleted: false,
+        // Only auctions where the user is registered
+        registeredUsers: {
+          some: {
+            userId: userId,
+          },
+        },
+      },
+      include: {
+        items: {
+          include: {
+            item: true,
+            bids: {
+              take: 1,
+              orderBy: {
+                offered_price: 'desc',
+              },
+            },
+          },
+        },
+      },
+      orderBy: {
+        endTime: 'asc',
+      },
+    });
+  }
+
+  // Get user auction registrations
   async getUserAuctionRegistrations(userId: string): Promise<any[]> {
     return this.prisma.auctionRegistration.findMany({
       where: {

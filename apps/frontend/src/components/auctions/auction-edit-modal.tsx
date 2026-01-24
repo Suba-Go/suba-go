@@ -76,12 +76,16 @@ export function AuctionEditModal({
 
   const durationOptions = useMemo(
     () => [
+      { value: 5, label: '5 minutos' },
+      { value: 10, label: '10 minutos' },
       { value: 15, label: '15 minutos' },
       { value: 30, label: '30 minutos' },
       { value: 45, label: '45 minutos' },
       { value: 60, label: '1 hora' },
       { value: 120, label: '2 horas' },
       { value: 300, label: '5 horas' },
+      { value: 1440, label: '1 dia' },
+      { value: 10080, label: '7 dias' },
     ],
     []
   );
