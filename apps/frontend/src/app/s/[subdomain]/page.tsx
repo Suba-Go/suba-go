@@ -13,8 +13,11 @@ import UserHomePage from '@/components/subdomain/user-home-page';
 export default async function SubdomainHomePage({
   params,
 }: {
-  params: { subdomain: string };
+  params: Promise<{ subdomain: string }>;
 }) {
+  // Await the params to satisfy the Next.js 15+ requirement
+  await params;
+
   const session = await auth();
 
   // If unauthenticated, go to public login (middleware will rewrite it to /s/[subdomain]/login)
