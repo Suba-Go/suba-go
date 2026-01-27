@@ -180,7 +180,17 @@ function attachSocketHandlers(conn: ManagedConn) {
         conn.participantCount = msg.data.participantCount;
       }
       if (typeof msg.data?.serverTimeMs === 'number') {
-        conn.serverOffsetMs = msg.data.serverTimeMs - Date.now();
+        // Apply the same monotonic+clamped offset update used for bid/time events.
+        // JOINED can arrive after a reconnect and its one-way timestamp is skewed by network latency.
+        // If we allow the offset to move backwards here, countdown timers can "gain" seconds.
+        const computed = msg.data.serverTimeMs - Date.now();
+        const monotonic = Math.max(conn.serverOffsetMs, computed);
+        const MAX_STEP = 250;
+        const delta = monotonic - conn.serverOffsetMs;
+        conn.serverOffsetMs =
+          Math.abs(delta) <= MAX_STEP
+            ? monotonic
+            : conn.serverOffsetMs + Math.sign(delta) * MAX_STEP;
       }
     }
 
@@ -202,11 +212,29 @@ function attachSocketHandlers(conn: ManagedConn) {
     }
 
     // Update server offset when available.
+    // IMPORTANT:
+    // Using one-way timestamps (serverTimeMs - clientNow) is skewed by network latency.
+    // Under load, latency fluctuates and can make the computed offset jump backwards,
+    // which causes countdown timers to "gain" seconds (bad UX).
+    // We therefore apply a monotonic + smoothed update:
+    // - Never move the offset in a direction that would make our perceived "server now" go backwards.
+    // - Clamp adjustments per message to avoid big jumps.
     if (
       (msg.event === 'BID_PLACED' || msg.event === 'AUCTION_TIME_EXTENDED') &&
       typeof msg.data?.serverTimeMs === 'number'
     ) {
-      conn.serverOffsetMs = msg.data.serverTimeMs - Date.now();
+      const computed = msg.data.serverTimeMs - Date.now();
+      // Prevent "time going backwards" (avoid offset becoming more negative).
+      const monotonic = Math.max(conn.serverOffsetMs, computed);
+      // Clamp per-message adjustment (ms)
+      const MAX_STEP = 250;
+      const delta = monotonic - conn.serverOffsetMs;
+      const clamped =
+        Math.abs(delta) <= MAX_STEP
+          ? monotonic
+          : conn.serverOffsetMs + Math.sign(delta) * MAX_STEP;
+
+      conn.serverOffsetMs = clamped;
     }
 
     if (msg.event === 'ERROR') {
