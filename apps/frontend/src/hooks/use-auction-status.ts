@@ -24,8 +24,6 @@ export interface AuctionStatusResult {
   isActive: boolean;
   isCompleted: boolean;
   isCanceled: boolean;
-  /** UI-only: startTime reached but backend still PENDIENTE */
-  isStarting: boolean;
   timeRemaining?: string;
   timeRemainingDetailed?: TimeRemainingDetailed;
   nowMs: number;
@@ -69,21 +67,11 @@ export function computeDisplayStatus(
   if (backendStatus === 'CANCELADA') return 'CANCELADA';
   if (backendStatus === 'COMPLETADA') return 'COMPLETADA';
 
-  if (!startMs || !endMs) return backendStatus;
-
-  // If backend says ACTIVE, trust it (unless already ended)
-  if (backendStatus === 'ACTIVA') {
-    if (nowMs >= endMs) return 'COMPLETADA';
-    return 'ACTIVA';
-  }
-
-  // Time-driven end: once ended, we can safely show COMPLETADA even if backend lags.
-  if (nowMs >= endMs) return 'COMPLETADA';
-
-  // Important: do NOT promote PENDIENTE -> ACTIVA purely on client clock.
-  // Under load the backend may flip a few seconds later; during that window we show a neutral
-  // "starting" state (handled separately by isStarting) while keeping displayStatus=PENDIENTE.
-  if (backendStatus === 'PENDIENTE') return 'PENDIENTE';
+  // IMPORTANT:
+  // Do NOT infer terminal states (COMPLETADA) from the client clock.
+  // With per-item soft-close timers (each product can extend independently),
+  // the auction must only be marked completed when the backend finalizes it.
+  // This prevents the manager UI from showing "Completada" while items are still active.
   return backendStatus;
 }
 
@@ -146,7 +134,6 @@ export function useAuctionStatus(
   const isActive = displayStatus === 'ACTIVA';
   const isCompleted = displayStatus === 'COMPLETADA';
   const isCanceled = displayStatus === 'CANCELADA';
-  const isStarting = backendStatus === 'PENDIENTE' && nowMs >= startMs && nowMs < endMs;
 
   const timeTargetMs = isPending ? startMs : isActive ? endMs : undefined;
 
@@ -171,7 +158,6 @@ export function useAuctionStatus(
     isActive,
     isCompleted,
     isCanceled,
-    isStarting,
     timeRemaining,
     timeRemainingDetailed,
     nowMs,
