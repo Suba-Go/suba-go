@@ -13,7 +13,9 @@ import {
 } from './toast';
 
 const TOAST_LIMIT = 1;
-const TOAST_REMOVE_DELAY = 1000000;
+// After a toast is closed, keep it around briefly for the exit animation,
+// then remove it from state.
+const TOAST_REMOVE_DELAY = 1000;
 
 type ToasterToast = ToastProps & {
   id: string;
@@ -61,6 +63,26 @@ interface State {
 }
 
 const toastTimeouts = new Map<string, ReturnType<typeof setTimeout>>();
+// Some environments / controlled open state setups can prevent Radix Toast
+// from auto-closing by itself. We enforce an explicit auto-dismiss timer
+// so toasts disappear after `duration`.
+const toastAutoDismissTimeouts = new Map<string, ReturnType<typeof setTimeout>>();
+
+const clearAutoDismiss = (toastId: string) => {
+  const t = toastAutoDismissTimeouts.get(toastId);
+  if (t) {
+    clearTimeout(t);
+    toastAutoDismissTimeouts.delete(toastId);
+  }
+};
+
+const clearRemoveQueue = (toastId: string) => {
+  const t = toastTimeouts.get(toastId);
+  if (t) {
+    clearTimeout(t);
+    toastTimeouts.delete(toastId);
+  }
+};
 
 const addToRemoveQueue = (toastId: string) => {
   if (toastTimeouts.has(toastId)) {
@@ -138,6 +160,27 @@ const listeners: Array<(state: State) => void> = [];
 let memoryState: State = { toasts: [] };
 
 function dispatch(action: Action) {
+  // Cleanup timers to avoid leaks and ensure predictable behavior
+  if (action.type === 'DISMISS_TOAST') {
+    if (action.toastId) {
+      clearAutoDismiss(action.toastId);
+    } else {
+      memoryState.toasts.forEach((t) => clearAutoDismiss(t.id));
+    }
+  }
+
+  if (action.type === 'REMOVE_TOAST') {
+    if (action.toastId) {
+      clearAutoDismiss(action.toastId);
+      clearRemoveQueue(action.toastId);
+    } else {
+      memoryState.toasts.forEach((t) => {
+        clearAutoDismiss(t.id);
+        clearRemoveQueue(t.id);
+      });
+    }
+  }
+
   memoryState = reducer(memoryState, action);
   listeners.forEach((listener) => {
     listener(memoryState);
@@ -149,12 +192,24 @@ type Toast = Omit<ToasterToast, 'id'>;
 function toast({ duration = 3000, ...props }: Toast) {
   const id = genId();
 
+  // Since we keep at most one toast, clear timers from previous toasts
+  // so they don't unexpectedly dismiss/remove a newer one.
+  if (TOAST_LIMIT === 1) {
+    memoryState.toasts.forEach((t) => {
+      clearAutoDismiss(t.id);
+      clearRemoveQueue(t.id);
+    });
+  }
+
   const update = (props: ToasterToast) =>
     dispatch({
       type: 'UPDATE_TOAST',
       toast: { ...props, id },
     });
-  const dismiss = () => dispatch({ type: 'DISMISS_TOAST', toastId: id });
+  const dismiss = () => {
+    clearAutoDismiss(id);
+    dispatch({ type: 'DISMISS_TOAST', toastId: id });
+  };
 
   dispatch({
     type: 'ADD_TOAST',
@@ -168,6 +223,15 @@ function toast({ duration = 3000, ...props }: Toast) {
       },
     },
   });
+
+  // Enforce auto-dismiss. Some controlled open state setups can prevent Radix
+  // from closing the toast automatically; this guarantees it disappears.
+  if (Number.isFinite(duration) && duration > 0) {
+    const t = setTimeout(() => {
+      dispatch({ type: 'DISMISS_TOAST', toastId: id });
+    }, duration);
+    toastAutoDismissTimeouts.set(id, t);
+  }
 
   return {
     id: id,
