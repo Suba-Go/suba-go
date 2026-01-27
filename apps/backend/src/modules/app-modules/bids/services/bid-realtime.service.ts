@@ -236,22 +236,28 @@ export class BidRealtimeService {
         );
       }
 
-      // Soft-close extension: extend only if we're within the last 30 seconds.
+      // Soft-close extension:
+      // If we're within the last 30 seconds and someone bids, the product timer must go back to 30 seconds.
+      // IMPORTANT: Use DB time (NOW()) for the candidate end. Under load, this request can wait on row locks;
+      // if we used a JS 'now' captured before waiting, we'd sometimes extend to <30s remaining.
       let extension: null | { auctionId: string; auctionItemId: string; newEndTimeIso: string } = null;
       const timeUntilEnd = itemEnd.getTime() - now.getTime();
       if (timeUntilEnd <= SOFT_CLOSE_THRESHOLD_MS && timeUntilEnd > 0) {
-        const candidateEnd = new Date(now.getTime() + SOFT_CLOSE_EXTENSION_MS);
         const updated = await tx.$queryRaw<Array<{ endTime: Date | string | null }>>`
           UPDATE "public"."auction_item"
           SET
             "startTime" = COALESCE("startTime", ${itemStart}),
-            "endTime"   = GREATEST(COALESCE("endTime", ${candidateEnd}), ${candidateEnd})
+            "endTime"   = GREATEST(
+              COALESCE("endTime", NOW() + INTERVAL '30 seconds'),
+              NOW() + INTERVAL '30 seconds'
+            )
           WHERE "id" = ${auctionItemId}
           RETURNING "endTime"
         `;
 
-        const updatedEndTime =
-          updated?.[0]?.endTime ? new Date(updated[0].endTime as any) : candidateEnd;
+        const updatedEndTime = updated?.[0]?.endTime
+          ? new Date(updated[0].endTime as any)
+          : new Date(Date.now() + SOFT_CLOSE_EXTENSION_MS);
 
         await tx.$executeRaw`
           UPDATE "public"."auction"

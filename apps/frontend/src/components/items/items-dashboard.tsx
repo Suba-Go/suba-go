@@ -177,9 +177,7 @@ export function ItemsDashboard({ subdomain }: ItemsDashboardProps) {
       total,
       disponible: byState[ItemStateEnum.DISPONIBLE] ?? 0,
       enSubasta: byState[ItemStateEnum.EN_SUBASTA] ?? 0,
-      vendido: byState[ItemStateEnum.VENDIDO] ?? 0,
-      eliminado: byState[ItemStateEnum.ELIMINADO] ?? 0,
-    };
+      vendido: byState[ItemStateEnum.VENDIDO] ?? 0,    };
   }, [items]);
 
   const filteredItems = useMemo(() => {
@@ -194,14 +192,36 @@ export function ItemsDashboard({ subdomain }: ItemsDashboardProps) {
 
       const matchesFilter = filterState === 'all' || item.state === filterState;
 
-      return matchesSearch && matchesFilter;
+      const notDeleted = item.state !== ItemStateEnum.ELIMINADO;
+
+      return notDeleted && matchesSearch && matchesFilter;
     });
+
+    const getStateRank = (state: string) => {
+      switch (state) {
+        case ItemStateEnum.DISPONIBLE:
+          return 0;
+        case ItemStateEnum.EN_SUBASTA:
+          return 1;
+        case ItemStateEnum.VENDIDO:
+          return 2;
+        default:
+          return 3;
+      }
+    };
 
     const sorted = [...filtered].sort((a, b) => {
       const aCreated = new Date(a.createdAt || 0).getTime();
       const bCreated = new Date(b.createdAt || 0).getTime();
       const aPrice = Number(a.basePrice ?? 0);
       const bPrice = Number(b.basePrice ?? 0);
+
+
+      // Always show available items first, then sold (when viewing all)
+      if (filterState === 'all') {
+        const rankDiff = getStateRank(a.state) - getStateRank(b.state);
+        if (rankDiff !== 0) return rankDiff;
+      }
 
       switch (sortKey) {
         case 'oldest':
@@ -337,9 +357,7 @@ export function ItemsDashboard({ subdomain }: ItemsDashboardProps) {
             <TabsTrigger value="all">Todas</TabsTrigger>
             <TabsTrigger value={ItemStateEnum.DISPONIBLE}>Disponibles</TabsTrigger>
             <TabsTrigger value={ItemStateEnum.EN_SUBASTA}>En subasta</TabsTrigger>
-            <TabsTrigger value={ItemStateEnum.VENDIDO}>Vendidos</TabsTrigger>
-            <TabsTrigger value={ItemStateEnum.ELIMINADO}>Eliminados</TabsTrigger>
-          </TabsList>
+            <TabsTrigger value={ItemStateEnum.VENDIDO}>Vendidos</TabsTrigger>          </TabsList>
         </Tabs>
 
         <div className="text-sm text-gray-600">

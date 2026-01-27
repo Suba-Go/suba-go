@@ -21,14 +21,9 @@ export interface TimeRemainingDetailed {
 export interface AuctionStatusResult {
   displayStatus: AuctionDisplayStatus;
   isPending: boolean;
-  isActive: boolean;
-  /**
-   * Backend still reports PENDIENTE, but the client clock (server-synced) has
-   * reached startTime. This usually means the auction is about to flip to ACTIVA
-   * (scheduler / broadcast lag) and the UI should show "iniciando" instead of
-   * "activa" to avoid desync/confusion.
-   */
+  /** startTime already passed but backend still PENDIENTE */
   isStarting: boolean;
+  isActive: boolean;
   isCompleted: boolean;
   isCanceled: boolean;
   timeRemaining?: string;
@@ -74,28 +69,11 @@ export function computeDisplayStatus(
   if (backendStatus === 'CANCELADA') return 'CANCELADA';
   if (backendStatus === 'COMPLETADA') return 'COMPLETADA';
 
-  if (!startMs || !endMs) return backendStatus;
-
-  // If backend says ACTIVE, trust it (unless already ended)
-  if (backendStatus === 'ACTIVA') {
-    if (nowMs >= endMs) return 'COMPLETADA';
-    return 'ACTIVA';
-  }
-
-  // If backend still says PENDIENTE, do NOT force ACTIVA in the UI.
-  // We instead expose isStarting=true so the UI can show "Iniciando...".
-  // This prevents a confusing state where the timer says "activa" but the user
-  // still can't bid because the backend hasn't flipped yet.
-  if (backendStatus === 'PENDIENTE') {
-    if (nowMs >= endMs) return 'COMPLETADA';
-    return 'PENDIENTE';
-  }
-
-  // Time-driven transition (UI realtime) for unknown/other intermediate states
-  if (nowMs >= endMs) return 'COMPLETADA';
-  if (nowMs >= startMs) return 'ACTIVA';
-
-  if (backendStatus === 'PENDIENTE') return 'PENDIENTE';
+  // IMPORTANT:
+  // Do NOT infer terminal states (COMPLETADA) from the client clock.
+  // With per-item soft-close timers (each product can extend independently),
+  // the auction must only be marked completed when the backend finalizes it.
+  // This prevents the manager UI from showing "Completada" while items are still active.
   return backendStatus;
 }
 
@@ -139,7 +117,11 @@ export function useAuctionStatus(
     if (!tickMs || tickMs <= 0) return;
 
     const id = setInterval(() => {
-      setNowMs(Date.now() + serverOffsetMs);
+      const next = Date.now() + serverOffsetMs;
+      // Monotonic clock: never allow perceived "server now" to go backwards.
+      // Under stress/reconnects, serverOffsetMs can be recalculated and (without this)
+      // countdowns can "gain" seconds, which feels like the timer resets incorrectly.
+      setNowMs((prev) => (next > prev ? next : prev));
     }, tickMs);
 
     return () => clearInterval(id);
@@ -151,18 +133,14 @@ export function useAuctionStatus(
   );
 
   const isPending = displayStatus === 'PENDIENTE';
+  // Friendly transitional state: startTime passed, but we still wait for backend to flip to ACTIVA.
+  // This prevents UI contradictions (timer says active while backend still pending) and avoids requiring refresh.
+  const isStarting = isPending && startMs > 0 && nowMs >= startMs && (endMs <= 0 || nowMs < endMs);
   const isActive = displayStatus === 'ACTIVA';
   const isCompleted = displayStatus === 'COMPLETADA';
   const isCanceled = displayStatus === 'CANCELADA';
 
-  const isStarting =
-    backendStatus === 'PENDIENTE' &&
-    !!startMs &&
-    !!endMs &&
-    nowMs >= startMs &&
-    nowMs < endMs;
-
-  const timeTargetMs = isPending ? startMs : isActive ? endMs : undefined;
+  const timeTargetMs = isPending && !isStarting ? startMs : isActive ? endMs : undefined;
 
   const timeRemainingDetailed = useMemo(() => {
     if (!timeTargetMs) return undefined;
@@ -182,8 +160,8 @@ export function useAuctionStatus(
   return {
     displayStatus,
     isPending,
-    isActive,
     isStarting,
+    isActive,
     isCompleted,
     isCanceled,
     timeRemaining,
