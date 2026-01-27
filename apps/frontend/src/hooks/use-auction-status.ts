@@ -24,6 +24,8 @@ export interface AuctionStatusResult {
   isActive: boolean;
   isCompleted: boolean;
   isCanceled: boolean;
+  /** UI-only: startTime reached but backend still PENDIENTE */
+  isStarting: boolean;
   timeRemaining?: string;
   timeRemainingDetailed?: TimeRemainingDetailed;
   nowMs: number;
@@ -75,10 +77,12 @@ export function computeDisplayStatus(
     return 'ACTIVA';
   }
 
-  // Time-driven transition (UI realtime)
+  // Time-driven end: once ended, we can safely show COMPLETADA even if backend lags.
   if (nowMs >= endMs) return 'COMPLETADA';
-  if (nowMs >= startMs) return 'ACTIVA';
 
+  // Important: do NOT promote PENDIENTE -> ACTIVA purely on client clock.
+  // Under load the backend may flip a few seconds later; during that window we show a neutral
+  // "starting" state (handled separately by isStarting) while keeping displayStatus=PENDIENTE.
   if (backendStatus === 'PENDIENTE') return 'PENDIENTE';
   return backendStatus;
 }
@@ -123,7 +127,11 @@ export function useAuctionStatus(
     if (!tickMs || tickMs <= 0) return;
 
     const id = setInterval(() => {
-      setNowMs(Date.now() + serverOffsetMs);
+      const next = Date.now() + serverOffsetMs;
+      // Monotonic clock: never allow perceived "server now" to go backwards.
+      // Under stress/reconnects, serverOffsetMs can be recalculated and (without this)
+      // countdowns can "gain" seconds, which feels like the timer resets incorrectly.
+      setNowMs((prev) => (next > prev ? next : prev));
     }, tickMs);
 
     return () => clearInterval(id);
@@ -138,6 +146,7 @@ export function useAuctionStatus(
   const isActive = displayStatus === 'ACTIVA';
   const isCompleted = displayStatus === 'COMPLETADA';
   const isCanceled = displayStatus === 'CANCELADA';
+  const isStarting = backendStatus === 'PENDIENTE' && nowMs >= startMs && nowMs < endMs;
 
   const timeTargetMs = isPending ? startMs : isActive ? endMs : undefined;
 
@@ -162,6 +171,7 @@ export function useAuctionStatus(
     isActive,
     isCompleted,
     isCanceled,
+    isStarting,
     timeRemaining,
     timeRemainingDetailed,
     nowMs,

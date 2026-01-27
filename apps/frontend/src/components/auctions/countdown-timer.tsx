@@ -95,6 +95,28 @@ export function CountdownTimer({
   }
 
   // Card variant - full card with detailed countdown (default)
+  // If the clock reached startTime but backend hasn't flipped to ACTIVA yet,
+  // show a neutral "iniciando" state to avoid confusing the user.
+  if (auctionStatus.isStarting) {
+    return (
+      <Card className={`border-amber-200 bg-amber-50 ${className}`}>
+        <CardContent className="pt-6">
+          <div className="flex items-center gap-3">
+            <Clock className="h-5 w-5 text-amber-600" />
+            <div className="flex-1">
+              <h3 className="font-medium text-amber-900 mb-1">
+                Iniciando subasta en vivo…
+              </h3>
+              <p className="text-sm text-amber-800">
+                Espera un momento mientras se habilitan las pujas.
+              </p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
   if (auctionStatus.isActive && auctionStatus.timeRemainingDetailed) {
     const { hours, minutes, seconds } = auctionStatus.timeRemainingDetailed;
 

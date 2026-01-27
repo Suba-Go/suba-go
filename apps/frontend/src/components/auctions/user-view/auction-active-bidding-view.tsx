@@ -355,9 +355,24 @@ useEffect(() => {
   setItemTimes((prev) => {
     const next: Record<string, { startTime: string | Date; endTime: string | Date }> = { ...prev };
     for (const ai of auctionItems) {
+      const incomingStart = (ai as any).startTime || auction.startTime;
+      const incomingEnd = (ai as any).endTime || auction.endTime;
+
+      // IMPORTANT: timers must be monotonic.
+      // Under load, multiple snapshot refetches can resolve out-of-order and bring older endTime values.
+      // Never allow an incoming snapshot to move endTime backwards.
+      const prevEnd = next[ai.id]?.endTime;
+      const prevEndMs = prevEnd ? new Date(prevEnd as any).getTime() : 0;
+      const incomingEndMs = incomingEnd ? new Date(incomingEnd as any).getTime() : 0;
+
       next[ai.id] = {
-        startTime: (ai as any).startTime || auction.startTime,
-        endTime: (ai as any).endTime || auction.endTime,
+        startTime: next[ai.id]?.startTime || incomingStart,
+        endTime:
+          Number.isFinite(prevEndMs) && Number.isFinite(incomingEndMs)
+            ? incomingEndMs > prevEndMs
+              ? incomingEnd
+              : prevEnd!
+            : incomingEnd,
       };
     }
     return next;
@@ -377,6 +392,21 @@ useEffect(() => {
       const itemId = String(data.auctionItemId);
       setItemTimes((prev) => {
         const current = prev[itemId];
+        const currentEnd = current?.endTime || (auction as any).endTime;
+        const currentEndMs = currentEnd
+          ? new Date(currentEnd as any).getTime()
+          : 0;
+        const nextEndMs = new Date(data.newEndTime as any).getTime();
+
+        // Never move the countdown backwards (ignore stale/out-of-order extensions)
+        if (
+          Number.isFinite(currentEndMs) &&
+          Number.isFinite(nextEndMs) &&
+          nextEndMs <= currentEndMs
+        ) {
+          return prev;
+        }
+
         return {
           ...prev,
           [itemId]: {
@@ -386,10 +416,10 @@ useEffect(() => {
         };
       });
 
-      // Optional: refresh snapshot to keep UI in sync (auction/item endTime persisted)
-      onRealtimeSnapshot?.();
+      // NOTE: Avoid immediate snapshot refetch here.
+      // Under stress, multiple overlapping refetches can resolve out-of-order and revert timers.
     },
-    [onRealtimeSnapshot, auction.startTime]
+    [auction.startTime, auction.endTime]
   );
 
   const { isJoined, connectionError, sendBid, serverOffsetMs } = useAuctionWebSocketBidding({
@@ -407,7 +437,11 @@ useEffect(() => {
   const [nowMs, setNowMs] = useState(() => Date.now() + (serverOffsetMs || 0));
 
   useEffect(() => {
-    const tick = () => setNowMs(Date.now() + (serverOffsetMs || 0));
+    const tick = () => {
+      const next = Date.now() + (serverOffsetMs || 0);
+      // Monotonic: never allow perceived server time to go backwards.
+      setNowMs((prev) => (next > prev ? next : prev));
+    };
     tick();
     const id = setInterval(tick, 1000);
     return () => clearInterval(id);

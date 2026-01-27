@@ -61,55 +61,67 @@ export function TimeSelector({
   }, [isOpen]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    let newValue = e.target.value;
+    const input = e.target;
+    const raw = input.value;
+    const cursor = input.selectionStart ?? raw.length;
 
-    // Remove any non-digit characters
-    newValue = newValue.replace(/\D/g, '');
+    // Allow typing "HH:MM" naturally (digits + single colon). This avoids the
+    // previous masking behavior that felt "stuck" when typing/deleting.
+    let sanitized = raw.replace(/[^\d:]/g, '');
 
-    // Limit to 4 digits (HHMM)
-    if (newValue.length > 4) {
-      newValue = newValue.slice(0, 4);
+    // Keep only one ':'
+    const firstColon = sanitized.indexOf(':');
+    if (firstColon !== -1) {
+      sanitized =
+        sanitized.slice(0, firstColon + 1) +
+        sanitized.slice(firstColon + 1).replace(/:/g, '');
     }
 
-    // Format as HH:MM
-    let formatted = newValue;
-    if (newValue.length >= 2) {
-      formatted = newValue.slice(0, 2) + ':' + newValue.slice(2);
+    // If user typed 4 digits (e.g. 1430) without ':', gently format to 14:30.
+    // Only do this when there's no colon in the input.
+    let formatted = sanitized;
+    let nextCursor = cursor;
+    if (!sanitized.includes(':')) {
+      const digitsOnly = sanitized.replace(/\D/g, '').slice(0, 4);
+      if (digitsOnly.length >= 3) {
+        formatted = `${digitsOnly.slice(0, 2)}:${digitsOnly.slice(2)}`;
+        // Adjust cursor if we inserted ':' before it.
+        if (cursor > 2) nextCursor = Math.min(cursor + 1, formatted.length);
+      } else {
+        formatted = digitsOnly;
+      }
     }
+
+    // Limit to 5 chars (HH:MM)
+    if (formatted.length > 5) formatted = formatted.slice(0, 5);
 
     setInputValue(formatted);
 
-    // Validate and update if complete
+    // Restore cursor position after React updates the controlled input.
+    requestAnimationFrame(() => {
+      try {
+        input.setSelectionRange(nextCursor, nextCursor);
+      } catch {
+        // ignore
+      }
+    });
+
+    // Update external value only when we have a valid full time.
     if (formatted.length === 5) {
       const [hoursStr, minutesStr] = formatted.split(':');
       const h = parseInt(hoursStr, 10);
       const m = parseInt(minutesStr, 10);
-
-      if (h >= 0 && h <= 23 && m >= 0 && m <= 59) {
-        onChange(formatted);
+      if (!isNaN(h) && !isNaN(m) && h >= 0 && h <= 23 && m >= 0 && m <= 59) {
+        const normalized = `${hoursStr.padStart(2, '0')}:${minutesStr.padStart(
+          2,
+          '0'
+        )}`;
+        onChange(normalized);
         setHours(h);
         setMinutes(m);
       }
     } else if (formatted.length === 0) {
       onChange('');
-    }
-  };
-
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    // Prevent deleting the colon
-    if (e.key === 'Backspace' || e.key === 'Delete') {
-      const cursorPos = (e.target as HTMLInputElement).selectionStart || 0;
-      const value = (e.target as HTMLInputElement).value;
-
-      // If trying to delete the colon, prevent it
-      if (value[cursorPos] === ':') {
-        e.preventDefault();
-        // Move cursor to the left
-        (e.target as HTMLInputElement).setSelectionRange(
-          cursorPos - 1,
-          cursorPos - 1
-        );
-      }
     }
   };
 
@@ -152,7 +164,6 @@ export function TimeSelector({
           type="text"
           value={inputValue}
           onChange={handleInputChange}
-          onKeyDown={handleKeyDown}
           onBlur={handleBlur}
           placeholder="10:00"
           className={`flex-1 font-mono ${className} ${

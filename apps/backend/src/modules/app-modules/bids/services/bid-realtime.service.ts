@@ -37,6 +37,9 @@ type PlaceBidResult = {
 export class BidRealtimeService {
   private readonly logger = new Logger(BidRealtimeService.name);
 
+  // Observability / performance (tunable via env)
+  private readonly slowBidTxWarnMs = Number(process.env.BID_TX_WARN_MS ?? 250);
+
   constructor(
     private readonly bidRepository: BidPrismaService,
     private readonly auctionsGateway: AuctionsGateway,
@@ -53,6 +56,8 @@ export class BidRealtimeService {
     tenantId: string,
     requestId: string
   ): Promise<PlaceBidResult> {
+    const tStart = process.hrtime.bigint();
+
     // Defensive validations (avoid DB errors / weird client payloads)
     if (!requestId) {
       throw new BadRequestException('requestId requerido');
@@ -207,32 +212,52 @@ export class BidRealtimeService {
           AND b."isDeleted" = false
       `;
       const max = maxRows?.[0]?.max ?? null;
-      const minimumBid = max !== null ? max + Number(row.bidIncrement) : Number(row.startingBid);
+      const bidIncrement = Math.max(1, Number(row.bidIncrement) || 1);
 
-      /*
+      // Minimum/step rules:
+      // - If there is a previous bid, the next minimum is max + bidIncrement.
+      // - Otherwise the first minimum is startingBid.
+      // - Always enforce increments (you can jump multiple increments, but must align to the step).
+      const base = max !== null ? Number(max) : Number(row.startingBid);
+      const minimumBid = max !== null ? base + bidIncrement : base;
+
       if (amount < minimumBid) {
         throw new BadRequestException(
           `La puja debe ser al menos $${minimumBid.toLocaleString()}`
         );
       }
-        */
 
-      // Soft-close extension: extend only if we're within the last 30 seconds.
+      const diff = amount - base;
+      // diff can be 0 only when max is null (first bid equals startingBid)
+      if (diff % bidIncrement !== 0) {
+        const nextValid = base + Math.ceil(diff / bidIncrement) * bidIncrement;
+        throw new BadRequestException(
+          `La puja debe respetar el incremento de $${bidIncrement.toLocaleString()}. Próxima puja válida: $${nextValid.toLocaleString()}`
+        );
+      }
+
+      // Soft-close extension:
+      // If we're within the last 30 seconds and someone bids, the product timer must go back to 30 seconds.
+      // IMPORTANT: Use DB time (NOW()) for the candidate end. Under load, this request can wait on row locks;
+      // if we used a JS 'now' captured before waiting, we'd sometimes extend to <30s remaining.
       let extension: null | { auctionId: string; auctionItemId: string; newEndTimeIso: string } = null;
       const timeUntilEnd = itemEnd.getTime() - now.getTime();
       if (timeUntilEnd <= SOFT_CLOSE_THRESHOLD_MS && timeUntilEnd > 0) {
-        const candidateEnd = new Date(now.getTime() + SOFT_CLOSE_EXTENSION_MS);
         const updated = await tx.$queryRaw<Array<{ endTime: Date | string | null }>>`
           UPDATE "public"."auction_item"
           SET
             "startTime" = COALESCE("startTime", ${itemStart}),
-            "endTime"   = GREATEST(COALESCE("endTime", ${candidateEnd}), ${candidateEnd})
+            "endTime"   = GREATEST(
+              COALESCE("endTime", NOW() + INTERVAL '30 seconds'),
+              NOW() + INTERVAL '30 seconds'
+            )
           WHERE "id" = ${auctionItemId}
           RETURNING "endTime"
         `;
 
-        const updatedEndTime =
-          updated?.[0]?.endTime ? new Date(updated[0].endTime as any) : candidateEnd;
+        const updatedEndTime = updated?.[0]?.endTime
+          ? new Date(updated[0].endTime as any)
+          : new Date(Date.now() + SOFT_CLOSE_EXTENSION_MS);
 
         await tx.$executeRaw`
           UPDATE "public"."auction"
@@ -301,8 +326,12 @@ export class BidRealtimeService {
       };
     });
 
+    const tAfterTx = process.hrtime.bigint();
+    const txMs = Number(tAfterTx - tStart) / 1e6;
+
     // Broadcast AFTER COMMIT (prevents UI from getting out of sync if a tx later fails)
     if (txResult.createdNow) {
+      const bStart = process.hrtime.bigint();
       this.logger.log(
         `Bid placed [req=${requestId}]: ${amount} by ${
           txResult.bid.user.email
@@ -343,6 +372,28 @@ export class BidRealtimeService {
           }
         );
       }
+
+      const bEnd = process.hrtime.bigint();
+      const broadcastMs = Number(bEnd - bStart) / 1e6;
+      const totalMs = Number(process.hrtime.bigint() - tStart) / 1e6;
+
+      // Performance log (can be used for dashboards/alerts)
+      const msg = `[bid-latency] req=${requestId} item=${auctionItemId} amount=${amount} txMs=${txMs.toFixed(
+        1
+      )} broadcastMs=${broadcastMs.toFixed(1)} totalMs=${totalMs.toFixed(1)}`;
+      if (txMs >= this.slowBidTxWarnMs) {
+        this.logger.warn(msg);
+      } else {
+        this.logger.debug(msg);
+      }
+    } else {
+      // Duplicate requestId or already processed; still log tx latency at debug
+      const totalMs = Number(process.hrtime.bigint() - tStart) / 1e6;
+      this.logger.debug(
+        `[bid-latency] req=${requestId} item=${auctionItemId} createdNow=false txMs=${txMs.toFixed(
+          1
+        )} totalMs=${totalMs.toFixed(1)}`
+      );
     }
 
     return {

@@ -87,7 +87,15 @@ export function AuctionManagerActiveView({
   const [isCreateItemModalOpen, setIsCreateItemModalOpen] = useState(false);
 
   // Local state for bids to handle real-time updates
+  // IMPORTANT:
+  // - `bidHistory` is a *preview* (top N bids) for UI rendering.
+  // - `bidCounts` is the authoritative count used for the "Total Pujas" card
+  //   and per-item "X puja(s) realizadas".
+  // This avoids a nasty bug where we keep only the last/top 10 bids for UI
+  // and accidentally make the totals go *down* when a new bid arrives.
   const [bidHistory, setBidHistory] = useState<ItemBidData>({});
+  const [bidCounts, setBidCounts] = useState<Record<string, number>>({});
+  const seenBidIdsRef = useRef<Set<string>>(new Set());
 
   // Keep item positions stable during live updates (avoid confusion when bids arrive).
   // We lock the initial order we see for each item id and sort by that order thereafter.
@@ -151,35 +159,48 @@ export function AuctionManagerActiveView({
   // Initialize bid history from props
   useEffect(() => {
     if (!auctionItems) return;
+    // 1) Update seen IDs + bid counts (monotonic)
+    setBidCounts((prevCounts) => {
+      const nextCounts: Record<string, number> = { ...prevCounts };
+      for (const ai of auctionItems) {
+        const itemId = String(ai.id);
+        const apiBids = ai.bids || [];
+        // Track all IDs we already know about (for dedupe on realtime)
+        for (const b of apiBids) {
+          if (b?.id) seenBidIdsRef.current.add(String(b.id));
+        }
+        const apiCount = apiBids.length;
+        const current = nextCounts[itemId] ?? 0;
+        // Never decrease the count when we receive a smaller snapshot
+        // (e.g. if the backend changes to pagination in the future).
+        nextCounts[itemId] = Math.max(current, apiCount);
+      }
+      return nextCounts;
+    });
+
+    // 2) Build UI preview (top 10 bids per item)
     setBidHistory((prev) => {
       const next: ItemBidData = { ...prev };
-      auctionItems.forEach((ai) => {
-        const fromApi: BidHistoryItem[] =
-          (ai.bids || [])
-            .map((b) => ({
-              id: b.id,
-              amount: Number(b.offered_price),
-              userId: b.userId,
-              userName: b.user?.public_name || 'Usuario',
-              timestamp: new Date(
-                b.bid_time || b.createdAt || Date.now()
-              ).getTime(),
-            }))
-            .sort((a, b) => b.amount - a.amount || b.timestamp - a.timestamp) ||
-          [];
+      for (const ai of auctionItems) {
+        const itemId = String(ai.id);
+        const fromApi: BidHistoryItem[] = (ai.bids || [])
+          .map((b) => ({
+            id: String(b.id),
+            amount: Number(b.offered_price),
+            userId: String(b.userId),
+            userName: b.user?.public_name || 'Usuario',
+            timestamp: new Date(b.bid_time || b.createdAt || Date.now()).getTime(),
+          }))
+          .sort((a, b) => b.amount - a.amount || b.timestamp - a.timestamp);
 
-        const existing = prev[ai.id] || [];
-        // Merge ensuring uniqueness by ID
-        const merged = [...fromApi, ...existing].reduce(
-          (acc: BidHistoryItem[], bid) => {
-            if (!acc.find((x) => x.id === bid.id)) acc.push(bid);
-            return acc;
-          },
-          []
-        );
+        const existing = prev[itemId] || [];
+        const merged = [...fromApi, ...existing].reduce((acc: BidHistoryItem[], bid) => {
+          if (!acc.find((x) => x.id === bid.id)) acc.push(bid);
+          return acc;
+        }, []);
         merged.sort((a, b) => b.amount - a.amount || b.timestamp - a.timestamp);
-        next[ai.id] = merged;
-      });
+        next[itemId] = merged.slice(0, 10);
+      }
       return next;
     });
   }, [auctionItems]);
@@ -196,35 +217,44 @@ export function AuctionManagerActiveView({
         timestamp,
       } = data;
 
+      const normalizedBidId = String(bidId);
+      const normalizedItemId = String(auctionItemId);
+
+      // 1) Increment authoritative counters exactly once per bid ID
+      if (!seenBidIdsRef.current.has(normalizedBidId)) {
+        seenBidIdsRef.current.add(normalizedBidId);
+        setBidCounts((prevCounts) => ({
+          ...prevCounts,
+          [normalizedItemId]: (prevCounts[normalizedItemId] ?? 0) + 1,
+        }));
+      }
+
+      // 2) Update UI preview (top 10)
       setBidHistory((prev) => {
-        const current = prev[auctionItemId] || [];
+        const current = prev[normalizedItemId] || [];
         const incoming: BidHistoryItem = {
-          id: bidId,
+          id: normalizedBidId,
           amount,
-          userId: bidderId,
+          userId: String(bidderId),
           userName: userName || 'Usuario',
           timestamp,
         };
-        const merged = [incoming, ...current].reduce(
-          (acc: BidHistoryItem[], bid) => {
-            if (!acc.find((x) => x.id === bid.id)) acc.push(bid);
-            return acc;
-          },
-          []
-        );
+        const merged = [incoming, ...current].reduce((acc: BidHistoryItem[], bid) => {
+          if (!acc.find((x) => x.id === bid.id)) acc.push(bid);
+          return acc;
+        }, []);
         merged.sort((a, b) => b.amount - a.amount || b.timestamp - a.timestamp);
-
         return {
           ...prev,
-          [auctionItemId]: merged.slice(0, 10),
+          [normalizedItemId]: merged.slice(0, 10),
         };
       });
 
       // Find the item details from the auctionItems list
-      const item = auctionItems.find((i) => i.id === auctionItemId)?.item;
+      const item = auctionItems.find((i) => String(i.id) === normalizedItemId)?.item;
       const itemDescription = item
         ? `${item.brand} ${item.model || ''} - ${item.plate}`.trim()
-        : `Item #${auctionItemId.slice(-4)}`;
+        : `Item #${normalizedItemId.slice(-4)}`;
 
       toast({
         title: 'Nueva puja recibida',
@@ -255,10 +285,22 @@ export function AuctionManagerActiveView({
     (data: any) => {
       if (!data?.newEndTime) return;
 
+      const nextEndMs = new Date(data.newEndTime as any).getTime();
+      if (!Number.isFinite(nextEndMs)) return;
+
       if (data?.auctionItemId) {
         const itemId = String(data.auctionItemId);
         setItemTimes((prev) => {
           const current = prev[itemId];
+          const currentEnd = current?.endTime || (auction as any).endTime;
+          const currentEndMs = currentEnd
+            ? new Date(currentEnd as any).getTime()
+            : 0;
+
+          // Never move the countdown backwards (ignore stale/out-of-order extensions)
+          if (Number.isFinite(currentEndMs) && nextEndMs <= currentEndMs) {
+            return prev;
+          }
           return {
             ...prev,
             [itemId]: {
@@ -271,15 +313,19 @@ export function AuctionManagerActiveView({
         setItemTimes((prev) => {
           const next = { ...prev };
           for (const key of Object.keys(next)) {
+            const curEnd = next[key]?.endTime || (auction as any).endTime;
+            const curEndMs = curEnd ? new Date(curEnd as any).getTime() : 0;
+            if (Number.isFinite(curEndMs) && nextEndMs <= curEndMs) continue;
             next[key] = { ...next[key], endTime: data.newEndTime };
           }
           return next;
         });
       }
 
-      onRealtimeSnapshot?.();
+      // NOTE: Avoid immediate snapshot refetch here.
+      // Under stress, multiple overlapping refetches can resolve out-of-order and revert timers.
     },
-    [onRealtimeSnapshot, auction.startTime]
+    [auction.startTime, auction.endTime]
   );
 
   const { isConnected, participantCount, serverOffsetMs: wsServerOffsetMs } = useAuctionWebSocketBidding({
@@ -304,7 +350,11 @@ export function AuctionManagerActiveView({
   const [nowMs, setNowMs] = useState(() => Date.now() + (wsServerOffsetMs || 0));
 
   useEffect(() => {
-    const tick = () => setNowMs(Date.now() + (wsServerOffsetMs || 0));
+    const tick = () => {
+      const next = Date.now() + (wsServerOffsetMs || 0);
+      // Monotonic: never allow perceived server time to go backwards.
+      setNowMs((prev) => (next > prev ? next : prev));
+    };
     tick();
     const id = setInterval(tick, 1000);
     return () => clearInterval(id);
@@ -317,9 +367,23 @@ export function AuctionManagerActiveView({
     setItemTimes((prev) => {
       const next: Record<string, { startTime: string | Date; endTime: string | Date }> = { ...prev };
       for (const ai of auctionItems) {
+        const incomingStart = (ai as any).startTime || auction.startTime;
+        const incomingEnd = (ai as any).endTime || auction.endTime;
+
+        // IMPORTANT: timers must be monotonic.
+        // Never allow an incoming snapshot to move endTime backwards.
+        const prevEnd = next[ai.id]?.endTime;
+        const prevEndMs = prevEnd ? new Date(prevEnd as any).getTime() : 0;
+        const incomingEndMs = incomingEnd ? new Date(incomingEnd as any).getTime() : 0;
+
         next[ai.id] = {
-          startTime: (ai as any).startTime || auction.startTime,
-          endTime: (ai as any).endTime || auction.endTime,
+          startTime: next[ai.id]?.startTime || incomingStart,
+          endTime:
+            Number.isFinite(prevEndMs) && Number.isFinite(incomingEndMs)
+              ? incomingEndMs > prevEndMs
+                ? incomingEnd
+                : prevEnd!
+              : incomingEnd,
         };
       }
       return next;
@@ -331,11 +395,8 @@ export function AuctionManagerActiveView({
   const totalItems = auctionItems?.length || 0;
 
   const totalBids = useMemo((): number => {
-    return Object.values(bidHistory).reduce(
-      (acc, bids) => acc + bids.length,
-      0
-    );
-  }, [bidHistory]);
+    return Object.values(bidCounts).reduce((acc, n) => acc + (Number(n) || 0), 0);
+  }, [bidCounts]);
 
   const displayItems = useMemo(() => {
     return stableAuctionItems.map((item) => {
@@ -648,7 +709,7 @@ export function AuctionManagerActiveView({
                           {auctionItem.bids && auctionItem.bids.length > 0 && (
                             <>
                               <p className="text-xs text-gray-500 pt-1">
-                                {auctionItem.bids.length} puja(s) realizadas
+                                {(bidCounts[String(auctionItem.id)] ?? auctionItem.bids.length)} puja(s) realizadas
                               </p>
                               <ItemBidHistory
                                 bids={auctionItem.bids as BidWithUserDto[]}
