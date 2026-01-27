@@ -129,12 +129,21 @@ export function AuctionManagerActiveView({
   const [itemTimes, setItemTimes] = useState<Record<string, { startTime: string | Date; endTime: string | Date }>>({});
 
 
-  // Server-authoritative end time (can be extended via soft-close)
-  const [auctionEndTime, setAuctionEndTime] = useState<string | Date>(auction.endTime);
-
-  useEffect(() => {
-    setAuctionEndTime(auction.endTime);
-  }, [auction.endTime]);
+  // Overall auction end time for the top banner countdown.
+  // IMPORTANT: With soft-close per-item timers, the auction must be considered active until
+  // ALL items finish. We therefore derive the banner endTime as the maximum of:
+  // - auction.endTime (overall end)
+  // - each auction_item.endTime (which can be extended to +30s on bids)
+  // This prevents the manager UI from showing the auction as finished while items are still active.
+  const auctionEndTime = useMemo(() => {
+    const baseMs = new Date(auction.endTime as any).getTime();
+    let maxMs = Number.isFinite(baseMs) ? baseMs : 0;
+    for (const v of Object.values(itemTimes)) {
+      const ms = new Date((v?.endTime ?? auction.endTime) as any).getTime();
+      if (Number.isFinite(ms)) maxMs = Math.max(maxMs, ms);
+    }
+    return new Date(maxMs || Date.now());
+  }, [auction.endTime, itemTimes]);
 
   // Server/client clock offset (ms). Updated from WebSocket JOINED message.
   const [serverOffsetMs, setServerOffsetMs] = useState(0);
@@ -321,6 +330,9 @@ export function AuctionManagerActiveView({
           return next;
         });
       }
+
+      // No need to manually update the banner endTime here.
+      // auctionEndTime is derived from itemTimes (max endTime) via useMemo.
 
       // NOTE: Avoid immediate snapshot refetch here.
       // Under stress, multiple overlapping refetches can resolve out-of-order and revert timers.
