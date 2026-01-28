@@ -437,15 +437,59 @@ useEffect(() => {
   const [nowMs, setNowMs] = useState(() => Date.now() + (serverOffsetMs || 0));
 
   useEffect(() => {
-    const tick = () => {
-      const next = Date.now() + (serverOffsetMs || 0);
-      // Monotonic: never allow perceived server time to go backwards.
-      setNowMs((prev) => (next > prev ? next : prev));
+    let timeout: ReturnType<typeof setTimeout> | null = null;
+
+    const getNearestEndMs = (): number => {
+      const candidates: number[] = [];
+
+      const overall = new Date(overallEndTime as any).getTime();
+      if (Number.isFinite(overall)) candidates.push(overall);
+
+      if (auctionItems && auctionItems.length > 0) {
+        for (const ai of auctionItems) {
+          const endTime =
+            itemTimes[ai.id]?.endTime || (ai as any).endTime || overallEndTime;
+          const ms = new Date(endTime as any).getTime();
+          if (Number.isFinite(ms)) candidates.push(ms);
+        }
+      }
+
+      // Fallback to overall end if we can't parse anything.
+      return candidates.length > 0 ? Math.min(...candidates) : Date.now();
     };
-    tick();
-    const id = setInterval(tick, 1000);
-    return () => clearInterval(id);
-  }, [serverOffsetMs]);
+
+    const schedule = () => {
+      // Adaptive tick:
+      // - Smooth near the end (250ms)
+      // - Lighter updates when far from end (1000ms)
+      const offset = serverOffsetMs || 0;
+      const now = Date.now() + offset;
+      const nearestEndMs = getNearestEndMs();
+      const remainingMs = Math.max(0, nearestEndMs - now);
+      const baseTickMs = remainingMs <= 15_000 ? 100 : remainingMs <= 120_000 ? 250 : 1000;
+
+      // Align to the tick grid to reduce visible jitter.
+      const alignedDelay = Math.max(10, baseTickMs - (now % baseTickMs));
+
+      timeout = setTimeout(() => {
+        const next = Date.now() + offset;
+        // Monotonic: never allow perceived server time to go backwards.
+        setNowMs((prev) => (next > prev ? next : prev));
+        schedule();
+      }, alignedDelay);
+    };
+
+    // Prime immediate tick, then schedule.
+    setNowMs((prev) => {
+      const next = Date.now() + (serverOffsetMs || 0);
+      return next > prev ? next : prev;
+    });
+    schedule();
+
+    return () => {
+      if (timeout) clearTimeout(timeout);
+    };
+  }, [serverOffsetMs, overallEndTime, auctionItems, itemTimes]);
 
   // Show congratulations per item (independent). If an item ends earlier than others,
   // only the winning user sees the message for that item.

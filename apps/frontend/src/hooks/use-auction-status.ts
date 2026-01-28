@@ -78,7 +78,10 @@ export function computeDisplayStatus(
 }
 
 function buildDetailed(deltaMs: number): TimeRemainingDetailed {
-  const totalSeconds = Math.max(0, Math.floor(deltaMs / 1000));
+  // UX note:
+  // Use CEIL so the timer doesn't appear to "lose" a second due to render jitter
+  // (e.g., 29.9s showing as 29). The backend remains authoritative.
+  const totalSeconds = Math.max(0, Math.ceil(deltaMs / 1000));
   const hours = Math.floor(totalSeconds / 3600);
   const minutes = Math.floor((totalSeconds % 3600) / 60);
   const seconds = totalSeconds % 60;
