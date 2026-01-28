@@ -11,33 +11,6 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
-/**
- * Monotonic, epoch-based client clock (ms).
- * Uses performance.now() when available to avoid jumps if the user changes their system clock.
- */
-let __baseNowMs: number | null = null;
-let __basePerfMs: number | null = null;
-
-function monotonicNowMs(): number {
-  // During SSR (shouldn't happen for client hooks), fallback safely.
-  if (typeof window === 'undefined') return Date.now();
-
-  if (__baseNowMs === null) {
-    __baseNowMs = Date.now();
-    __basePerfMs =
-      typeof performance !== 'undefined' && typeof performance.now === 'function'
-        ? performance.now()
-        : 0;
-  }
-
-  const perfNow =
-    typeof performance !== 'undefined' && typeof performance.now === 'function'
-      ? performance.now()
-      : 0;
-
-  return __baseNowMs + (perfNow - (__basePerfMs ?? 0));
-}
-
 export interface BidData {
   auctionItemId: string;
   amount: number;
@@ -100,13 +73,10 @@ interface UseAuctionWebSocketBiddingReturn {
   connectionError: string | null;
   /** Difference between server clock and local clock in ms (server - local). */
   serverOffsetMs: number;
-  /** Last known server "now" (ms epoch), monotonic (never decreases). */
+  
+  /** Best-known server clock in ms, monotonic (never goes backwards). */
   serverNowMonotonicMs: number;
-  /** Periodic clock sync timer (PING/PONG). */
-  timeSyncTimer: ReturnType<typeof setInterval> | null;
-  /** In-flight PINGs by requestId -> clientSentAtMs (monotonic epoch ms). */
-  pendingPings: Map<string, number>;
-  /** Returns requestId if the bid was sent. */
+/** Returns requestId if the bid was sent. */
   sendBid: (auctionItemId: string, amount: number) => string | null;
 }
 
@@ -133,7 +103,10 @@ type ManagedConn = {
   joined: boolean;
   participantCount: number;
   serverOffsetMs: number;
-  lastError: string | null;
+    serverNowMonotonicMs: number;
+  timeSyncTimer: ReturnType<typeof setInterval> | null;
+  pendingPings: Map<string, number>;
+lastError: string | null;
   closing: boolean;
   reconnectAttempts: number;
   reconnectTimer: ReturnType<typeof setTimeout> | null;
@@ -141,6 +114,62 @@ type ManagedConn = {
   auctionId: string;
   accessToken: string;
 };
+
+function updateServerClock(conn: ManagedConn, serverTimeMs: number, clientRecvAtMs: number) {
+  // Maintain a monotonic estimate of server "now" so timers never jump backwards.
+  const proposedServerNow = serverTimeMs;
+  conn.serverNowMonotonicMs = Math.max(conn.serverNowMonotonicMs, proposedServerNow);
+
+  // Offset is (server - local)
+  const proposedOffset = conn.serverNowMonotonicMs - clientRecvAtMs;
+
+  // Clamp how fast offset can move to avoid visible jumps.
+  const MAX_STEP = 250; // ms per message
+  const delta = proposedOffset - conn.serverOffsetMs;
+  conn.serverOffsetMs =
+    Math.abs(delta) <= MAX_STEP
+      ? proposedOffset
+      : conn.serverOffsetMs + Math.sign(delta) * MAX_STEP;
+}
+
+function startTimeSync(conn: ManagedConn) {
+  if (conn.timeSyncTimer) return;
+  conn.timeSyncTimer = setInterval(() => {
+    if (conn.closing) return;
+
+    const requestId =
+      (globalThis.crypto as any)?.randomUUID?.() ||
+      Math.random().toString(16).slice(2) + Date.now().toString(16);
+
+    const clientSentAtMs = Date.now();
+    conn.pendingPings.set(requestId, clientSentAtMs);
+
+    // prune stale pings
+    const cutoff = clientSentAtMs - 120_000;
+    for (const [id, t] of conn.pendingPings) {
+      if (t < cutoff) conn.pendingPings.delete(id);
+    }
+
+    try {
+      conn.socket.send(
+        JSON.stringify({
+          event: 'TIME_SYNC_PING',
+          data: { requestId, clientSentAtMs },
+        })
+      );
+    } catch {
+      // ignore
+    }
+  }, 15_000);
+}
+
+function stopTimeSync(conn: ManagedConn) {
+  if (conn.timeSyncTimer) {
+    clearInterval(conn.timeSyncTimer);
+    conn.timeSyncTimer = null;
+  }
+  conn.pendingPings.clear();
+}
 
 // Global, per-tab connection pool.
 const connections = new Map<string, ManagedConn>();
@@ -181,65 +210,6 @@ function createRequestId(): string {
   return `${Date.now()}-${Math.random().toString(16).slice(2)}`;
 }
 
-
-function applyServerOffsetUpdate(conn: ManagedConn, serverTimeMs: number, clientRecvAtMs: number, clientSentAtMs?: number) {
-  // If we have an RTT estimate (PING/PONG), use NTP-style midpoint.
-  const rttMs =
-    typeof clientSentAtMs === 'number' && Number.isFinite(clientSentAtMs)
-      ? Math.max(0, clientRecvAtMs - clientSentAtMs)
-      : null;
-
-  const offsetCandidate =
-    rttMs !== null
-      ? serverTimeMs - (clientSentAtMs! + rttMs / 2)
-      : serverTimeMs - clientRecvAtMs;
-
-  // Compute a monotonic server "now" (never goes backwards).
-  const proposedServerNow = clientRecvAtMs + offsetCandidate;
-  conn.serverNowMonotonicMs = Math.max(conn.serverNowMonotonicMs, proposedServerNow);
-
-  // New offset consistent with the monotonic server time.
-  conn.serverOffsetMs = conn.serverNowMonotonicMs - clientRecvAtMs;
-}
-
-function startTimeSync(conn: ManagedConn) {
-  if (conn.timeSyncTimer) return;
-
-  conn.timeSyncTimer = setInterval(() => {
-    const ws = conn.socket;
-    if (!ws || ws.readyState !== WebSocket.OPEN) return;
-
-    const requestId = createRequestId();
-    const clientSentAtMs = monotonicNowMs();
-    conn.pendingPings.set(requestId, clientSentAtMs);
-
-    try {
-      ws.send(
-        JSON.stringify({
-          event: 'PING',
-          data: { requestId, clientTimeMs: clientSentAtMs },
-        })
-      );
-    } catch {
-      // ignore
-    }
-
-    // Prune stale pings (safety)
-    const cutoff = clientSentAtMs - 30_000;
-    for (const [id, t] of conn.pendingPings) {
-      if (t < cutoff) conn.pendingPings.delete(id);
-    }
-  }, 8000);
-}
-
-function stopTimeSync(conn: ManagedConn) {
-  if (conn.timeSyncTimer) {
-    clearInterval(conn.timeSyncTimer);
-    conn.timeSyncTimer = null;
-  }
-  conn.pendingPings.clear();
-}
-
 function attachSocketHandlers(conn: ManagedConn) {
   const ws = conn.socket;
 
@@ -247,9 +217,6 @@ function attachSocketHandlers(conn: ManagedConn) {
     conn.reconnectAttempts = 0;
     conn.lastError = null;
     conn.subscribers.forEach((s) => s.onOpen());
-
-    // Start periodic clock sync (PING/PONG) as soon as the socket is open.
-    startTimeSync(conn);
 
     // Always (re)join on open.
     try {
@@ -268,33 +235,25 @@ function attachSocketHandlers(conn: ManagedConn) {
     const msg = safeParseMessage(ev.data);
     if (!msg) return;
 
-    // Handle app-level PONG for RTT-based clock sync.
-    if (msg.event === 'PONG') {
-      const serverTimeMs = msg.data?.serverTimeMs;
-      const requestId = msg.data?.requestId;
-      const recvAtMs = monotonicNowMs();
-
-      if (typeof serverTimeMs === 'number' && typeof requestId === 'string') {
-        const sentAtMs = conn.pendingPings.get(requestId);
-        conn.pendingPings.delete(requestId);
-        applyServerOffsetUpdate(conn, serverTimeMs, recvAtMs, sentAtMs);
-      } else if (typeof serverTimeMs === 'number') {
-        applyServerOffsetUpdate(conn, serverTimeMs, recvAtMs);
-      }
-
-      // PONG is internal; no need to fan out to subscribers.
-      return;
-    }
-
     // Keep minimal shared state on the connection.
-    if (msg.event === 'JOINED') {
+    
+if (msg.event === 'TIME_SYNC_PONG') {
+  const requestId = msg.data?.requestId as string | undefined;
+  const serverTimeMs = msg.data?.serverTimeMs as number | undefined;
+  if (requestId && typeof serverTimeMs === 'number') {
+    conn.pendingPings.delete(requestId);
+    updateServerClock(conn, serverTimeMs, Date.now());
+  }
+}
+
+if (msg.event === 'JOINED') {
       conn.joined = true;
       if (typeof msg.data?.participantCount === 'number') {
         conn.participantCount = msg.data.participantCount;
       }
       if (typeof msg.data?.serverTimeMs === 'number') {
-        // Time sync: update offset from server time (monotonic, never backwards).
-        applyServerOffsetUpdate(conn, msg.data.serverTimeMs, monotonicNowMs());
+        updateServerClock(conn, msg.data.serverTimeMs, Date.now());
+        startTimeSync(conn);
       }
     }
 
@@ -316,21 +275,13 @@ function attachSocketHandlers(conn: ManagedConn) {
     }
 
     // Update server offset when available.
-    // IMPORTANT:
-    // Using one-way timestamps (serverTimeMs - clientNow) is skewed by network latency.
-    // Under load, latency fluctuates and can make the computed offset jump backwards,
-    // which causes countdown timers to "gain" seconds (bad UX).
-    // We therefore apply a monotonic + smoothed update:
-    // - Never move the offset in a direction that would make our perceived "server now" go backwards.
-    // - Clamp adjustments per message to avoid big jumps.
     if (
       (msg.event === 'BID_PLACED' || msg.event === 'AUCTION_TIME_EXTENDED') &&
       typeof msg.data?.serverTimeMs === 'number'
     ) {
-      applyServerOffsetUpdate(conn, msg.data.serverTimeMs, monotonicNowMs());
+      updateServerClock(conn, msg.data.serverTimeMs, Date.now());
     }
-
-    if (msg.event === 'ERROR') {
+if (msg.event === 'ERROR') {
       const serverMsg =
         typeof msg.data?.message === 'string'
           ? msg.data.message
@@ -347,7 +298,6 @@ function attachSocketHandlers(conn: ManagedConn) {
   };
 
   ws.onclose = () => {
-    stopTimeSync(conn);
     conn.joined = false;
     conn.subscribers.forEach((s) => s.onClose());
 
@@ -392,10 +342,10 @@ function getOrCreateConnection(params: {
     joined: false,
     participantCount: 0,
     serverOffsetMs: 0,
-    serverNowMonotonicMs: 0,
+        serverNowMonotonicMs: 0,
     timeSyncTimer: null,
     pendingPings: new Map<string, number>(),
-    lastError: null,
+lastError: null,
     closing: false,
     reconnectAttempts: 0,
     reconnectTimer: null,
@@ -427,6 +377,7 @@ export function useAuctionWebSocketBidding({
   const [participantCount, setParticipantCount] = useState(0);
   const [connectionError, setConnectionError] = useState<string | null>(null);
   const [serverOffsetMs, setServerOffsetMs] = useState(0);
+  const [serverNowMonotonicMs, setServerNowMonotonicMs] = useState(0);
 
   const callbacksRef = useRef({
     onBidPlaced,
@@ -464,6 +415,7 @@ export function useAuctionWebSocketBidding({
     setConnectionError(conn.lastError);
     setParticipantCount(conn.participantCount);
     setServerOffsetMs(conn.serverOffsetMs);
+    setServerNowMonotonicMs(conn.serverNowMonotonicMs);
     setIsJoined(conn.joined);
     setIsConnected(conn.socket.readyState === WebSocket.OPEN);
 
@@ -485,6 +437,7 @@ export function useAuctionWebSocketBidding({
           setIsJoined(true);
           setParticipantCount(conn.participantCount);
           setServerOffsetMs(conn.serverOffsetMs);
+    setServerNowMonotonicMs(conn.serverNowMonotonicMs);
           // If server provided a snapshot (auction / item clocks), sync it immediately.
           callbacksRef.current.onSnapshot?.({
             auction: msg.data?.auction,
@@ -509,6 +462,7 @@ export function useAuctionWebSocketBidding({
 
         if (msg.event === 'BID_PLACED') {
           setServerOffsetMs(conn.serverOffsetMs);
+    setServerNowMonotonicMs(conn.serverNowMonotonicMs);
           callbacksRef.current.onBidPlaced?.(msg.data);
           return;
         }
@@ -520,6 +474,7 @@ export function useAuctionWebSocketBidding({
 
         if (msg.event === 'AUCTION_TIME_EXTENDED') {
           setServerOffsetMs(conn.serverOffsetMs);
+    setServerNowMonotonicMs(conn.serverNowMonotonicMs);
           callbacksRef.current.onTimeExtension?.(msg.data);
           return;
         }
@@ -549,7 +504,6 @@ export function useAuctionWebSocketBidding({
       if (conn.refCount === 0) {
         // Close connection cleanly when last subscriber unmounts.
         conn.closing = true;
-        stopTimeSync(conn);
         if (conn.reconnectTimer) {
           clearTimeout(conn.reconnectTimer);
           conn.reconnectTimer = null;
@@ -631,6 +585,7 @@ export function useAuctionWebSocketBidding({
     participantCount,
     connectionError,
     serverOffsetMs,
+    serverNowMonotonicMs,
     sendBid,
   };
 }
