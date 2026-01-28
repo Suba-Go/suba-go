@@ -73,7 +73,10 @@ interface UseAuctionWebSocketBiddingReturn {
   connectionError: string | null;
   /** Difference between server clock and local clock in ms (server - local). */
   serverOffsetMs: number;
-  /** Returns requestId if the bid was sent. */
+  
+  /** Best-known server clock in ms, monotonic (never goes backwards). */
+  serverNowMonotonicMs: number;
+/** Returns requestId if the bid was sent. */
   sendBid: (auctionItemId: string, amount: number) => string | null;
 }
 
@@ -100,7 +103,10 @@ type ManagedConn = {
   joined: boolean;
   participantCount: number;
   serverOffsetMs: number;
-  lastError: string | null;
+    serverNowMonotonicMs: number;
+  timeSyncTimer: ReturnType<typeof setInterval> | null;
+  pendingPings: Map<string, number>;
+lastError: string | null;
   closing: boolean;
   reconnectAttempts: number;
   reconnectTimer: ReturnType<typeof setTimeout> | null;
@@ -108,6 +114,62 @@ type ManagedConn = {
   auctionId: string;
   accessToken: string;
 };
+
+function updateServerClock(conn: ManagedConn, serverTimeMs: number, clientRecvAtMs: number) {
+  // Maintain a monotonic estimate of server "now" so timers never jump backwards.
+  const proposedServerNow = serverTimeMs;
+  conn.serverNowMonotonicMs = Math.max(conn.serverNowMonotonicMs, proposedServerNow);
+
+  // Offset is (server - local)
+  const proposedOffset = conn.serverNowMonotonicMs - clientRecvAtMs;
+
+  // Clamp how fast offset can move to avoid visible jumps.
+  const MAX_STEP = 250; // ms per message
+  const delta = proposedOffset - conn.serverOffsetMs;
+  conn.serverOffsetMs =
+    Math.abs(delta) <= MAX_STEP
+      ? proposedOffset
+      : conn.serverOffsetMs + Math.sign(delta) * MAX_STEP;
+}
+
+function startTimeSync(conn: ManagedConn) {
+  if (conn.timeSyncTimer) return;
+  conn.timeSyncTimer = setInterval(() => {
+    if (conn.closing) return;
+
+    const requestId =
+      (globalThis.crypto as any)?.randomUUID?.() ||
+      Math.random().toString(16).slice(2) + Date.now().toString(16);
+
+    const clientSentAtMs = Date.now();
+    conn.pendingPings.set(requestId, clientSentAtMs);
+
+    // prune stale pings
+    const cutoff = clientSentAtMs - 120_000;
+    for (const [id, t] of conn.pendingPings) {
+      if (t < cutoff) conn.pendingPings.delete(id);
+    }
+
+    try {
+      conn.socket.send(
+        JSON.stringify({
+          event: 'TIME_SYNC_PING',
+          data: { requestId, clientSentAtMs },
+        })
+      );
+    } catch {
+      // ignore
+    }
+  }, 15_000);
+}
+
+function stopTimeSync(conn: ManagedConn) {
+  if (conn.timeSyncTimer) {
+    clearInterval(conn.timeSyncTimer);
+    conn.timeSyncTimer = null;
+  }
+  conn.pendingPings.clear();
+}
 
 // Global, per-tab connection pool.
 const connections = new Map<string, ManagedConn>();
@@ -174,23 +236,24 @@ function attachSocketHandlers(conn: ManagedConn) {
     if (!msg) return;
 
     // Keep minimal shared state on the connection.
-    if (msg.event === 'JOINED') {
+    
+if (msg.event === 'TIME_SYNC_PONG') {
+  const requestId = msg.data?.requestId as string | undefined;
+  const serverTimeMs = msg.data?.serverTimeMs as number | undefined;
+  if (requestId && typeof serverTimeMs === 'number') {
+    conn.pendingPings.delete(requestId);
+    updateServerClock(conn, serverTimeMs, Date.now());
+  }
+}
+
+if (msg.event === 'JOINED') {
       conn.joined = true;
       if (typeof msg.data?.participantCount === 'number') {
         conn.participantCount = msg.data.participantCount;
       }
       if (typeof msg.data?.serverTimeMs === 'number') {
-        // Apply the same monotonic+clamped offset update used for bid/time events.
-        // JOINED can arrive after a reconnect and its one-way timestamp is skewed by network latency.
-        // If we allow the offset to move backwards here, countdown timers can "gain" seconds.
-        const computed = msg.data.serverTimeMs - Date.now();
-        const monotonic = Math.max(conn.serverOffsetMs, computed);
-        const MAX_STEP = 250;
-        const delta = monotonic - conn.serverOffsetMs;
-        conn.serverOffsetMs =
-          Math.abs(delta) <= MAX_STEP
-            ? monotonic
-            : conn.serverOffsetMs + Math.sign(delta) * MAX_STEP;
+        updateServerClock(conn, msg.data.serverTimeMs, Date.now());
+        startTimeSync(conn);
       }
     }
 
@@ -212,32 +275,13 @@ function attachSocketHandlers(conn: ManagedConn) {
     }
 
     // Update server offset when available.
-    // IMPORTANT:
-    // Using one-way timestamps (serverTimeMs - clientNow) is skewed by network latency.
-    // Under load, latency fluctuates and can make the computed offset jump backwards,
-    // which causes countdown timers to "gain" seconds (bad UX).
-    // We therefore apply a monotonic + smoothed update:
-    // - Never move the offset in a direction that would make our perceived "server now" go backwards.
-    // - Clamp adjustments per message to avoid big jumps.
     if (
       (msg.event === 'BID_PLACED' || msg.event === 'AUCTION_TIME_EXTENDED') &&
       typeof msg.data?.serverTimeMs === 'number'
     ) {
-      const computed = msg.data.serverTimeMs - Date.now();
-      // Prevent "time going backwards" (avoid offset becoming more negative).
-      const monotonic = Math.max(conn.serverOffsetMs, computed);
-      // Clamp per-message adjustment (ms)
-      const MAX_STEP = 250;
-      const delta = monotonic - conn.serverOffsetMs;
-      const clamped =
-        Math.abs(delta) <= MAX_STEP
-          ? monotonic
-          : conn.serverOffsetMs + Math.sign(delta) * MAX_STEP;
-
-      conn.serverOffsetMs = clamped;
+      updateServerClock(conn, msg.data.serverTimeMs, Date.now());
     }
-
-    if (msg.event === 'ERROR') {
+if (msg.event === 'ERROR') {
       const serverMsg =
         typeof msg.data?.message === 'string'
           ? msg.data.message
@@ -298,7 +342,10 @@ function getOrCreateConnection(params: {
     joined: false,
     participantCount: 0,
     serverOffsetMs: 0,
-    lastError: null,
+        serverNowMonotonicMs: 0,
+    timeSyncTimer: null,
+    pendingPings: new Map<string, number>(),
+lastError: null,
     closing: false,
     reconnectAttempts: 0,
     reconnectTimer: null,
@@ -330,6 +377,7 @@ export function useAuctionWebSocketBidding({
   const [participantCount, setParticipantCount] = useState(0);
   const [connectionError, setConnectionError] = useState<string | null>(null);
   const [serverOffsetMs, setServerOffsetMs] = useState(0);
+  const [serverNowMonotonicMs, setServerNowMonotonicMs] = useState(0);
 
   const callbacksRef = useRef({
     onBidPlaced,
@@ -367,6 +415,7 @@ export function useAuctionWebSocketBidding({
     setConnectionError(conn.lastError);
     setParticipantCount(conn.participantCount);
     setServerOffsetMs(conn.serverOffsetMs);
+    setServerNowMonotonicMs(conn.serverNowMonotonicMs);
     setIsJoined(conn.joined);
     setIsConnected(conn.socket.readyState === WebSocket.OPEN);
 
@@ -388,6 +437,7 @@ export function useAuctionWebSocketBidding({
           setIsJoined(true);
           setParticipantCount(conn.participantCount);
           setServerOffsetMs(conn.serverOffsetMs);
+    setServerNowMonotonicMs(conn.serverNowMonotonicMs);
           // If server provided a snapshot (auction / item clocks), sync it immediately.
           callbacksRef.current.onSnapshot?.({
             auction: msg.data?.auction,
@@ -412,6 +462,7 @@ export function useAuctionWebSocketBidding({
 
         if (msg.event === 'BID_PLACED') {
           setServerOffsetMs(conn.serverOffsetMs);
+    setServerNowMonotonicMs(conn.serverNowMonotonicMs);
           callbacksRef.current.onBidPlaced?.(msg.data);
           return;
         }
@@ -423,6 +474,7 @@ export function useAuctionWebSocketBidding({
 
         if (msg.event === 'AUCTION_TIME_EXTENDED') {
           setServerOffsetMs(conn.serverOffsetMs);
+    setServerNowMonotonicMs(conn.serverNowMonotonicMs);
           callbacksRef.current.onTimeExtension?.(msg.data);
           return;
         }
@@ -533,6 +585,7 @@ export function useAuctionWebSocketBidding({
     participantCount,
     connectionError,
     serverOffsetMs,
+    serverNowMonotonicMs,
     sendBid,
   };
 }
