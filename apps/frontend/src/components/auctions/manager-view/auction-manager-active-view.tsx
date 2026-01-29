@@ -158,12 +158,7 @@ export function AuctionManagerActiveView({
     fallbackData: [],
   });
 
-  const auctionStatus = useAuctionStatus(
-    auction.status,
-    auction.startTime,
-    auctionEndTime,
-    { serverOffsetMs }
-  );
+  // NOTE: auctionStatus is computed after the shared nowMs is initialized (to keep all timers perfectly consistent).
 
   // Initialize bid history from props
   useEffect(() => {
@@ -362,15 +357,64 @@ export function AuctionManagerActiveView({
   const [nowMs, setNowMs] = useState(() => Date.now() + (wsServerOffsetMs || 0));
 
   useEffect(() => {
-    const tick = () => {
-      const next = Date.now() + (wsServerOffsetMs || 0);
-      // Monotonic: never allow perceived server time to go backwards.
-      setNowMs((prev) => (next > prev ? next : prev));
+    let timeout: ReturnType<typeof setTimeout> | null = null;
+
+    const getNearestEndMs = (): number => {
+      const candidates: number[] = [];
+
+      const overall = new Date(auction.endTime as any).getTime();
+      if (Number.isFinite(overall)) candidates.push(overall);
+
+      if (auctionItems && auctionItems.length > 0) {
+        for (const ai of auctionItems) {
+          const endTime =
+            itemTimes[ai.id]?.endTime || (ai as any).endTime || auction.endTime;
+          const ms = new Date(endTime as any).getTime();
+          if (Number.isFinite(ms)) candidates.push(ms);
+        }
+      }
+
+      return candidates.length > 0 ? Math.min(...candidates) : Date.now();
     };
-    tick();
-    const id = setInterval(tick, 1000);
-    return () => clearInterval(id);
-  }, [wsServerOffsetMs]);
+
+    const schedule = () => {
+      // Adaptive tick:
+      // - Smooth near the end (250ms)
+      // - Lighter updates when far from end (1000ms)
+      const offset = wsServerOffsetMs || 0;
+      const now = Date.now() + offset;
+      const nearestEndMs = getNearestEndMs();
+      const remainingMs = Math.max(0, nearestEndMs - now);
+      const baseTickMs = remainingMs <= 15_000 ? 100 : remainingMs <= 120_000 ? 250 : 1000;
+
+      const alignedDelay = Math.max(10, baseTickMs - (now % baseTickMs));
+
+      timeout = setTimeout(() => {
+        const next = Date.now() + offset;
+        // Monotonic: never allow perceived server time to go backwards.
+        setNowMs((prev) => (next > prev ? next : prev));
+        schedule();
+      }, alignedDelay);
+    };
+
+    // Prime immediate tick, then schedule.
+    setNowMs((prev) => {
+      const next = Date.now() + (wsServerOffsetMs || 0);
+      return next > prev ? next : prev;
+    });
+    schedule();
+
+    return () => {
+      if (timeout) clearTimeout(timeout);
+    };
+  }, [wsServerOffsetMs, auction.endTime, auctionItems, itemTimes]);
+
+  const auctionStatus = useAuctionStatus(
+    auction.status,
+    auction.startTime,
+    auctionEndTime,
+    { serverOffsetMs, nowMs }
+  );
 
 
   // Initialize per-item clocks (fallback to auction-level times when item times are null)
