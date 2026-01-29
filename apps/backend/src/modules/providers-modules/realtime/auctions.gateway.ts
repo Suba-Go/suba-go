@@ -444,6 +444,30 @@ export class AuctionsGateway
     }
   }
 
+
+  /**
+   * Application-level PING/PONG.
+   *
+   * Why not rely only on WS protocol ping frames?
+   * - Browsers don't expose server timestamps for protocol-level pong.
+   * - We need serverTimeMs to do NTP-style clock sync on the client for precise countdowns.
+   */
+  @SubscribeMessage('PING')
+  handlePing(
+    @MessageBody() data: { requestId?: string; clientTimeMs?: number },
+    @ConnectedSocket() client: WebSocket
+  ) {
+    // Echo requestId + clientTimeMs back, and include server time.
+    this.sendMessage(client, {
+      event: 'PONG',
+      data: {
+        requestId: data?.requestId,
+        clientTimeMs: typeof data?.clientTimeMs === 'number' ? data.clientTimeMs : undefined,
+        serverTimeMs: Date.now(),
+      },
+    });
+  }
+
   /**
    * Handle PLACE_BID message
    * Validates the request and forwards to BidRealtimeService for processing

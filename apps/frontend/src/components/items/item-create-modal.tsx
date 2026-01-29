@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import {
@@ -9,7 +9,7 @@ import {
   LegalStatusEnum,
   ItemStateEnum,
 } from '@suba-go/shared-validation';
-import { Car, Upload, FileText } from 'lucide-react';
+import { Car, Upload, FileText, ChevronLeft, ChevronRight } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -41,12 +41,22 @@ export function ItemCreateModal({
   const [isUploadingPhotos, setIsUploadingPhotos] = useState(false);
   const [isUploadingDocs, setIsUploadingDocs] = useState(false);
   const [photoUrls, setPhotoUrls] = useState<string[]>([]);
+  const [photoCarouselIndex, setPhotoCarouselIndex] = useState(0);
   const [docUrls, setDocUrls] = useState<string[]>([]);
   const { toast } = useToast();
   const { company } = useCompany();
   const primaryColor = company?.principal_color || '#3B82F6';
 
   const isUploadingFiles = isUploadingPhotos || isUploadingDocs;
+
+
+  // Keep carousel index valid when photos change
+  useEffect(() => {
+    setPhotoCarouselIndex((idx) => {
+      if (photoUrls.length === 0) return 0;
+      return Math.min(idx, photoUrls.length - 1);
+    });
+  }, [photoUrls.length]);
 
   // Create dynamic style for focus ring and border
   const inputFocusStyle = useMemo(
@@ -123,8 +133,41 @@ export function ItemCreateModal({
   const handleClose = () => {
     reset();
     setPhotoUrls([]);
+    setPhotoCarouselIndex(0);
     setDocUrls([]);
     onClose();
+  };
+
+
+  const goPrevPhoto = (e?: any) => {
+    e?.preventDefault();
+    e?.stopPropagation();
+    setPhotoCarouselIndex((idx) => {
+      if (photoUrls.length === 0) return 0;
+      return (idx - 1 + photoUrls.length) % photoUrls.length;
+    });
+  };
+
+  const goNextPhoto = (e?: any) => {
+    e?.preventDefault();
+    e?.stopPropagation();
+    setPhotoCarouselIndex((idx) => {
+      if (photoUrls.length === 0) return 0;
+      return (idx + 1) % photoUrls.length;
+    });
+  };
+
+  const setCurrentAsCover = (e?: any) => {
+    e?.preventDefault();
+    e?.stopPropagation();
+    setPhotoUrls((prev) => {
+      if (prev.length <= 1) return prev;
+      const idx = Math.min(photoCarouselIndex, prev.length - 1);
+      if (idx === 0) return prev;
+      const next = [prev[idx], ...prev.slice(0, idx), ...prev.slice(idx + 1)];
+      return next;
+    });
+    setPhotoCarouselIndex(0);
   };
 
   return (
@@ -345,6 +388,91 @@ export function ItemCreateModal({
               <p className="text-xs text-gray-500 mt-1">
                 Formatos: JPG, PNG, WebP (máx. 5MB cada una)
               </p>
+
+              {photoUrls.length > 0 && (
+                <div className="mt-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <p className="text-sm font-semibold text-gray-900">
+                        Foto de presentación
+                      </p>
+                      <p className="text-xs text-gray-600">
+                        La portada será la imagen que se verá en listados y tarjetas.
+                      </p>
+                    </div>
+
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="shrink-0"
+                      onClick={setCurrentAsCover}
+                      disabled={photoUrls.length === 0 || photoCarouselIndex === 0}
+                    >
+                      Usar como portada
+                    </Button>
+                  </div>
+
+                  <div className="mt-3 rounded-xl border bg-white p-3">
+                    <div className="relative overflow-hidden rounded-lg bg-gray-50">
+                      {/* Cover badge */}
+                      {photoCarouselIndex === 0 && (
+                        <div className="absolute left-2 top-2 z-10 rounded-full bg-black/70 px-2 py-1 text-[11px] font-medium text-white">
+                          Portada
+                        </div>
+                      )}
+
+                      <img
+                        src={photoUrls[photoCarouselIndex]}
+                        alt={`Foto ${photoCarouselIndex + 1}`}
+                        className="h-[220px] w-full select-none object-contain"
+                        draggable={false}
+                      />
+
+                      {photoUrls.length > 1 && (
+                        <>
+                          <button
+                            type="button"
+                            onClick={goPrevPhoto}
+                            className="absolute left-2 top-1/2 z-10 -translate-y-1/2 rounded-full bg-white/90 p-2 shadow hover:bg-white"
+                            aria-label="Foto anterior"
+                          >
+                            <ChevronLeft className="h-5 w-5" />
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={goNextPhoto}
+                            className="absolute right-2 top-1/2 z-10 -translate-y-1/2 rounded-full bg-white/90 p-2 shadow hover:bg-white"
+                            aria-label="Foto siguiente"
+                          >
+                            <ChevronRight className="h-5 w-5" />
+                          </button>
+                        </>
+                      )}
+                    </div>
+
+                    {photoUrls.length > 1 && (
+                      <div className="mt-3 flex items-center justify-center gap-2">
+                        {photoUrls.map((_, i) => (
+                          <button
+                            key={i}
+                            type="button"
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              setPhotoCarouselIndex(i);
+                            }}
+                            className={`h-2.5 w-2.5 rounded-full ${
+                              i === photoCarouselIndex ? 'bg-blue-500' : 'bg-gray-300'
+                            }`}
+                            aria-label={`Ir a foto ${i + 1}`}
+                          />
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
 
             <div>
