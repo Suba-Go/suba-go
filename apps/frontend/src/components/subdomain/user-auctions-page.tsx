@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import { ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Search, X } from 'lucide-react';
@@ -52,6 +52,371 @@ export default function UserAuctionsPage() {
   const [pageSize, setPageSize] = useState<6 | 9 | 12>(9);
   const [activePage, setActivePage] = useState(1);
   const [historyPage, setHistoryPage] = useState(1);
+
+
+  // --- Realtime status sync for "Mis Subastas" ---
+  // This view previously fetched once and would remain stale (e.g. PENDIENTE) even after the auction started.
+  // We open ONE WS connection and join the rooms for the user's relevant auctions (PENDIENTE/ACTIVA),
+  // so AUCTION_STATUS_CHANGED updates the list immediately.
+  const accessToken = session?.tokens?.accessToken ?? '';
+  const tenantId = useMemo(() => {
+    return (
+      (companyContext?.company as any)?.tenantId ??
+      (session?.user as any)?.tenantId ??
+      // Fallback: derive from the first auction once loaded
+      (auctions.find((a: any) => a?.tenantId)?.tenantId as string | undefined) ??
+      ''
+    );
+  }, [companyContext?.company, session?.user, auctions]);
+
+  const wsRef = useRef<WebSocket | null>(null);
+  const joinedAuctionsRef = useRef<Set<string>>(new Set());
+  const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const reconnectAttemptRef = useRef(0);
+  const unmountedRef = useRef(false);
+
+  // --- Shared server-synced clock for ALL cards in this page ---
+  // We compute an NTP-style offset using WS PING/PONG and drive a single ticker.
+  // This prevents subtle 1s drift between cards and keeps "Termina en" consistent
+  // when the server extends time (soft-close).
+  const baseClientNowRef = useRef<number>(0);
+  const basePerfRef = useRef<number>(0);
+  const serverOffsetRef = useRef<number>(0);
+  const [serverOffsetMs, setServerOffsetMs] = useState<number>(0);
+  const [syncedNowMs, setSyncedNowMs] = useState<number>(() => Date.now());
+  const timeTickerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const timeSyncIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // Keep track of outstanding PINGs: requestId -> clientSendMs
+  const pendingPingsRef = useRef<Map<string, number>>(new Map());
+
+  const createRequestId = () => `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+
+  const clientNowMonotonicMs = () => {
+    // Initialize base anchors lazily (client-only component).
+    if (!baseClientNowRef.current) {
+      baseClientNowRef.current = Date.now();
+      basePerfRef.current = typeof performance !== 'undefined' ? performance.now() : 0;
+    }
+    const perfNow = typeof performance !== 'undefined' ? performance.now() : 0;
+    return baseClientNowRef.current + (perfNow - basePerfRef.current);
+  };
+
+  const applyOffsetSample = (sampleOffsetMs: number, weight = 0.2) => {
+    // Smooth offset updates to avoid jitter when RTT fluctuates.
+    const prev = serverOffsetRef.current || 0;
+    const next = prev + (sampleOffsetMs - prev) * weight;
+    serverOffsetRef.current = next;
+    setServerOffsetMs(next);
+  };
+
+  const stopTimeTicker = () => {
+    if (timeTickerRef.current) {
+      clearInterval(timeTickerRef.current);
+      timeTickerRef.current = null;
+    }
+  };
+
+  const stopTimeSync = () => {
+    if (timeSyncIntervalRef.current) {
+      clearInterval(timeSyncIntervalRef.current);
+      timeSyncIntervalRef.current = null;
+    }
+    pendingPingsRef.current.clear();
+  };
+
+  const wsUrl = useMemo(() => {
+    const endpoint =
+      process.env.NEXT_PUBLIC_WS_ENDPOINT ||
+      (process.env.BACKEND_URL
+        ? process.env.BACKEND_URL.replace(/^http/, 'ws') + '/ws'
+        : 'ws://localhost:3001/ws');
+    return accessToken ? `${endpoint}?token=${encodeURIComponent(accessToken)}` : '';
+  }, [accessToken]);
+
+  const realtimeTargetAuctionIds = useMemo(() => {
+    // Only join rooms that can change in realtime for this view
+    return auctions
+      .filter((a) => a?.id && (a.status === 'PENDIENTE' || a.status === 'ACTIVA'))
+      .map((a) => a.id as string);
+  }, [auctions]);
+
+  const realtimeTargetAuctionIdsRef = useRef<string[]>([]);
+  useEffect(() => {
+    realtimeTargetAuctionIdsRef.current = realtimeTargetAuctionIds;
+  }, [realtimeTargetAuctionIds]);
+
+  const upsertAuctionFromWs = (auctionId: string, patch: Partial<AuctionDto> & any) => {
+    setAuctions((prev) => prev.map((a) => (a.id === auctionId ? { ...a, ...patch } : a)));
+  };
+
+  // Adaptive tick for smoother UI close to boundaries (start/end), without burning CPU.
+  const adaptiveTickMs = useMemo(() => {
+    const now = Date.now() + serverOffsetMs;
+    let minDelta = Number.POSITIVE_INFINITY;
+    for (const a of auctions) {
+      const start = a?.startTime ? new Date(a.startTime as any).getTime() : 0;
+      const end = a?.endTime ? new Date(a.endTime as any).getTime() : 0;
+      if (!start || !end) continue;
+      // Pending -> target start; Active -> target end.
+      const target = a.status === 'PENDIENTE' ? start : a.status === 'ACTIVA' ? end : 0;
+      if (!target) continue;
+      const d = target - now;
+      if (d > 0 && d < minDelta) minDelta = d;
+    }
+    if (minDelta <= 15_000) return 100;
+    if (minDelta <= 120_000) return 250;
+    return 1000;
+  }, [auctions, serverOffsetMs]);
+
+  // Drive ONE shared server-synced clock for the whole page.
+  useEffect(() => {
+    stopTimeTicker();
+    const tick = adaptiveTickMs;
+    if (!tick || tick <= 0) return;
+
+    const updateNow = () => {
+      const next = clientNowMonotonicMs() + (serverOffsetRef.current || 0);
+      setSyncedNowMs((prev) => (next > prev ? next : prev));
+    };
+
+    // Immediate update so first paint is aligned.
+    updateNow();
+
+    timeTickerRef.current = setInterval(updateNow, tick);
+    return () => stopTimeTicker();
+  }, [adaptiveTickMs]);
+
+  // Connect WS once (per page mount) to receive status changes.
+  useEffect(() => {
+    unmountedRef.current = false;
+
+    if (!wsUrl || !tenantId) return;
+
+    const cleanup = () => {
+      // Stop shared clock services before touching the socket.
+      stopTimeSync();
+      stopTimeTicker();
+
+      if (reconnectTimerRef.current) {
+        clearTimeout(reconnectTimerRef.current);
+        reconnectTimerRef.current = null;
+      }
+      const ws = wsRef.current;
+      wsRef.current = null;
+
+      if (ws) {
+        try {
+          // Leave joined rooms gracefully
+          joinedAuctionsRef.current.forEach((auctionId) => {
+            try {
+              ws.send(
+                JSON.stringify({
+                  event: 'LEAVE_AUCTION',
+                  data: { tenantId, auctionId },
+                })
+              );
+            } catch {
+              // ignore
+            }
+          });
+          joinedAuctionsRef.current.clear();
+        } finally {
+          try {
+            ws.close();
+          } catch {
+            // ignore
+          }
+        }
+      }
+    };
+
+    const safeParse = (raw: any) => {
+      try {
+        if (typeof raw !== 'string') return null;
+        return JSON.parse(raw);
+      } catch {
+        return null;
+      }
+    };
+
+    const backoffMs = (attempt: number) => {
+      const base = 600;
+      const ms = Math.floor(base * Math.pow(1.6, attempt));
+      return Math.min(ms, 12_000);
+    };
+
+    const sendPing = (ws: WebSocket) => {
+      if (ws.readyState !== WebSocket.OPEN) return;
+      const requestId = createRequestId();
+      const clientTimeMs = Date.now();
+      pendingPingsRef.current.set(requestId, clientTimeMs);
+      try {
+        ws.send(
+          JSON.stringify({
+            event: 'PING',
+            data: { requestId, clientTimeMs },
+          })
+        );
+      } catch {
+        // ignore
+      }
+    };
+
+    const startTimeSync = (ws: WebSocket) => {
+      stopTimeSync();
+      // Kick one ping immediately and then keep a cadence.
+      sendPing(ws);
+      timeSyncIntervalRef.current = setInterval(() => sendPing(ws), 15_000);
+    };
+
+    const connect = () => {
+      if (unmountedRef.current) return;
+
+      cleanup();
+
+      let ws: WebSocket;
+      try {
+        ws = new WebSocket(wsUrl);
+      } catch (e) {
+        console.error('WS init failed:', e);
+        return;
+      }
+
+      wsRef.current = ws;
+
+      ws.onopen = () => {
+        reconnectAttemptRef.current = 0;
+
+        // Start periodic clock sync (PING/PONG) as soon as the socket is open.
+        startTimeSync(ws);
+
+        // Join current targets immediately
+        (realtimeTargetAuctionIdsRef.current || []).forEach((auctionId) => {
+          if (joinedAuctionsRef.current.has(auctionId)) return;
+          joinedAuctionsRef.current.add(auctionId);
+          ws.send(
+            JSON.stringify({
+              event: 'JOIN_AUCTION',
+              data: { tenantId, auctionId },
+            })
+          );
+        });
+      };
+
+      ws.onmessage = (ev) => {
+        const msg = safeParse(ev.data);
+        if (!msg || typeof msg.event !== 'string') return;
+
+        if (msg.event === 'PONG') {
+          const requestId = msg.data?.requestId;
+          const echoedClientTimeMs = typeof msg.data?.clientTimeMs === 'number' ? msg.data.clientTimeMs : undefined;
+          const serverTimeMs = typeof msg.data?.serverTimeMs === 'number' ? msg.data.serverTimeMs : undefined;
+          const tRecv = Date.now();
+
+          const tSend =
+            (requestId && pendingPingsRef.current.get(requestId)) ??
+            echoedClientTimeMs;
+          if (requestId) pendingPingsRef.current.delete(requestId);
+
+          if (typeof tSend === 'number' && typeof serverTimeMs === 'number') {
+            const rtt = Math.max(0, tRecv - tSend);
+            // Estimate server time at receive: serverTimeMs + rtt/2 (assumes symmetric path).
+            const estimatedServerNow = serverTimeMs + rtt / 2;
+            const sampleOffset = estimatedServerNow - tRecv;
+            applyOffsetSample(sampleOffset, 0.25);
+          }
+          return;
+        }
+
+        if (msg.event === 'JOINED') {
+          const a = msg.data?.auction;
+          const st = typeof msg.data?.serverTimeMs === 'number' ? msg.data.serverTimeMs : undefined;
+          if (typeof st === 'number') {
+            // Quick coarse correction on join (no RTT) - keep weight low.
+            applyOffsetSample(st - Date.now(), 0.1);
+          }
+          if (a?.id) {
+            upsertAuctionFromWs(a.id, {
+              status: a.status,
+              startTime: a.startTime,
+              endTime: a.endTime,
+            });
+          }
+          return;
+        }
+
+        if (msg.event === 'AUCTION_STATUS_CHANGED') {
+          const auctionId = msg.data?.auctionId;
+          const status = msg.data?.status;
+          const a = msg.data?.auction;
+          if (auctionId && status) {
+            upsertAuctionFromWs(auctionId, {
+              status,
+              ...(a?.startTime ? { startTime: a.startTime } : null),
+              ...(a?.endTime ? { endTime: a.endTime } : null),
+            });
+          }
+          return;
+        }
+
+        if (msg.event === 'AUCTION_TIME_EXTENDED') {
+          // Keep list cards consistent if the server extended the auction end time.
+          const auctionId = msg.data?.auctionId;
+          const newEndTime = msg.data?.newEndTime;
+          const st = typeof msg.data?.serverTimeMs === 'number' ? msg.data.serverTimeMs : undefined;
+          if (typeof st === 'number') {
+            applyOffsetSample(st - Date.now(), 0.15);
+          }
+          if (auctionId && newEndTime) {
+            upsertAuctionFromWs(auctionId, { endTime: newEndTime });
+          }
+          return;
+        }
+      };
+
+      ws.onerror = () => {
+        // ignore; close handler will trigger reconnect
+      };
+
+      ws.onclose = () => {
+        if (unmountedRef.current) return;
+        const attempt = reconnectAttemptRef.current++;
+        const wait = backoffMs(attempt);
+        reconnectTimerRef.current = setTimeout(connect, wait);
+      };
+    };
+
+    connect();
+
+    return () => {
+      unmountedRef.current = true;
+      cleanup();
+    };
+    // Connect only when auth/tenant changes
+  }, [wsUrl, tenantId]);
+
+  // Join newly visible auctions as the list changes (without reopening socket).
+  useEffect(() => {
+    const ws = wsRef.current;
+    if (!ws || ws.readyState !== WebSocket.OPEN) return;
+    if (!tenantId) return;
+
+    realtimeTargetAuctionIds.forEach((auctionId) => {
+      if (joinedAuctionsRef.current.has(auctionId)) return;
+      joinedAuctionsRef.current.add(auctionId);
+      try {
+        ws.send(
+          JSON.stringify({
+            event: 'JOIN_AUCTION',
+            data: { tenantId, auctionId },
+          })
+        );
+      } catch {
+        // ignore
+      }
+    });
+  }, [realtimeTargetAuctionIds, tenantId]);
 
   // Hard guard: only USER should access these views (client requirement)
   useEffect(() => {
@@ -342,6 +707,7 @@ export default function UserAuctionsPage() {
                         key={auction.id}
                         auction={auction as any}
                         onUpdate={() => {}}
+                        clock={{ nowMs: syncedNowMs, serverOffsetMs, tickMs: adaptiveTickMs }}
                         imageSizes={gridImageSizes}
                         imageQuality={82}
                       />
@@ -452,6 +818,7 @@ export default function UserAuctionsPage() {
                         key={auction.id}
                         auction={auction as any}
                         onUpdate={() => {}}
+                        clock={{ nowMs: syncedNowMs, serverOffsetMs, tickMs: adaptiveTickMs }}
                         imageSizes={gridImageSizes}
                         imageQuality={82}
                       />

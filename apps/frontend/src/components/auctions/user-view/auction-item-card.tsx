@@ -4,7 +4,7 @@
  */
 'use client';
 
-import Image from 'next/image';
+import { SafeImage } from '@/components/ui/safe-image';
 import {
   Card,
   CardContent,
@@ -168,18 +168,14 @@ export function AuctionItemCard({
 
         {/* Product photo (per item) */}
         <div className="relative h-48 sm:h-56 w-full overflow-hidden rounded-xl bg-gray-100">
-          <Image
+          <SafeImage
             src={photoUrl || FALLBACK_IMAGE_DATA_URL}
             alt={`${auctionItem.item?.brand ?? 'Producto'} ${auctionItem.item?.model ?? ''}`.trim()}
             fill
             className={photoUrl ? 'object-cover' : 'object-contain p-8 opacity-80'}
             sizes="(max-width: 1024px) 100vw, 50vw"
             quality={photoUrl ? 82 : 60}
-            onError={(e) => {
-              const target = e.currentTarget as HTMLImageElement;
-              target.src = FALLBACK_IMAGE_DATA_URL;
-            }}
-          />
+/>
         </div>
 
         {/* Current Price Info */}

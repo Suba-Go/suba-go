@@ -4,10 +4,9 @@
  */
 'use client';
 
+import { SafeImage } from '@/components/ui/safe-image';
 import { useMemo, useState } from 'react';
 import Link from 'next/link';
-import Image from 'next/image';
-
 import { Alert, AlertDescription } from '@suba-go/shared-components/components/ui/alert';
 import { Button } from '@suba-go/shared-components/components/ui/button';
 import { Input } from '@suba-go/shared-components/components/ui/input';
@@ -195,7 +194,7 @@ export function AuctionPendingView({
                   }}
                 >
                   {coverUrl ? (
-                    <Image
+                    <SafeImage
                       src={coverUrl}
                       alt={item?.title || item?.plate || 'Producto'}
                       fill

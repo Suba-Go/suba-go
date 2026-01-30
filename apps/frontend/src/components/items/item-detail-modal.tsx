@@ -1,5 +1,6 @@
 'use client';
 
+import { SafeImage } from '@/components/ui/safe-image';
 import { useState } from 'react';
 import {
   Car,
@@ -26,8 +27,6 @@ import {
   CarouselPrevious,
 } from '@suba-go/shared-components/components/ui/carousel';
 import { DocumentPreview } from '@/components/ui/document-preview';
-import Image from 'next/image';
-
 interface ItemDetailModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -191,7 +190,7 @@ export function ItemDetailModal({
                   {photoUrls.map((url, index) => (
                     <CarouselItem key={index}>
                       <div className="aspect-video bg-gray-100 rounded-lg overflow-hidden">
-                        <Image
+                        <SafeImage
                           src={url}
                           alt={`Foto ${index + 1}`}
                           width={100}

@@ -1,5 +1,6 @@
 'use client';
 
+import { SafeImage } from '@/components/ui/safe-image';
 import { useState, useEffect } from 'react';
 import {
   Car,
@@ -14,7 +15,6 @@ import {
   ChevronLeft,
   ChevronRight,
 } from 'lucide-react';
-import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { Button } from '@suba-go/shared-components/components/ui/button';
 import { Badge } from '@suba-go/shared-components/components/ui/badge';
@@ -361,7 +361,7 @@ export function AuctionItemDetailModal({
                     {photoUrls.map((url: string, index: number) => (
                       <CarouselItem key={index} className="pl-0">
                         <div className="aspect-video relative bg-gray-100 rounded-lg overflow-hidden">
-                          <Image
+                          <SafeImage
                             src={url}
                             fill
                             alt={`Foto ${index + 1}`}

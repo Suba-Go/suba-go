@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { useSession } from 'next-auth/react';
-import Image from 'next/image';
+import { SafeImage } from '@/components/ui/safe-image';
 import Link from 'next/link';
 import {
   ChevronLeft,
@@ -289,7 +289,7 @@ export default function UserAwardsPage() {
           {computed.pageItems.map((item) => (
             <Card key={item.id} className="overflow-hidden hover:shadow-md transition-shadow">
               <div className="aspect-video relative bg-gray-100">
-                <Image
+                <SafeImage
                   src={parseFirstPhoto(item.photos)}
                   alt={`${item.brand} ${item.model}`}
                   fill
