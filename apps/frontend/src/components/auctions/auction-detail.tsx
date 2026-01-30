@@ -1,5 +1,6 @@
 'use client';
 
+import { SafeImage } from '@/components/ui/safe-image';
 import { useState, useEffect, useRef, useMemo } from 'react';
 
 import {
@@ -42,7 +43,6 @@ import {
   getAuctionStatusLabel,
 } from '@/lib/auction-badge-colors';
 import { AuctionEditModal } from './auction-edit-modal';
-import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { useAuctionStatus } from '@/hooks/use-auction-status';
 import { useAuctionCancelToggle } from '@/hooks/use-auction-cancel-toggle';
@@ -588,20 +588,14 @@ export function AuctionDetail({
                       {/* Item Image */}
                       {auctionItem.item?.photos && (
                         <div className="relative h-48 overflow-hidden rounded-t-lg bg-gray-100">
-                          <Image
+                          <SafeImage
                             src={auctionItem.item.photos.split(',')[0]?.trim()}
                             alt={`${auctionItem.item.brand} ${auctionItem.item.model}`}
                             fill
                             className="object-cover"
                             sizes="(max-width: 1024px) 100vw, 50vw"
                             quality={82}
-                            onError={(e) => {
-                              const target =
-                                e.currentTarget as HTMLImageElement;
-                              target.src =
-                                'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgdmlld0JveD0iMCAwIDIwMCAyMDAiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxyZWN0IHdpZHRoPSIyMDAiIGhlaWdodD0iMjAwIiBmaWxsPSIjRjNGNEY2Ii8+CjxwYXRoIGQ9Ik04MCA2MEgxMjBWODBIODBWNjBaIiBmaWxsPSIjOUI5QkEwIi8+CjxwYXRoIGQ9Ik02MCA4MEgxNDBWMTQwSDYwVjgwWiIgZmlsbD0iIzlCOUJBMCIvPgo8L3N2Zz4K';
-                            }}
-                          />
+/>
                         </div>
                       )}
 

@@ -39,6 +39,9 @@ const auctionWithDetailsArgs = Prisma.validator<Prisma.AuctionDefaultArgs>()({
                 id: true,
                 email: true,
                 public_name: true,
+	            // Needed for AUCTION_MANAGER views (real bidder name).
+	            // USER views will be sanitized in AuctionsService.getAuctionById.
+	            name: true,
               },
             },
           },

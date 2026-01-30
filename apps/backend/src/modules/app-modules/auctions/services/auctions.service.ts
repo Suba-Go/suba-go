@@ -136,7 +136,41 @@ async createAuction(
       }
     }
 
-    return auction;
+	    // Privacy: USERs must not receive real names/emails of other bidders.
+	    // AUCTION_MANAGER/ADMIN can see real bidder names.
+	    if (requester?.role === 'USER') {
+	      // Create a shallow clone and sanitize nested bid user payloads.
+	      const sanitized: any = {
+	        ...auction,
+	        items: (auction as any).items?.map((ai: any) => ({
+	          ...ai,
+	          bids: (ai.bids || []).map((b: any) => ({
+	            ...b,
+	            user: b.user
+	              ? {
+	                  id: b.user.id,
+	                  public_name: b.user.public_name,
+	                }
+	              : null,
+	          })),
+	          item: ai.item
+	            ? {
+	                ...ai.item,
+	                // soldToUser may exist for completed auctions; sanitize as well.
+	                soldToUser: ai.item.soldToUser
+	                  ? {
+	                      id: ai.item.soldToUser.id,
+	                      public_name: ai.item.soldToUser.public_name,
+	                    }
+	                  : null,
+	              }
+	            : ai.item,
+	        })),
+	      };
+	      return sanitized;
+	    }
+
+	    return auction as any;
   }
 
   async updateAuction(

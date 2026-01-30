@@ -3,7 +3,15 @@
 import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { Car, X, Image as ImageIcon, FileText } from 'lucide-react';
+import { SafeImage } from '@/components/ui/safe-image';
+import {
+  Car,
+  X,
+  Image as ImageIcon,
+  FileText,
+  ChevronLeft,
+  ChevronRight,
+} from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -50,7 +58,19 @@ export function ItemEditModal({
   const [docUrls, setDocUrls] = useState<string[]>([]);
   const [newPhotoUrls, setNewPhotoUrls] = useState<string[]>([]);
   const [newDocUrls, setNewDocUrls] = useState<string[]>([]);
+  const [photoCarouselIndex, setPhotoCarouselIndex] = useState(0);
   const { toast } = useToast();
+
+  const allPhotoUrls = [...photoUrls, ...newPhotoUrls];
+
+  // Keep carousel index valid when photos change
+  useEffect(() => {
+    setPhotoCarouselIndex((idx) => {
+      if (allPhotoUrls.length === 0) return 0;
+      return Math.min(idx, allPhotoUrls.length - 1);
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [photoUrls.length, newPhotoUrls.length]);
 
   // Extract filename from Vercel Blob URL
   const getFilenameFromUrl = (url: string): string => {
@@ -117,11 +137,68 @@ export function ItemEditModal({
       // Reset new uploads
       setNewPhotoUrls([]);
       setNewDocUrls([]);
+      setPhotoCarouselIndex(0);
     }
   }, [item, isOpen, reset, setValue]);
 
   const removePhoto = (index: number) => {
     setPhotoUrls((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  const removeNewPhoto = (index: number) => {
+    setNewPhotoUrls((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  const goPrevPhoto = (e?: any) => {
+    e?.preventDefault();
+    e?.stopPropagation();
+    setPhotoCarouselIndex((idx) => {
+      if (allPhotoUrls.length === 0) return 0;
+      return (idx - 1 + allPhotoUrls.length) % allPhotoUrls.length;
+    });
+  };
+
+  const goNextPhoto = (e?: any) => {
+    e?.preventDefault();
+    e?.stopPropagation();
+    setPhotoCarouselIndex((idx) => {
+      if (allPhotoUrls.length === 0) return 0;
+      return (idx + 1) % allPhotoUrls.length;
+    });
+  };
+
+  /**
+   * Sets the current carousel photo as cover.
+   * The cover is defined as the first photo in the final `photos` list.
+   */
+  const setCurrentAsCover = (e?: any) => {
+    e?.preventDefault();
+    e?.stopPropagation();
+    if (allPhotoUrls.length <= 1) return;
+
+    const idx = Math.min(photoCarouselIndex, allPhotoUrls.length - 1);
+    if (idx === 0) return;
+
+    // If cover is from existing photos, reorder inside `photoUrls`.
+    if (idx < photoUrls.length) {
+      setPhotoUrls((prev) => {
+        const picked = prev[idx];
+        const next = [picked, ...prev.slice(0, idx), ...prev.slice(idx + 1)];
+        return next;
+      });
+      setPhotoCarouselIndex(0);
+      return;
+    }
+
+    // If cover is from newly uploaded photos, move it to the front of `photoUrls`
+    // so it becomes the first element in the final merged list.
+    const newIdx = idx - photoUrls.length;
+    const pickedNew = newPhotoUrls[newIdx];
+    if (!pickedNew) return;
+
+    setPhotoUrls((prev) => [pickedNew, ...prev]);
+    setNewPhotoUrls((prev) => prev.filter((_, i) => i !== newIdx));
+    setPhotoCarouselIndex(0);
   };
 
   const removeDoc = (index: number) => {
@@ -201,6 +278,7 @@ export function ItemEditModal({
       setDocUrls([]);
       setNewPhotoUrls([]);
       setNewDocUrls([]);
+      setPhotoCarouselIndex(0);
       onClose();
     }
   };
@@ -394,6 +472,95 @@ export function ItemEditModal({
             </div>
           </div>
 
+          {/* Photos Carousel + Cover Selection */}
+          {allPhotoUrls.length > 0 && (
+            <div className="space-y-3">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <Label className="flex items-center gap-2">
+                    <ImageIcon className="h-4 w-4" />
+                    Foto de presentación
+                  </Label>
+                  <p className="text-xs text-gray-600">
+                    La portada será la imagen que se verá en listados y tarjetas.
+                  </p>
+                </div>
+
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="shrink-0"
+                  onClick={setCurrentAsCover}
+                  disabled={allPhotoUrls.length === 0 || photoCarouselIndex === 0}
+                >
+                  Usar como portada
+                </Button>
+              </div>
+
+              <div className="rounded-xl border bg-white p-3">
+                <div className="relative overflow-hidden rounded-lg bg-gray-50">
+                  {/* Cover badge */}
+                  {photoCarouselIndex === 0 && (
+                    <div className="absolute left-2 top-2 z-10 rounded-full bg-black/70 px-2 py-1 text-[11px] font-medium text-white">
+                      Portada
+                    </div>
+                  )}
+
+                  <img
+                    src={allPhotoUrls[photoCarouselIndex]}
+                    alt={`Foto ${photoCarouselIndex + 1}`}
+                    className="h-[220px] w-full select-none object-contain"
+                    draggable={false}
+                  />
+
+                  {allPhotoUrls.length > 1 && (
+                    <>
+                      <button
+                        type="button"
+                        onClick={goPrevPhoto}
+                        className="absolute left-2 top-1/2 z-10 -translate-y-1/2 rounded-full bg-white/90 p-2 shadow hover:bg-white"
+                        aria-label="Foto anterior"
+                      >
+                        <ChevronLeft className="h-5 w-5" />
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={goNextPhoto}
+                        className="absolute right-2 top-1/2 z-10 -translate-y-1/2 rounded-full bg-white/90 p-2 shadow hover:bg-white"
+                        aria-label="Foto siguiente"
+                      >
+                        <ChevronRight className="h-5 w-5" />
+                      </button>
+                    </>
+                  )}
+                </div>
+
+                {allPhotoUrls.length > 1 && (
+                  <div className="mt-3 flex items-center justify-center gap-2">
+                    {allPhotoUrls.map((_, i) => (
+                      <button
+                        key={i}
+                        type="button"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          setPhotoCarouselIndex(i);
+                        }}
+                        className={`h-2.5 w-2.5 rounded-full ${
+                          i === photoCarouselIndex
+                            ? 'bg-blue-500'
+                            : 'bg-gray-300'
+                        }`}
+                        aria-label={`Ir a foto ${i + 1}`}
+                      />
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
           {/* Existing Photos */}
           {photoUrls.length > 0 && (
             <div className="space-y-3">
@@ -405,7 +572,7 @@ export function ItemEditModal({
                 {photoUrls.map((url, index) => (
                   <div key={index} className="relative group">
                     <div className="aspect-video bg-gray-100 rounded-lg overflow-hidden">
-                      <Image
+                      <SafeImage
                         src={url}
                         width={100}
                         height={100}
@@ -419,6 +586,46 @@ export function ItemEditModal({
                       size="sm"
                       className="absolute top-1 right-1 h-6 w-6 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
                       onClick={() => removePhoto(index)}
+                    >
+                      <X className="h-3 w-3" />
+                    </Button>
+                    <p
+                      className="text-xs text-gray-500 mt-1 truncate"
+                      title={getFilenameFromUrl(url)}
+                    >
+                      {getFilenameFromUrl(url)}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* New Photos Preview (optional) */}
+          {newPhotoUrls.length > 0 && (
+            <div className="space-y-3">
+              <Label className="flex items-center gap-2">
+                <ImageIcon className="h-4 w-4" />
+                Fotos Nuevas ({newPhotoUrls.length})
+              </Label>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                {newPhotoUrls.map((url, index) => (
+                  <div key={index} className="relative group">
+                    <div className="aspect-video bg-gray-100 rounded-lg overflow-hidden">
+                      <Image
+                        src={url}
+                        width={100}
+                        height={100}
+                        alt={`Foto nueva ${index + 1}`}
+                        className="w-full h-full object-cover"
+                      />
+                    </div>
+                    <Button
+                      type="button"
+                      variant="destructive"
+                      size="sm"
+                      className="absolute top-1 right-1 h-6 w-6 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
+                      onClick={() => removeNewPhoto(index)}
                     >
                       <X className="h-3 w-3" />
                     </Button>

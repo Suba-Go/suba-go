@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState, useRef } from 'react';
 import { useSession } from 'next-auth/react';
 import Image from 'next/image';
+import { SafeImage } from '@/components/ui/safe-image';
 import { AuctionCard } from '@/components/auctions/auction-card';
 import {
   Card,
@@ -555,7 +556,7 @@ useEffect(() => {
                 >
                   <div className="aspect-video relative bg-gray-100">
                     {item.photos ? (
-                      <Image
+                      <SafeImage
                         src={
                           ((): string => {
                             try {
@@ -574,6 +575,8 @@ useEffect(() => {
                         className="object-cover"
                         sizes="(max-width: 768px) 100vw, (max-width: 1280px) 50vw, 33vw"
                         quality={82}
+                        // Improves real-world reliability on production (especially Vercel Blob)
+                        fallbackSrc="/placeholder-car.png"
                       />
                     ) : (
                       <div className="w-full h-full flex items-center justify-center text-gray-400">
