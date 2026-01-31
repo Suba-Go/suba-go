@@ -263,8 +263,23 @@ export function AuctionCreateModal({
   }, []);
 
   return (
-    <Dialog open={isOpen} onOpenChange={handleClose}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto p-4 sm:p-6">
+    <Dialog
+      open={isOpen}
+      onOpenChange={(open) => {
+        // Only close when the dialog is actually being closed.
+        // Prevents accidental closes when focus temporarily leaves the dialog
+        // (e.g. when opening a nested file picker in a child dialog).
+        if (!open) handleClose();
+      }}
+    >
+      <DialogContent
+        className="max-w-2xl max-h-[90vh] overflow-y-auto p-4 sm:p-6"
+        onFocusOutside={(e) => {
+          // Avoid closing the dialog when the browser opens the native file picker
+          // from a nested dialog (Radix can treat that as focus outside).
+          e.preventDefault();
+        }}
+      >
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Calendar className="h-5 w-5" />

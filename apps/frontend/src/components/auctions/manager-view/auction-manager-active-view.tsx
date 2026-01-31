@@ -29,6 +29,7 @@ import {
   useAuctionWebSocketBidding,
   BidData,
 } from '@/hooks/use-auction-websocket-bidding';
+import { useLiveAccessToken } from '@/hooks/use-live-access-token';
 import {
   AuctionDto,
   AuctionItemWithItmeAndBidsDto,
@@ -80,6 +81,8 @@ export function AuctionManagerActiveView({
 }: AuctionManagerActiveViewProps) {
   const router = useRouter();
   const { toast } = useToast();
+  // Keep a fresh access token while the manager stays on the live view.
+  const liveAccessToken = useLiveAccessToken(accessToken) ?? accessToken;
   const [activeTab, setActiveTab] = useState('items');
   const [selectedItemForDetail, setSelectedItemForDetail] =
     useState<AuctionItemWithItmeAndBidsDto | null>(null);
@@ -347,7 +350,7 @@ export function AuctionManagerActiveView({
   const { isConnected, participantCount, serverOffsetMs: wsServerOffsetMs } = useAuctionWebSocketBidding({
     auctionId: auction.id,
     tenantId: tenantId || '',
-    accessToken: accessToken || '',
+    accessToken: liveAccessToken || '',
     onBidPlaced: handleBidPlaced,
     onTimeExtension: handleTimeExtension,
     onStatusChanged: () => {

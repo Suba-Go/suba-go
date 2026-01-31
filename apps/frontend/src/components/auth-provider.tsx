@@ -2,6 +2,7 @@
 
 import { SessionProvider } from 'next-auth/react';
 import { ReactNode } from 'react';
+import { SessionKeeper } from './session-keeper';
 
 interface Props {
   children: ReactNode;
@@ -12,7 +13,13 @@ const NextAuthProvider = ({ children }: Props) => {
   // and persist the new tokens back to the session cookie.
   // Without this, backend calls can start returning 401 once the access token expires.
   return (
-    <SessionProvider refetchInterval={60} refetchOnWindowFocus>
+    <SessionProvider
+      // Refetch a bit more often so the jwt callback can refresh the access token
+      // before it expires (important for long-lived pages like live auctions).
+      refetchInterval={30}
+      refetchOnWindowFocus
+    >
+      <SessionKeeper />
       {children}
     </SessionProvider>
   );
