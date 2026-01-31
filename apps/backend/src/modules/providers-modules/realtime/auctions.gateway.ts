@@ -43,6 +43,10 @@ interface RoomMeta {
   tenantId: string;
   auctionId: string;
   clients: Set<WebSocket>;
+  /** Unique user presence for the room (userId -> sockets). */
+  userSockets: Map<string, Set<WebSocket>>;
+  /** Pending leave timers (userId -> timeout) to debounce reconnect thrash. */
+  pendingLeaves: Map<string, NodeJS.Timeout>;
 }
 
 /** Simple token bucket used for WS rate-limits */
@@ -355,7 +359,7 @@ export class AuctionsGateway
     this.joinRoom(client, roomKey, tenantId, auctionId);
 
     const room = this.rooms.get(roomKey);
-    const participantCount = room ? room.clients.size : 0;
+    const participantCount = room ? room.userSockets.size : 0;
 
     this.logger.log(
       `${meta.email} joined auction ${auctionId} (${participantCount} participants)`
@@ -416,13 +420,6 @@ export class AuctionsGateway
 
     this.leaveRoom(client, roomKey);
 
-    const room = this.rooms.get(roomKey);
-    const participantCount = room ? room.clients.size : 0;
-
-    this.logger.log(
-      `${meta.email} left auction ${auctionId} (${participantCount} remaining)`
-    );
-
     // Send confirmation to client
     this.sendMessage(client, {
       event: 'LEFT',
@@ -431,17 +428,6 @@ export class AuctionsGateway
         auctionId,
       },
     });
-
-    // Broadcast updated participant count
-    if (room) {
-      this.broadcastToRoom(roomKey, {
-        event: 'PARTICIPANT_COUNT',
-        data: {
-          auctionId,
-          count: participantCount,
-        },
-      });
-    }
   }
 
 
@@ -717,11 +703,26 @@ export class AuctionsGateway
         tenantId,
         auctionId,
         clients: new Set(),
+        userSockets: new Map(),
+        pendingLeaves: new Map(),
       });
     }
 
     const room = this.rooms.get(roomKey)!;
     room.clients.add(client);
+
+    // --- Presence (unique users) ---
+    // If there is a pending debounced leave for this user, cancel it.
+    const pending = room.pendingLeaves.get(meta.userId);
+    if (pending) {
+      clearTimeout(pending);
+      room.pendingLeaves.delete(meta.userId);
+    }
+
+    const sockets = room.userSockets.get(meta.userId) ?? new Set<WebSocket>();
+    sockets.add(client);
+    room.userSockets.set(meta.userId, sockets);
+
     meta.rooms.add(roomKey);
     this.clients.set(client, meta);
   }
@@ -737,8 +738,55 @@ export class AuctionsGateway
     if (room) {
       room.clients.delete(client);
 
+      // --- Presence (unique users) ---
+      const sockets = room.userSockets.get(meta.userId);
+      if (sockets) {
+        sockets.delete(client);
+
+        if (sockets.size === 0) {
+          // Debounce leaving for a short grace window.
+          // This avoids UI flicker when a browser rapidly reconnects (common on mobile
+          // networks and during dev refresh/re-render loops).
+          //
+          // IMPORTANT: we keep the (userId -> empty sockets set) entry during the grace
+          // period so the participant count does not flap. If the user reconnects, we
+          // cancel the timer and add the socket back.
+          room.userSockets.set(meta.userId, sockets);
+
+          // Only schedule a broadcast if there isn't already one pending.
+          if (!room.pendingLeaves.has(meta.userId)) {
+            const t = setTimeout(() => {
+              const currentRoom = this.rooms.get(roomKey);
+              if (!currentRoom) return;
+
+              currentRoom.pendingLeaves.delete(meta.userId);
+              const currentSockets = currentRoom.userSockets.get(meta.userId);
+
+              // If still empty after the grace period, remove presence and broadcast.
+              if (!currentSockets || currentSockets.size === 0) {
+                currentRoom.userSockets.delete(meta.userId);
+                this.broadcastToRoom(roomKey, {
+                  event: 'PARTICIPANT_COUNT',
+                  data: {
+                    auctionId: currentRoom.auctionId,
+                    count: currentRoom.userSockets.size,
+                  },
+                });
+              }
+            }, 1000);
+            room.pendingLeaves.set(meta.userId, t);
+          }
+        } else {
+          room.userSockets.set(meta.userId, sockets);
+        }
+      }
+
       // Delete room if empty
       if (room.clients.size === 0) {
+        // Clear any pending leave timers.
+        for (const [, t] of room.pendingLeaves) {
+          clearTimeout(t);
+        }
         this.rooms.delete(roomKey);
         this.logger.debug(`Room ${roomKey} deleted (empty)`);
       }
@@ -866,7 +914,7 @@ export class AuctionsGateway
   getParticipantCount(tenantId: string, auctionId: string): number {
     const roomKey = this.getRoomKey(tenantId, auctionId);
     const room = this.rooms.get(roomKey);
-    return room ? room.clients.size : 0;
+    return room ? room.userSockets.size : 0;
   }
 
   /**
@@ -892,17 +940,20 @@ export class AuctionsGateway
       isAlive: boolean;
     }> = [];
 
-    room.clients.forEach((client) => {
-      const meta = this.clients.get(client);
+    // Return one entry per unique userId.
+    for (const [userId, sockets] of room.userSockets) {
+      // Pick the first socket to read metadata.
+      const first = sockets.values().next().value as WebSocket | undefined;
+      const meta = first ? this.clients.get(first) : undefined;
       if (meta) {
         users.push({
-          userId: meta.userId,
+          userId,
           email: meta.email,
           role: meta.role,
           isAlive: meta.isAlive,
         });
       }
-    });
+    }
 
     return users;
   }
@@ -933,7 +984,7 @@ export class AuctionsGateway
       rooms.push({
         tenantId: room.tenantId,
         auctionId: room.auctionId,
-        count: room.clients.size,
+        count: room.userSockets.size,
       });
     });
     return rooms;

@@ -6,8 +6,8 @@
 
 'use client';
 
+import { SafeImage } from '@/components/ui/safe-image';
 import { useState } from 'react';
-import Image from 'next/image';
 import { Trophy, TrendingUp, XCircle } from 'lucide-react';
 import {
   Card,
@@ -125,18 +125,14 @@ export function AuctionCompletedView({
               <AlertDescription className="text-green-900">
                 <div className="flex gap-4 items-start">
                   <div className="relative h-16 w-24 shrink-0 overflow-hidden rounded-md bg-white/60 border border-green-200">
-                    <Image
+                    <SafeImage
                       src={highlightPhotoUrl || FALLBACK_IMAGE_DATA_URL}
                       alt="Producto"
                       fill
                       className={highlightPhotoUrl ? 'object-cover' : 'object-contain p-2 opacity-80'}
                       sizes="96px"
                       quality={highlightPhotoUrl ? 82 : 60}
-                      onError={(e) => {
-                        const target = e.currentTarget as HTMLImageElement;
-                        target.src = FALLBACK_IMAGE_DATA_URL;
-                      }}
-                    />
+/>
                   </div>
                   <div className="space-y-2">
                     <p className="text-xl font-bold">
@@ -158,18 +154,14 @@ export function AuctionCompletedView({
               <AlertDescription className="text-orange-900">
                 <div className="flex gap-4 items-start">
                   <div className="relative h-16 w-24 shrink-0 overflow-hidden rounded-md bg-white/60 border border-orange-200">
-                    <Image
+                    <SafeImage
                       src={highlightPhotoUrl || FALLBACK_IMAGE_DATA_URL}
                       alt="Producto"
                       fill
                       className={highlightPhotoUrl ? 'object-cover' : 'object-contain p-2 opacity-80'}
                       sizes="96px"
                       quality={highlightPhotoUrl ? 82 : 60}
-                      onError={(e) => {
-                        const target = e.currentTarget as HTMLImageElement;
-                        target.src = FALLBACK_IMAGE_DATA_URL;
-                      }}
-                    />
+/>
                   </div>
                   <div className="space-y-2">
                     <p className="text-xl font-bold">

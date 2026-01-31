@@ -1,7 +1,7 @@
 'use client';
 
+import { SafeImage } from '@/components/ui/safe-image';
 import Link from 'next/link';
-import Image from 'next/image';
 import { Clock, Users, Car, MoreVertical, Edit } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { useCompanyContextOptional } from '@/contexts/company-context';
@@ -71,6 +71,16 @@ interface AuctionCardProps {
   onUpdate: () => void;
   onEdit?: (auction: AuctionCardProps['auction']) => void;
   /**
+   * Optional server-synced clock.
+   * When provided, the card won't create its own interval and will instead
+   * render using this shared, server-aligned clock.
+   */
+  clock?: {
+    nowMs: number;
+    serverOffsetMs?: number;
+    tickMs?: number;
+  };
+  /**
    * Responsive image sizes string for Next/Image.
    * Pass per-view to avoid requesting an image that's too small (blurry)
    * or too large (wasted bandwidth).
@@ -86,6 +96,7 @@ export function AuctionCard({
   auction,
   onUpdate,
   onEdit,
+  clock,
   imageSizes,
   imageQuality,
 }: AuctionCardProps) {
@@ -99,7 +110,14 @@ export function AuctionCard({
   const auctionStatus = useAuctionStatus(
     auction.status,
     auction.startTime,
-    auction.endTime
+    auction.endTime,
+    clock
+      ? {
+          nowMs: clock.nowMs,
+          serverOffsetMs: clock.serverOffsetMs,
+          tickMs: clock.tickMs,
+        }
+      : undefined
   );
   const showActionsMenu = auctionStatus.isCompleted || auctionStatus.isPending;
 
@@ -191,7 +209,7 @@ export function AuctionCard({
     <Card className="hover:shadow-lg transition-shadow overflow-hidden">
       {/* Product preview (main image) */}
       <div className="relative aspect-video w-full bg-gray-100">
-        <Image
+        <SafeImage
           src={coverImage}
           alt={auction.title || 'Subasta'}
           fill

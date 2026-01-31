@@ -153,6 +153,17 @@ class WebSocketClient {
    */
   onStateChange(handler: StateChangeHandler): () => void {
     this.stateChangeHandlers.add(handler);
+
+    // Immediately notify the subscriber of the current state.
+    // This prevents subtle bugs where a component subscribes after the socket
+    // is already AUTHENTICATED and would otherwise never receive a state change
+    // (and therefore never JOIN its auction rooms).
+    try {
+      handler(this.state);
+    } catch (err) {
+      console.error('StateChangeHandler error:', err);
+    }
+
     return () => this.stateChangeHandlers.delete(handler);
   }
 

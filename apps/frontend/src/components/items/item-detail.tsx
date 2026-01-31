@@ -1,5 +1,6 @@
 'use client';
 
+import { SafeImage } from '@/components/ui/safe-image';
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import {
@@ -17,7 +18,6 @@ import {
   Package,
   Gavel,
 } from 'lucide-react';
-import Image from 'next/image';
 import { ItemStateEnum } from '@suba-go/shared-validation';
 import {
   getAuctionBadgeColor,
@@ -374,7 +374,7 @@ export function ItemDetail({ itemId, userRole }: ItemDetailProps) {
                   {photoUrls.map((url: string, index: number) => (
                     <CarouselItem key={index} className="pl-0">
                       <div className="aspect-video relative bg-gray-100 rounded-lg overflow-hidden">
-                        <Image
+                        <SafeImage
                           src={url}
                           fill
                           alt={`Foto ${index + 1}`}
