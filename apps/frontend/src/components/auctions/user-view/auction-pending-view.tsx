@@ -21,6 +21,7 @@ import { AuctionStartingOverlay } from '../auction-starting-overlay';
 import { AuctionItemDetailModal } from '../auction-item-detail-modal';
 import { useAuctionWebSocketBidding } from '@/hooks/use-auction-websocket-bidding';
 import { useAuctionStatus } from '@/hooks/use-auction-status';
+import { useLiveAccessToken } from '@/hooks/use-live-access-token';
 
 interface AuctionPendingViewProps {
   auction: AuctionDto;
@@ -37,13 +38,14 @@ export function AuctionPendingView({
   tenantId,
   onRealtimeSnapshot,
 }: AuctionPendingViewProps) {
+  const liveAccessToken = useLiveAccessToken(accessToken) ?? accessToken;
   const [query, setQuery] = useState('');
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
 
   const { connectionError, serverOffsetMs } = useAuctionWebSocketBidding({
     auctionId: auction.id,
     tenantId,
-    accessToken,
+    accessToken: liveAccessToken,
     onStatusChanged: () => {
       // If auction turns active, parent should refetch and reroute view
       onRealtimeSnapshot?.();
