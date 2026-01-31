@@ -24,6 +24,7 @@ import { apiFetch } from '@/lib/api/api-fetch';
 import { FileUpload } from '@/components/ui/file-upload';
 import { FormattedInput } from '@/components/ui/formatted-input';
 import { useCompany } from '@/hooks/use-company';
+import { SafeImage } from '@/components/ui/safe-image';
 
 interface ItemCreateModalProps {
   isOpen: boolean;
@@ -435,7 +436,7 @@ export function ItemCreateModal({
                         </div>
                       )}
 
-                      <img
+                      <SafeImage
                         src={photoUrls[photoCarouselIndex]}
                         alt={`Foto ${photoCarouselIndex + 1}`}
                         className="h-[220px] w-full select-none object-contain"

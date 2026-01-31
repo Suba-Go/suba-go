@@ -153,6 +153,9 @@ export function AuctionCard({
   };
 
   const getTimeDisplay = () => {
+    if (auctionStatus.isStarting) {
+      return 'Iniciando subasta...';
+    }
     if (auctionStatus.isPending && auctionStatus.timeRemaining) {
       return `Inicia en ${auctionStatus.timeRemaining}`;
     }

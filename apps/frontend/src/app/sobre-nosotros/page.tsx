@@ -1,6 +1,6 @@
 import { Metadata } from 'next';
-import Image from 'next/image';
 import { Wrench, Users, ShieldCheck } from 'lucide-react';
+import { SafeImage } from '@/components/ui/safe-image';
 
 export const metadata: Metadata = {
   title: 'Sobre nosotros | Suba&Go',
@@ -48,7 +48,7 @@ export default function SobreNosotrosPage() {
             {/* Juan Aspillaga */}
             <div className="bg-white rounded-2xl overflow-hidden shadow-lg hover:shadow-2xl transition-shadow border border-gray-100 flex flex-col">
               <div className="aspect-[4/3] relative w-full bg-gray-200">
-                <img
+                <SafeImage
                   src="https://g95bzcjyoeattqzt.public.blob.vercel-storage.com/WhatsApp%20Image%202026-01-05%20at%2021.17.48.jpeg"
                   alt="Juan Aspillaga"
                   className="w-full h-full object-cover"
@@ -69,7 +69,7 @@ export default function SobreNosotrosPage() {
             {/* Nicolás Hörmann */}
             <div className="bg-white rounded-2xl overflow-hidden shadow-lg hover:shadow-2xl transition-shadow border border-gray-100 flex flex-col">
               <div className="aspect-[4/3] relative w-full bg-gray-200">
-                <img
+                <SafeImage
                   src="https://g95bzcjyoeattqzt.public.blob.vercel-storage.com/nicofin.png"
                   alt="Nicolás Hörmann"
                   className="w-full h-full object-cover"
