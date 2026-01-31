@@ -20,6 +20,7 @@ import { AuctionItemCard } from './auction-item-card';
 import { SelfBidWarningDialog, AutoBidConfirmDialog } from './bidding-dialogs';
 import { useAuctionWebSocketBidding } from '@/hooks/use-auction-websocket-bidding';
 import { useAutoBidSettings } from '@/hooks/use-auto-bid-settings';
+import { useLiveAccessToken } from '@/hooks/use-live-access-token';
 import {
   AuctionDto,
   AuctionItemWithItmeAndBidsDto,
@@ -63,6 +64,11 @@ export function AuctionActiveBiddingView({
   userId,
   onRealtimeSnapshot,
 }: AuctionActiveBiddingViewProps) {
+  // The access token received from the Server Component can become stale if the
+  // user stays on this page for a long time (live auctions). Always prefer the
+  // most recent token from NextAuth session.
+  const liveAccessToken = useLiveAccessToken(accessToken) ?? accessToken;
+
   const [bidStates, setBidStates] = useState<BidState>({});
   const [bidHistory, setBidHistory] = useState<ItemBidHistory>({});
 
@@ -425,7 +431,7 @@ useEffect(() => {
   const { isJoined, connectionError, sendBid, serverOffsetMs } = useAuctionWebSocketBidding({
     auctionId: auction.id,
     tenantId,
-    accessToken,
+    accessToken: liveAccessToken,
     onBidPlaced: handleBidPlaced,
     onBidRejected: handleBidRejected,
     onTimeExtension: handleTimeExtension,

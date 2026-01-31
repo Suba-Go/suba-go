@@ -290,8 +290,22 @@ export function ItemEditModal({
   if (!item) return null;
 
   return (
-    <Dialog open={isOpen} onOpenChange={handleClose}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+    <Dialog
+      open={isOpen}
+      onOpenChange={(open) => {
+        // Only close when the dialog is actually being closed.
+        // This avoids accidental closes when Radix fires focus-outside events
+        // (e.g. when the native file picker opens).
+        if (!open) handleClose(false);
+      }}
+    >
+      <DialogContent
+        className="max-w-2xl max-h-[90vh] overflow-y-auto"
+        onFocusOutside={(e) => {
+          // Prevent the dialog from closing when the browser opens the native file picker.
+          e.preventDefault();
+        }}
+      >
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Car className="h-5 w-5" />

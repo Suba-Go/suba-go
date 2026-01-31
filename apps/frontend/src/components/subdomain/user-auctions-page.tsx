@@ -59,15 +59,10 @@ export default function UserAuctionsPage() {
   // We open ONE WS connection and join the rooms for the user's relevant auctions (PENDIENTE/ACTIVA),
   // so AUCTION_STATUS_CHANGED updates the list immediately.
   const accessToken = session?.tokens?.accessToken ?? '';
-  const tenantId = useMemo(() => {
-    return (
-      (companyContext?.company as any)?.tenantId ??
-      (session?.user as any)?.tenantId ??
-      // Fallback: derive from the first auction once loaded
-      (auctions.find((a: any) => a?.tenantId)?.tenantId as string | undefined) ??
-      ''
-    );
-  }, [companyContext?.company, session?.user, auctions]);
+  const tenantId =
+    (companyContext?.company as any)?.tenantId ??
+    (session?.user as any)?.tenantId ??
+    '';
 
   const wsRef = useRef<WebSocket | null>(null);
   const joinedAuctionsRef = useRef<Set<string>>(new Set());

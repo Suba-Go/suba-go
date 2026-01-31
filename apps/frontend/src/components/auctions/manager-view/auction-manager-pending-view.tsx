@@ -22,6 +22,7 @@ import {
 } from '@suba-go/shared-components/components/ui/tabs';
 import { useFetchData } from '@/hooks/use-fetch-data';
 import { useAuctionWebSocketBidding } from '@/hooks/use-auction-websocket-bidding';
+import { useLiveAccessToken } from '@/hooks/use-live-access-token';
 import {
   getAuctionBadgeColor,
   getAuctionStatusLabel,
@@ -73,6 +74,7 @@ export function AuctionManagerPendingView({
   onRealtimeSnapshot,
 }: AuctionManagerPendingViewProps) {
   const router = useRouter();
+  const liveAccessToken = useLiveAccessToken(accessToken) ?? accessToken;
   const [activeTab, setActiveTab] = useState('items');
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [selectedItemForDetail, setSelectedItemForDetail] =
@@ -94,7 +96,7 @@ export function AuctionManagerPendingView({
   const { connectionError, serverOffsetMs: wsServerOffsetMs } = useAuctionWebSocketBidding({
     auctionId: auction.id,
     tenantId,
-    accessToken,
+    accessToken: liveAccessToken,
     onStatusChanged: () => {
       // Status changed on backend; let parent refetch and route to the correct view.
       onRealtimeSnapshot?.();
