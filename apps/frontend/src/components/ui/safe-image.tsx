@@ -1,75 +1,129 @@
 'use client';
 
-import Image, { type ImageProps } from 'next/image';
-import { useMemo, useState } from 'react';
+import * as React from 'react';
 
-type SafeImageProps = Omit<ImageProps, 'src'> & {
-  src: string;
-  /** Fallback if the image fails to load after retries. */
+type NativeImgProps = Omit<React.ImgHTMLAttributes<HTMLImageElement>, 'src'> & {
+  src?: string | null;
   fallbackSrc?: string;
-  /** How many retries before falling back. Default: 2 */
-  maxRetries?: number;
 };
 
-function isVercelBlobUrl(url: string) {
-  // Examples:
-  //  - https://xxxx.public.blob.vercel-storage.com/...
-  //  - https://xxxx.blob.vercel-storage.com/...
-  return /\.blob\.vercel-storage\.com\//i.test(url);
-}
-
-function withCacheBust(url: string) {
-  const sep = url.includes('?') ? '&' : '?';
-  return `${url}${sep}v=${Date.now()}`;
-}
-
 /**
- * A resilient wrapper around next/image to avoid intermittent image failures in production.
- *
- * Why:
- * - Vercel Blob URLs are already CDN-served and immutable; Next's optimizer can occasionally
- *   timeout or fail under load, causing broken images until refresh.
- *
- * What this does:
- * - For Vercel Blob URLs, it bypasses Next optimization (unoptimized) to hit the CDN directly.
- * - Adds a small retry with cache-busting query param.
+ * Props de compatibilidad (estilo next/image) que a veces quedan en componentes.
+ * No se pasan al DOM, pero permiten que TS no marque error y que el comportamiento sea razonable.
  */
-export function SafeImage({
-  src,
-  fallbackSrc = '/placeholder-car.png',
-  maxRetries = 2,
-  onError,
-  unoptimized,
-  ...props
-}: SafeImageProps) {
-  const normalizedSrc = (src || '').trim() || fallbackSrc;
-  const [currentSrc, setCurrentSrc] = useState(normalizedSrc);
-  const [attempt, setAttempt] = useState(0);
+type NextImageCompatProps = {
+  fill?: boolean;
+  priority?: boolean;
+  quality?: number;
+  // Estas existen en <img> (sizes) o son comunes en next/image y queremos tolerarlas.
+  // No hacemos nada especial con ellas salvo evitar que rompan el tipado o el DOM.
+  placeholder?: 'blur' | 'empty';
+  blurDataURL?: string;
+  loader?: unknown;
+  unoptimized?: boolean;
+};
 
-  const shouldBypassOptimizer = useMemo(() => {
-    if (!currentSrc) return false;
-    if (unoptimized) return true;
-    return isVercelBlobUrl(currentSrc);
-  }, [currentSrc, unoptimized]);
+export type SafeImageProps = NativeImgProps & NextImageCompatProps;
+
+function normalizeSrc(src?: string | null): string | undefined {
+  if (!src) return undefined;
+
+  const trimmed = String(src).trim();
+  if (!trimmed) return undefined;
+
+  // data: / blob: deben pasar tal cual
+  if (trimmed.startsWith('data:') || trimmed.startsWith('blob:')) return trimmed;
+
+  // URL absoluta
+  if (/^https?:\/\//i.test(trimmed)) return trimmed;
+
+  // Si viene tipo "uploads/xxx.png", lo hacemos absoluto para evitar rutas relativas rotas
+  if (!trimmed.startsWith('/')) return `/${trimmed}`;
+
+  return trimmed;
+}
+
+export function SafeImage(props: SafeImageProps) {
+  const {
+    src,
+    alt,
+    fallbackSrc = '/placeholder-car.png',
+
+    // Compat props (NO van al DOM)
+    fill,
+    priority,
+    quality,
+    placeholder,
+    blurDataURL,
+    loader,
+    unoptimized,
+
+    // Props nativas
+    className,
+    style,
+    onError,
+    loading,
+    decoding,
+    fetchPriority,
+
+    ...rest
+  } = props;
+
+  const initial = normalizeSrc(src) ?? fallbackSrc;
+  const [currentSrc, setCurrentSrc] = React.useState<string>(initial);
+  const hasErroredRef = React.useRef(false);
+
+  // Si cambia src externo, reseteamos
+  React.useEffect(() => {
+    const next = normalizeSrc(src) ?? fallbackSrc;
+    hasErroredRef.current = false;
+    setCurrentSrc(next);
+  }, [src, fallbackSrc]);
+
+  const handleError: React.ReactEventHandler<HTMLImageElement> = (e) => {
+    if (!hasErroredRef.current) {
+      hasErroredRef.current = true;
+      setCurrentSrc(fallbackSrc);
+    }
+    onError?.(e);
+  };
+
+  // priority en next/image → lo más parecido en <img> es eager + high fetchPriority
+  const resolvedLoading = priority ? 'eager' : (loading ?? 'lazy');
+  const resolvedFetchPriority = priority ? 'high' : fetchPriority;
+
+  // fill en next/image: ocupa todo el contenedor (requiere que el padre sea position: relative)
+  const resolvedStyle: React.CSSProperties =
+    fill
+      ? {
+          position: 'absolute',
+          inset: 0,
+          width: '100%',
+          height: '100%',
+          objectFit: (style as any)?.objectFit ?? 'cover',
+          ...style,
+        }
+      : {
+          ...style,
+        };
+
+  // Importante: filtramos props compat para que NO lleguen al DOM.
+  // También filtramos "quality" (no existe en <img>) y otras.
+  // rest ya no incluye esas props porque las desestructuramos arriba.
 
   return (
-    <Image
-      {...props}
+    <img
+      {...rest}
       src={currentSrc}
-      unoptimized={shouldBypassOptimizer}
-      onError={(e) => {
-        onError?.(e);
-        // Retry a couple of times (helps with transient CDN/optimizer hiccups)
-        if (attempt < maxRetries) {
-          setAttempt((a) => a + 1);
-          setCurrentSrc((prev) => withCacheBust(prev));
-          return;
-        }
-        // Fallback
-        if (currentSrc !== fallbackSrc) {
-          setCurrentSrc(fallbackSrc);
-        }
-      }}
+      alt={alt ?? ''}
+      className={className}
+      style={resolvedStyle}
+      loading={resolvedLoading}
+      decoding={decoding ?? 'async'}
+      fetchPriority={resolvedFetchPriority as any}
+      onError={handleError}
     />
   );
 }
+
+export default SafeImage;

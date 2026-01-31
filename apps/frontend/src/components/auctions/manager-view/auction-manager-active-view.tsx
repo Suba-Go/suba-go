@@ -353,6 +353,34 @@ export function AuctionManagerActiveView({
     accessToken: liveAccessToken || '',
     onBidPlaced: handleBidPlaced,
     onTimeExtension: handleTimeExtension,
+    // Snapshot on join is authoritative for per-item clocks.
+    onSnapshot: (snap) => {
+      const items = snap?.auctionItems;
+      if (!items || items.length === 0) return;
+      setItemTimes((prev) => {
+        const next: Record<string, { startTime: string | Date; endTime: string | Date }> = { ...prev };
+        for (const it of items) {
+          const id = String(it.id);
+          const incomingStart = it.startTime || (auction as any).startTime;
+          const incomingEnd = it.endTime || (auction as any).endTime;
+
+          const prevEnd = next[id]?.endTime;
+          const prevEndMs = prevEnd ? new Date(prevEnd as any).getTime() : 0;
+          const incomingEndMs = incomingEnd ? new Date(incomingEnd as any).getTime() : 0;
+
+          next[id] = {
+            startTime: next[id]?.startTime || incomingStart,
+            endTime:
+              Number.isFinite(prevEndMs) && Number.isFinite(incomingEndMs)
+                ? incomingEndMs > prevEndMs
+                  ? incomingEnd
+                  : (prevEnd as any)
+                : incomingEnd,
+          };
+        }
+        return next;
+      });
+    },
     onStatusChanged: () => {
       // When the backend switches to COMPLETADA, refetch snapshot data so the router swaps
       // the view for everyone in real-time.

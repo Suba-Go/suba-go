@@ -520,7 +520,7 @@ export function ItemEditModal({
                     </div>
                   )}
 
-                  <img
+                  <SafeImage
                     src={allPhotoUrls[photoCarouselIndex]}
                     alt={`Foto ${photoCarouselIndex + 1}`}
                     className="h-[220px] w-full select-none object-contain"

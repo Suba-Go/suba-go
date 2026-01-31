@@ -81,12 +81,68 @@ interface UseAuctionWebSocketBiddingReturn {
 }
 
 const getWebSocketUrl = (): string => {
-  if (process.env.NEXT_PUBLIC_WS_ENDPOINT) {
-    return process.env.NEXT_PUBLIC_WS_ENDPOINT;
+  const toWsEndpoint = (input: string): string | null => {
+    try {
+      const u = new URL(input, typeof window !== 'undefined' ? window.location.origin : undefined);
+      u.protocol = u.protocol === 'https:' ? 'wss:' : 'ws:';
+      u.pathname = '/ws';
+      u.search = '';
+      u.hash = '';
+      return u.toString().replace(/\/$/, '');
+    } catch {
+      return null;
+    }
+  };
+
+  const explicit = process.env.NEXT_PUBLIC_WS_URL || process.env.NEXT_PUBLIC_WS_ENDPOINT;
+  if (explicit) {
+    const parsed = toWsEndpoint(explicit);
+    if (parsed) return parsed;
   }
-  const backendUrl = process.env.BACKEND_URL || 'http://localhost:3001';
-  return backendUrl.replace(/^http/, 'ws') + '/ws';
+
+  const backend = process.env.BACKEND_URL || process.env.NEXT_PUBLIC_BACKEND_URL;
+  if (backend) {
+    const parsed = toWsEndpoint(backend);
+    if (parsed) return parsed;
+  }
+
+  const apiUrl = process.env.NEXT_PUBLIC_API_URL;
+  if (apiUrl) {
+    const parsed = toWsEndpoint(apiUrl);
+    if (parsed) {
+      if (typeof window !== 'undefined') {
+        try {
+          const a = new URL(apiUrl, window.location.origin);
+          const sameHost = a.hostname === window.location.hostname;
+          const samePort =
+            (a.port || (a.protocol === 'https:' ? '443' : '80')) ===
+            (window.location.port || (window.location.protocol === 'https:' ? '443' : '80'));
+          if (sameHost && samePort) {
+            const backendPort =
+              process.env.NEXT_PUBLIC_BACKEND_PORT ||
+              process.env.NEXT_PUBLIC_WS_PORT ||
+              '3001';
+            const proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+            return `${proto}//${window.location.hostname}:${backendPort}/ws`;
+          }
+        } catch {
+          // ignore
+        }
+      }
+      return parsed;
+    }
+  }
+
+  if (typeof window !== 'undefined') {
+    const proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const port =
+      process.env.NEXT_PUBLIC_BACKEND_PORT || process.env.NEXT_PUBLIC_WS_PORT || '3001';
+    return `${proto}//${window.location.hostname}:${port}/ws`;
+  }
+
+  return 'ws://localhost:3001/ws';
 };
+
 
 type Subscriber = {
   onOpen: () => void;

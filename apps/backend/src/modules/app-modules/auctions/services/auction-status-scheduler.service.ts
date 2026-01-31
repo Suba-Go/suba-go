@@ -78,6 +78,27 @@ export class AuctionStatusSchedulerService
   }
 
   /**
+   * Force the scheduler to re-evaluate upcoming events ASAP.
+   *
+   * Why: the scheduler uses adaptive polling. If a new auction is created/edited shortly after a check,
+   * the next wake-up might still be the defaultInterval (e.g. 30s), causing auctions to stay PENDIENTE
+   * briefly after their startTime. This 'poke' makes the scheduler react immediately to new data.
+   */
+  public poke(): void {
+    if (!this.isRunning) return;
+
+    if (this.schedulerInterval) {
+      clearTimeout(this.schedulerInterval);
+      this.schedulerInterval = undefined;
+    }
+
+    // Run a check on the next tick to avoid re-entrancy inside current call stack.
+    this.schedulerInterval = setTimeout(() => {
+      void this.scheduleNextCheck();
+    }, 0);
+  }
+
+  /**
    * Schedule the next check with adaptive interval
    */
   private async scheduleNextCheck() {

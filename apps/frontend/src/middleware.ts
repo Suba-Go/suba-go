@@ -22,8 +22,15 @@ const AUTH_SECRET = process.env.AUTH_SECRET;
 export default async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
-  // ✅ bypass total de NextAuth endpoints
+  //  bypass total de NextAuth endpoints
   if (pathname.startsWith('/api/auth')) {
+    return NextResponse.next();
+  }
+
+  // bypass de archivos estáticos (public/*) como .png, .jpg, .svg, .css, etc.
+  // En Vercel (y en general), el middleware puede interceptar estos requests y reescribirlos
+  // hacia rutas tenant (/s/[subdomain]/...), rompiendo placeholders y assets.
+  if (!pathname.startsWith('/api') && /\.[a-z0-9]+$/i.test(pathname)) {
     return NextResponse.next();
   }
 
@@ -159,6 +166,6 @@ export const config = {
     '/api/:path*',
 
     // Cubre páginas (excluye internals)
-    '/((?!api|_next|uploads|favicon.ico|robots.txt|sitemap.xml).*)',
+    '/((?!api|_next|uploads|favicon.ico|robots.txt|sitemap.xml|.*\\..*).*)',
   ],
 };

@@ -16,6 +16,7 @@ import {
 } from '@suba-go/shared-components/components/ui/card';
 import { Input } from '@suba-go/shared-components/components/ui/input';
 import { getTenantKeyFromLocation } from '@/lib/tenant-utils';
+import { SafeImage } from '@/components/ui/safe-image';
 
 type Props = {
   initialData: CompanyDto;
@@ -186,7 +187,7 @@ export default function CompanySettingsForm({ initialData }: Props) {
             <div className="flex items-center gap-4">
               {form.logo && (
                 <div className="p-2 border rounded-md bg-gray-50 h-16 w-32 flex items-center justify-center">
-                  <img
+                  <SafeImage
                     src={form.logo}
                     alt="Logo preview"
                     className="max-h-full max-w-full object-contain"

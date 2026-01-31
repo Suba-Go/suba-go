@@ -16,7 +16,7 @@ import { WsAuthAdapter } from './modules/providers-modules/realtime/ws-auth.adap
 dotenv.config({
   path: '.env',
 });
-const PORT = parseInt(process.env.PORT) || 3333;
+const PORT = Number(process.env.PORT ?? 3001);
 
 async function bootstrap() {
   const logger = new Logger();
@@ -83,7 +83,7 @@ async function bootstrap() {
         logger.warn(
           `Too many requests to the API from IP: ${req.ip}, URL: ${req.originalUrl}`
         );
-        res.status(415).send('Muchas peticiones, por favor intenta más tarde.');
+        res.status(429).send('Muchas peticiones, por favor intenta más tarde.');
       },
     })
   );
@@ -100,10 +100,7 @@ async function bootstrap() {
 
   // const document = SwaggerModule.createDocument(app, config);
   // SwaggerModule.setup('api-docs', app, document);
-  await app.listen(
-    process.env.PORT ? Number(process.env.PORT) : 3000,
-    '0.0.0.0'
-  );
+  await app.listen(PORT, '0.0.0.0');
 
   // Determine the server URL based on environment
   let serverUrl: string;

@@ -6,6 +6,7 @@ import {
 } from '@nestjs/common';
 import { AuctionPrismaService } from './auction-prisma.service';
 import { AuctionsGateway } from '../../../providers-modules/realtime/auctions.gateway';
+import { AuctionStatusSchedulerService } from './auction-status-scheduler.service';
 import { UpdateAuctionDto, AuctionStatsDto, CreateAuctionDto } from '../dto/auction.dto';
 import type { Auction } from '@prisma/client';
 import {
@@ -24,7 +25,8 @@ export class AuctionsService {
   constructor(
     private readonly auctionRepository: AuctionPrismaService,
     private readonly prisma: PrismaService,
-    private readonly auctionsGateway: AuctionsGateway
+    private readonly auctionsGateway: AuctionsGateway,
+    private readonly auctionStatusScheduler: AuctionStatusSchedulerService
   ) {}
 
 async createAuction(
@@ -76,6 +78,9 @@ async createAuction(
         throw err;
       }
     }
+
+    // Ensure the automatic status scheduler re-evaluates soon (important for auctions starting within seconds)
+    this.auctionStatusScheduler.poke();
 
     return this.auctionRepository.getAuctionById(auction.id);
   }
@@ -463,6 +468,29 @@ async cancelAuction(id: string, tenantId: string): Promise<Auction> {
 
     // Register user
     await this.auctionRepository.registerUserToAuction(auctionId, userId);
+
+    // Real-time UX: notify the invited user (if connected) so "Mis Subastas" can update
+    // immediately without requiring a refresh/poll.
+    try {
+      const auctionSnapshot = await this.prisma.auction.findUnique({
+        where: { id: auctionId },
+        select: {
+          id: true,
+          title: true,
+          description: true,
+          status: true,
+          startTime: true,
+          endTime: true,
+          type: true,
+          tenantId: true,
+        },
+      });
+      if (auctionSnapshot && auctionSnapshot.tenantId === tenantId) {
+        this.auctionsGateway?.notifyAuctionInvited(tenantId, userId, auctionSnapshot as any);
+      }
+    } catch {
+      // Non-blocking
+    }
 
     return {
       success: true,

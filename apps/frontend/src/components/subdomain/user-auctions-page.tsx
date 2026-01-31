@@ -120,14 +120,76 @@ export default function UserAuctionsPage() {
     pendingPingsRef.current.clear();
   };
 
-  const wsUrl = useMemo(() => {
-    const endpoint =
-      process.env.NEXT_PUBLIC_WS_ENDPOINT ||
-      (process.env.BACKEND_URL
-        ? process.env.BACKEND_URL.replace(/^http/, 'ws') + '/ws'
-        : 'ws://localhost:3001/ws');
-    return accessToken ? `${endpoint}?token=${encodeURIComponent(accessToken)}` : '';
+    const wsUrl = useMemo(() => {
+    if (!accessToken) return '';
+
+    const toWsEndpoint = (input: string): string | null => {
+      try {
+        const u = new URL(input, typeof window !== 'undefined' ? window.location.origin : undefined);
+        u.protocol = u.protocol === 'https:' ? 'wss:' : 'ws:';
+        u.pathname = '/ws';
+        u.search = '';
+        u.hash = '';
+        return u.toString().replace(/\/$/, '');
+      } catch {
+        return null;
+      }
+    };
+
+    // Prefer explicit WS endpoint
+    const explicit =
+      process.env.NEXT_PUBLIC_WS_URL || process.env.NEXT_PUBLIC_WS_ENDPOINT;
+    if (explicit) {
+      const parsed = toWsEndpoint(explicit);
+      if (parsed) return `${parsed}?token=${encodeURIComponent(accessToken)}`;
+    }
+
+    // Prefer backend URL (not API proxy)
+    const backend = process.env.BACKEND_URL || process.env.NEXT_PUBLIC_BACKEND_URL;
+    if (backend) {
+      const parsed = toWsEndpoint(backend);
+      if (parsed) return `${parsed}?token=${encodeURIComponent(accessToken)}`;
+    }
+
+    // If API URL points to the frontend origin, assume backend WS is on :3001 (or env override)
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL;
+    if (apiUrl && typeof window !== 'undefined') {
+      try {
+        const a = new URL(apiUrl, window.location.origin);
+        const sameHost = a.hostname === window.location.hostname;
+        const samePort =
+          (a.port || (a.protocol === 'https:' ? '443' : '80')) ===
+          (window.location.port || (window.location.protocol === 'https:' ? '443' : '80'));
+        if (sameHost && samePort) {
+          const backendPort =
+            process.env.NEXT_PUBLIC_BACKEND_PORT ||
+            process.env.NEXT_PUBLIC_WS_PORT ||
+            '3001';
+          const proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+          return `${proto}//${window.location.hostname}:${backendPort}/ws?token=${encodeURIComponent(accessToken)}`;
+        }
+        const parsed = toWsEndpoint(apiUrl);
+        if (parsed) return `${parsed}?token=${encodeURIComponent(accessToken)}`;
+      } catch {
+        // ignore
+      }
+    }
+
+    // Final fallback
+    const proto =
+      typeof window !== 'undefined' && window.location.protocol === 'https:'
+        ? 'wss:'
+        : 'ws:';
+    const host =
+      typeof window !== 'undefined' ? window.location.hostname : 'localhost';
+    const port =
+      process.env.NEXT_PUBLIC_BACKEND_PORT ||
+      process.env.NEXT_PUBLIC_WS_PORT ||
+      '3001';
+
+    return `${proto}//${host}:${port}/ws?token=${encodeURIComponent(accessToken)}`;
   }, [accessToken]);
+
 
   const realtimeTargetAuctionIds = useMemo(() => {
     // Only join rooms that can change in realtime for this view
