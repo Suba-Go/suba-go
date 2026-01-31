@@ -1,5 +1,6 @@
 'use client';
 
+import { SafeImage } from '@/components/ui/safe-image';
 import { useState, useMemo, useEffect } from 'react';
 import {
   Car,
@@ -33,8 +34,6 @@ import {
   CarouselPrevious,
   type CarouselApi,
 } from '@suba-go/shared-components/components/ui/carousel';
-import Image from 'next/image';
-
 interface Item {
   id: string;
   plate?: string;
@@ -516,7 +515,7 @@ export function ItemSelector({
                       {photoUrls.map((url: string, index: number) => (
                         <CarouselItem key={index} className="pl-0">
                           <div className="aspect-video relative bg-gray-100 rounded-lg overflow-hidden">
-                            <Image
+                            <SafeImage
                               src={url}
                               alt={`Foto ${index + 1}`}
                               fill

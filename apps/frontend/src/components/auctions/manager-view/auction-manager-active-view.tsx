@@ -1,5 +1,6 @@
 'use client';
 
+import { SafeImage } from '@/components/ui/safe-image';
 import { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { ArrowLeft, Clock, Wifi, WifiOff, Trophy } from 'lucide-react';
@@ -23,7 +24,6 @@ import {
   getAuctionBadgeColor,
   getAuctionStatusLabel,
 } from '@/lib/auction-badge-colors';
-import Image from 'next/image';
 import { useAuctionStatus } from '@/hooks/use-auction-status';
 import {
   useAuctionWebSocketBidding,
@@ -47,6 +47,12 @@ interface BidHistoryItem {
   amount: number;
   userId: string;
   userName: string;
+  /** When available (e.g. from initial HTTP load), keep the full user object so manager can always show real names. */
+  user?: {
+    name?: string | null;
+    email?: string | null;
+    public_name?: string | null;
+  } | null;
   timestamp: number;
 }
 
@@ -192,7 +198,8 @@ export function AuctionManagerActiveView({
             id: String(b.id),
             amount: Number(b.offered_price),
             userId: String(b.userId),
-            userName: b.user?.public_name || 'Usuario',
+            userName: getRealUserLabel((b as any)?.user) || 'Usuario',
+            user: (b as any)?.user ?? null,
             timestamp: new Date(b.bid_time || b.createdAt || Date.now()).getTime(),
           }))
           .sort((a, b) => b.amount - a.amount || b.timestamp - a.timestamp);
@@ -241,6 +248,8 @@ export function AuctionManagerActiveView({
           amount,
           userId: String(bidderId),
           userName: userName || 'Usuario',
+          // For WS events we only get a display string. Keep it as `name` so manager label stays stable.
+          user: userName ? { name: userName, email: null, public_name: null } : null,
           timestamp,
         };
         const merged = [incoming, ...current].reduce((acc: BidHistoryItem[], bid) => {
@@ -464,7 +473,7 @@ export function AuctionManagerActiveView({
             offered_price: h.amount,
             userId: h.userId,
             bid_time: new Date(h.timestamp),
-            user: { public_name: h.userName },
+            user: h.user ?? { public_name: h.userName, name: null, email: null },
           } as any)
       );
 
@@ -669,7 +678,7 @@ export function AuctionManagerActiveView({
                     >
                       {auctionItem.item?.photos && (
                         <div className="relative h-48 overflow-hidden rounded-t-lg bg-gray-100">
-                          <Image
+                          <SafeImage
                             src={auctionItem.item.photos.split(',')[0]?.trim()}
                             alt={`${auctionItem.item.brand} ${auctionItem.item.model}`}
                             fill
@@ -679,13 +688,7 @@ export function AuctionManagerActiveView({
                             // resulting in noticeable blur when the card is ~50% width.
                             sizes="(max-width: 1024px) 100vw, 50vw"
                             quality={82}
-                            onError={(e) => {
-                              const target =
-                                e.currentTarget as HTMLImageElement;
-                              target.src =
-                                'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgdmlld0JveD0iMCAwIDIwMCAyMDAiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxyZWN0IHdpZHRoPSIyMDAiIGhlaWdodD0iMjAwIiBmaWxsPSIjRjNGNEY2Ii8+CjxwYXRoIGQ9Ik04MCA2MEgxMjBWODBIODBWNjBaIiBmaWxsPSIjOUI5QkEwIi8+CjxwYXRoIGQ9Ik02MCA4MEgxNDBWMTQwSDYwVjgwWiIgZmlsbD0iIzlCOUJBMCIvPgo8L3N2Zz4K';
-                            }}
-                          />
+/>
                         </div>
                       )}
 

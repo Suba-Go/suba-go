@@ -66,6 +66,7 @@ const auctionItemWithDetailsArgs =
               id: true,
               email: true,
               public_name: true,
+              name: true,
               role: true,
             },
           },

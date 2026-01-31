@@ -1,5 +1,6 @@
 'use client';
 
+import { SafeImage } from '@/components/ui/safe-image';
 import React, { useMemo, useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import {
@@ -40,7 +41,6 @@ import { ItemEditModal } from './item-edit-modal';
 import { ItemsDashboardSkeleton } from './items-dashboard-skeleton';
 import { Spinner } from '@suba-go/shared-components/components/ui/spinner';
 import { useAutoFormat } from '@/hooks/use-auto-format';
-import Image from 'next/image';
 import { useCompanyContextOptional } from '@/contexts/company-context';
 import { darkenColor } from '@/utils/color-utils';
 
@@ -482,7 +482,7 @@ export function ItemsDashboard({ subdomain }: ItemsDashboardProps) {
             <div className="relative h-48 overflow-hidden rounded-t-lg bg-gray-100">
               {item.photos ? (
                 <>
-                  <Image
+                  <SafeImage
                     src={item.photos.split(',')[0]?.trim()}
                     alt={`${item.brand} ${item.model}`}
                     fill
