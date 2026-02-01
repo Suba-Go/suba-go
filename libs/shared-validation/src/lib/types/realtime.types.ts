@@ -64,6 +64,23 @@ export type WsServerMessage =
         }>;
       };
     }
+  | {
+      /** Out-of-room notification when a user is invited/registered to an auction */
+      event: 'AUCTION_INVITED';
+      data: {
+        auction: {
+          id: string;
+          title?: string;
+          description?: string | null;
+          status: string;
+          startTime: string;
+          endTime: string;
+          type?: any;
+        };
+        /** Server time used by the client to compute a clock offset */
+        serverTimeMs?: number;
+      };
+    }
   | { event: 'LEFT'; data: { room: string; auctionId: string } }
   | { event: 'KICKED_DUPLICATE'; data: { room: string; reason: string } }
   | { event: 'BID_PLACED'; data: BidPlacedData }

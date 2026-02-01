@@ -371,6 +371,21 @@ export class BidRealtimeService {
             },
           }
         );
+
+        // Tenant-wide broadcast so the "Mis subastas" list can update timers even before joining the auction room.
+        this.auctionsGateway.broadcastToRoom(
+          `${tenantId}:__TENANT__`,
+          {
+            event: 'AUCTION_TIME_EXTENDED',
+            data: {
+              auctionId: txResult.extension.auctionId,
+              auctionItemId: txResult.extension.auctionItemId,
+              newEndTime: txResult.extension.newEndTimeIso,
+              extensionSeconds: SOFT_CLOSE_EXTENSION_MS / 1000,
+              serverTimeMs: Date.now(),
+            },
+          }
+        );
       }
 
       const bEnd = process.hrtime.bigint();

@@ -158,12 +158,21 @@ export function useAuctionStatus(
   const timeRemaining = useMemo(() => {
     if (!timeTargetMs) return undefined;
 
+    // If we're past the pending startTime but backend hasn't flipped to ACTIVA yet,
+    // avoid showing a misleading 'Inicia en ...' that grows over time. UI should
+    // render a dedicated 'Iniciando...' state using isStarting.
+    if (isStarting) return undefined;
+
+    const deltaMs = timeTargetMs - nowMs;
+    // Clamp at 0 to avoid inverted timers due to tiny clock skews.
+    if (deltaMs <= 0) return '0 segundos';
+
     // Convert to a date relative to the client clock for correct wording
     const clientNow = Date.now();
-    const clientTarget = new Date(clientNow + (timeTargetMs - (clientNow + serverOffsetMs)));
+    const clientTarget = new Date(clientNow + deltaMs);
 
     return formatDistanceStrict(new Date(clientNow), clientTarget, { locale: es });
-  }, [timeTargetMs, serverOffsetMs, nowMs]);
+  }, [timeTargetMs, nowMs, isStarting]);
 
   return {
     displayStatus,

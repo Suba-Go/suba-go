@@ -187,6 +187,9 @@ export class AuctionsGateway
 
     this.clients.set(client, meta);
 
+    // Join tenant-wide room for list-level real-time updates
+    this.joinRoom(client, this.getTenantRoomKey(meta.tenantId), meta.tenantId, '__TENANT__');
+
     // Set up pong handler to mark client as alive
     client.on('pong', () => {
       const currentMeta = this.clients.get(client);
@@ -198,15 +201,49 @@ export class AuctionsGateway
 
     this.logger.log(`Client connected: ${user.email} (role: ${user.role})`);
 
-    // Send initial connection acknowledgment (no handshake needed)
+    // Send initial connection acknowledgment (client should send HELLO to finalize handshake)
     this.sendMessage(client, {
       event: 'CONNECTED',
       data: {
-        message: 'WebSocket connection established. Ready to join auctions.',
+        message: 'WebSocket connection established. Send HELLO to complete handshake, then join auctions.',
         email: user.email,
       },
     });
   }
+
+
+  /**
+   * Second handshake: client sends HELLO to finalize the session.
+   * The frontend waits for HELLO_OK before considering the connection "ready".
+   */
+  @SubscribeMessage('HELLO')
+  handleHello(
+    @MessageBody() body: { token?: string; clientInfo?: any },
+    @ConnectedSocket() client: WebSocket
+  ) {
+    const meta = this.clients.get(client);
+
+    if (!meta) {
+      this.sendError(client, WsErrorCode.UNAUTHORIZED, 'No session found');
+      return;
+    }
+
+    this.logger.log(`HELLO received from ${meta.email}`);
+
+    this.sendMessage(client, {
+      event: 'HELLO_OK',
+      data: {
+        ok: true,
+        user: {
+          userId: meta.userId,
+          email: meta.email,
+          role: meta.role,
+          tenantId: meta.tenantId,
+        },
+      },
+    });
+  }
+
 
   /**
    * Called when a client disconnects
@@ -683,7 +720,82 @@ export class AuctionsGateway
         timestamp: new Date().toISOString(),
       },
     });
+
+    // Also broadcast to the tenant-wide room so users can update their lists without joining every auction room.
+    this.broadcastToRoom(this.getTenantRoomKey(tenantId), {
+      event: 'AUCTION_STATUS_CHANGED',
+      data: {
+        auctionId,
+        status,
+        auction,
+        timestamp: new Date().toISOString(),
+      },
+    });
   }
+
+/**
+ * Notify a specific invited/registered user that a new auction is available.
+ * This is used so the "Mis Subastas" list can update in real-time without refresh.
+ */
+notifyAuctionInvited(
+  tenantId: string,
+  userId: string,
+  auction: {
+    id: string;
+    title?: string;
+    description?: string | null;
+    status: any;
+    startTime: string | Date;
+    endTime: string | Date;
+    type?: any;
+  }
+) {
+  const toIso = (v: string | Date): string => {
+    if (typeof v === 'string') return v;
+    try {
+      return v.toISOString();
+    } catch {
+      return new Date(v as any).toISOString();
+    }
+  };
+
+  const message: WsServerMessage = {
+    event: 'AUCTION_INVITED',
+    data: {
+      auction: {
+        id: auction.id,
+        title: auction.title,
+        description: auction.description ?? null,
+        status: String(auction.status),
+        startTime: toIso(auction.startTime),
+        endTime: toIso(auction.endTime),
+        type: (auction as any).type,
+      },
+      serverTimeMs: Date.now(),
+    },
+  };
+
+  let sent = 0;
+
+  // Find all sockets for this user (can be multiple tabs) and notify.
+  this.server.clients.forEach((ws: any) => {
+    if (!ws || ws.readyState !== 1) return; // OPEN
+    const meta = this.clients.get(ws);
+    if (!meta) return;
+    if (meta.userId !== userId) return;
+    if ((meta.tenantId ?? '') !== (tenantId ?? '')) return;
+
+    this.sendMessage(ws, message);
+    sent++;
+  });
+
+  if (sent > 0) {
+    this.logger.log(
+      `📨 AUCTION_INVITED sent to user ${userId} (${sent} socket(s)) for auction ${auction.id}`
+    );
+  }
+}
+
 
   /**
    * Join a room
@@ -801,6 +913,16 @@ export class AuctionsGateway
    */
   private getRoomKey(tenantId: string, auctionId: string): string {
     return `${tenantId}:${auctionId}`;
+  }
+
+  /**
+   * Tenant-wide broadcast room.
+   * All connected clients join this room on connect, so they can receive
+   * auction list updates (status/time changes) even if they haven't joined
+   * a specific auction room yet.
+   */
+  private getTenantRoomKey(tenantId: string): string {
+    return this.getRoomKey(tenantId, '__TENANT__');
   }
 
   /**

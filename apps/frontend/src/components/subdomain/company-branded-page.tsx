@@ -5,6 +5,7 @@ import { CompanyDto } from '@suba-go/shared-validation';
 import { useSession } from 'next-auth/react';
 import UserHomePage from './user-home-page';
 import { useRouter } from 'next/navigation';
+import { SafeImage } from '@/components/ui/safe-image';
 
 interface CompanyBrandedPageProps {
   company: CompanyDto;
@@ -80,7 +81,7 @@ export default function CompanyBrandedPage({
           {/* Company logo */}
           {company.logo && !company.background_logo_enabled && (
             <div className="mb-6 flex justify-center">
-              <img
+              <SafeImage
                 src={company.logo}
                 alt={`${company.name} logo`}
                 className="h-24 object-contain"
