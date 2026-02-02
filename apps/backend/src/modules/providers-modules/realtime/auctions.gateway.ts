@@ -126,7 +126,7 @@ export class AuctionsGateway
       let aliveCount = 0;
       let deadCount = 0;
 
-      server.clients.forEach((ws: any) => {
+      server.clients.forEach((ws: WebSocket) => {
         const meta = this.clients.get(ws);
         if (!meta) return;
 
@@ -623,7 +623,9 @@ export class AuctionsGateway
     } catch (error: unknown) {
       const message =
         error instanceof Error ? error.message : 'Error al procesar la puja';
-      this.logger.error(`Bid placement failed: ${message}`);
+      this.logger.error(
+        `Bid placement failed [req=${data.requestId}] user=${meta?.email ?? 'unknown'} tenant=${data.tenantId ?? 'unknown'} auction=${data.auctionId ?? 'unknown'} item=${data.auctionItemId}: ${message}`,
+      );
 
       // IMPORTANT: reply with BID_REJECTED so the frontend can stop the loading state.
       if (data?.auctionItemId) {
@@ -707,17 +709,40 @@ export class AuctionsGateway
   ) {
     const roomKey = this.getRoomKey(tenantId, auctionId);
 
+    const toIso = (v: any): string | undefined => {
+      if (!v) return undefined;
+      if (typeof v === 'string') return v;
+      if (v instanceof Date) return v.toISOString();
+      try {
+        return new Date(v).toISOString();
+      } catch {
+        return undefined;
+      }
+    };
+
+    const serverTimeMs = Date.now();
+
+    const safeAuction = auction
+      ? {
+          ...auction,
+          startTime: toIso(auction.startTime),
+          endTime: toIso(auction.endTime),
+        }
+      : undefined;
+
     this.logger.log(
-      `📢 Broadcasting status change for auction ${auctionId}: ${status}`
+      `Broadcasting status change for auction ${auctionId}: ${status}`
     );
 
     this.broadcastToRoom(roomKey, {
       event: 'AUCTION_STATUS_CHANGED',
       data: {
         auctionId,
+        tenantId,
         status,
-        auction,
+        auction: safeAuction,
         timestamp: new Date().toISOString(),
+        serverTimeMs,
       },
     });
 
@@ -726,75 +751,14 @@ export class AuctionsGateway
       event: 'AUCTION_STATUS_CHANGED',
       data: {
         auctionId,
+        tenantId,
         status,
-        auction,
+        auction: safeAuction,
         timestamp: new Date().toISOString(),
+        serverTimeMs,
       },
     });
   }
-
-/**
- * Notify a specific invited/registered user that a new auction is available.
- * This is used so the "Mis Subastas" list can update in real-time without refresh.
- */
-notifyAuctionInvited(
-  tenantId: string,
-  userId: string,
-  auction: {
-    id: string;
-    title?: string;
-    description?: string | null;
-    status: any;
-    startTime: string | Date;
-    endTime: string | Date;
-    type?: any;
-  }
-) {
-  const toIso = (v: string | Date): string => {
-    if (typeof v === 'string') return v;
-    try {
-      return v.toISOString();
-    } catch {
-      return new Date(v as any).toISOString();
-    }
-  };
-
-  const message: WsServerMessage = {
-    event: 'AUCTION_INVITED',
-    data: {
-      auction: {
-        id: auction.id,
-        title: auction.title,
-        description: auction.description ?? null,
-        status: String(auction.status),
-        startTime: toIso(auction.startTime),
-        endTime: toIso(auction.endTime),
-        type: (auction as any).type,
-      },
-      serverTimeMs: Date.now(),
-    },
-  };
-
-  let sent = 0;
-
-  // Find all sockets for this user (can be multiple tabs) and notify.
-  this.server.clients.forEach((ws: any) => {
-    if (!ws || ws.readyState !== 1) return; // OPEN
-    const meta = this.clients.get(ws);
-    if (!meta) return;
-    if (meta.userId !== userId) return;
-    if ((meta.tenantId ?? '') !== (tenantId ?? '')) return;
-
-    this.sendMessage(ws, message);
-    sent++;
-  });
-
-  if (sent > 0) {
-    this.logger.log(
-      `📨 AUCTION_INVITED sent to user ${userId} (${sent} socket(s)) for auction ${auction.id}`
-    );
-  }
-}
 
 
   /**
@@ -1019,6 +983,59 @@ notifyAuctionInvited(
         requestId,
       },
     });
+  }
+
+  /**
+   * Notify a specific user that they were invited/registered to an auction.
+   *
+   * This is sent out-of-room (tenant-wide) so the user's "My Auctions" view can
+   * update in real time without having to join the auction room.
+   */
+  notifyAuctionInvited(tenantId: string, userId: string, auction: any) {
+    const toIso = (v: unknown): string => {
+      if (typeof v === 'string') return v;
+      if (v instanceof Date) return v.toISOString();
+      try {
+        return new Date(v as any).toISOString();
+      } catch {
+        return new Date().toISOString();
+      }
+    };
+
+    const payload: WsServerMessage = {
+      event: 'AUCTION_INVITED',
+      data: {
+        auction: {
+          id: String(auction?.id ?? ''),
+          title: auction?.title,
+          description: auction?.description ?? null,
+          status: String(auction?.status ?? 'PENDIENTE'),
+          startTime: toIso(auction?.startTime),
+          endTime: toIso(auction?.endTime),
+          type: auction?.type,
+        },
+        serverTimeMs: Date.now(),
+      },
+    };
+
+    // Deliver to all sockets for that user in this tenant (one user can have multiple tabs).
+    let delivered = 0;
+    this.server.clients.forEach((ws: WebSocket) => {
+      const meta = this.clients.get(ws);
+      if (!meta) return;
+      if (meta.userId !== userId) return;
+      if (tenantId && meta.tenantId && meta.tenantId !== tenantId) return;
+      this.sendMessage(ws, payload);
+      delivered += 1;
+    });
+
+    if (delivered > 0) {
+      this.logger.log(
+        `AUCTION_INVITED sent to user ${userId} (${delivered} socket(s)) for auction ${String(
+          auction?.id ?? ''
+        )}`
+      );
+    }
   }
 
   /**

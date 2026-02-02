@@ -1,12 +1,15 @@
 /**
  * @file ws-client.ts
- * @description WebSocket client utility with double handshake support (HELLO -> HELLO_OK)
+ * @description Single WebSocket client (one per browser tab) with:
+ * - Double handshake (HELLO -> HELLO_OK)
+ * - NTP-like time synchronization using app-level PING/PONG
+ * - Monotonic server clock (never goes backwards)
+ * - Ref-counted JOIN/LEAVE per auction room
+ * - Automatic rejoin after reconnect
  *
- * Improvements:
- * - connect() resolves ONLY after HELLO_OK
- * - Prevents concurrent connect attempts (single in-flight promise)
- * - Robust URL building to avoid accidentally connecting to Next.js (:3000) websockets
- * - Avoids treating browser 'error' events (often empty {}) as fatal; relies on close/timeout instead
+ * Notes:
+ * - All countdowns in the UI should use getServerNowMs() to stay consistent across devices.
+ * - The server remains authoritative for auction/item start/end times.
  */
 
 import {
@@ -17,159 +20,273 @@ import {
 
 type MessageHandler = (message: WsServerMessage) => void;
 type StateChangeHandler = (state: WsConnectionState) => void;
+type TimeSyncHandler = (info: {
+  offsetMs: number;
+  rttMs: number;
+  serverNowMs: number;
+}) => void;
+
+type PingSample = { offsetMs: number; rttMs: number; atMs: number };
+
+// Async token provider used to refresh tokens before reconnect.
+type TokenProvider = () => Promise<string | undefined>;
+
+// Internal control messages emitted by the backend that are not part of the shared-validation
+// `WsServerMessage` union. We keep them typed here to avoid TS errors and runtime confusion.
+type WsReadyMessage = { event: 'READY'; data?: { serverTimeMs?: number } };
+type WsUnauthorizedMessage = {
+  event: 'UNAUTHORIZED';
+  data?: { code?: string; message?: string };
+};
+type WsPongMessage = {
+  event: 'PONG';
+  data?: { clientTimeMs?: number; serverTimeMs?: number };
+};
+
+type WsRawMessage =
+  | WsServerMessage
+  | WsReadyMessage
+  | WsUnauthorizedMessage
+  | WsPongMessage
+  | { event: string; data?: unknown };
+
+function createRequestId(): string {
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const c: any = typeof crypto !== 'undefined' ? crypto : undefined;
+    if (c?.randomUUID) return c.randomUUID();
+  } catch {
+    // ignore
+  }
+  return `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+}
 
 class WebSocketClient {
   private socket: WebSocket | null = null;
-  private messageHandlers: Set<MessageHandler> = new Set();
-  private stateChangeHandlers: Set<StateChangeHandler> = new Set();
+
+  private readonly messageHandlers = new Set<MessageHandler>();
+  private readonly stateHandlers = new Set<StateChangeHandler>();
+  private readonly timeSyncHandlers = new Set<TimeSyncHandler>();
+
   private state: WsConnectionState = WsConnectionState.DISCONNECTED;
-
-  private reconnectAttempts = 0;
-  private readonly maxReconnectAttempts = 5;
-  private readonly baseReconnectDelayMs = 1000;
-
-  private reconnectTimer?: ReturnType<typeof setTimeout>;
-  private heartbeatTimer?: ReturnType<typeof setInterval>;
-
   private token?: string;
+  private tokenProvider?: TokenProvider;
 
-  // Prevent duplicate parallel connections from multiple callers
+  // Connection promise deduplication (avoid multiple connect() races)
   private connectPromise?: Promise<void>;
   private connectPromiseToken?: string;
 
-  connect(token: string): Promise<void> {
-    // If there is already an in-flight connect for the same token, reuse it.
-    if (this.connectPromise && this.connectPromiseToken === token) {
-      return this.connectPromise;
+  // Sequence guards to ignore late events from old sockets (stale onclose/onerror).
+  private connectSeq = 0;
+  private activeSeq = 0;
+
+  // Reconnect
+  private reconnectAttempts = 0;
+  private readonly maxReconnectAttempts = 8;
+  private readonly baseReconnectDelayMs = 800;
+  private reconnectTimer?: ReturnType<typeof setTimeout>;
+
+  // When true, the client intentionally closed the socket and we must NOT auto-reconnect.
+  // This avoids reconnect loops during logout.
+  private manualClose = false;
+
+  private readonly onOnline = () => {
+    // If the browser comes back online, try to recover immediately.
+    if (!this.isReady() && this.token) {
+      void this.connect(this.token).catch(() => undefined);
+    }
+  };
+
+  private readonly onVisibility = () => {
+    // When the tab becomes visible again, the socket might have been suspended.
+    if (typeof document === 'undefined') return;
+    if (document.visibilityState === 'visible' && !this.isReady() && this.token) {
+      void this.connect(this.token).catch(() => undefined);
+    }
+  };
+
+  // Heartbeat / time sync
+  private heartbeatTimer?: ReturnType<typeof setInterval>;
+  private readonly heartbeatIntervalMs = 15000;
+
+  // Time sync state
+  private offsetMs = 0;
+  private rttMs = 0;
+  private readonly samples: PingSample[] = [];
+  private lastServerNowMs = 0;
+  private readonly pendingPings = new Map<string, number>(); // requestId -> clientSendMs
+
+  // Join ref counting
+  private readonly joinCounts = new Map<string, number>(); // roomKey -> refCount
+  private readonly joinedRooms = new Set<string>(); // roomKey actually joined (server-side)
+  private readonly pendingJoins = new Set<string>(); // roomKey waiting for AUTH
+
+  constructor() {
+    // Best-effort resilience: recover from background tab throttling and offline/online transitions.
+    // This is especially important on Vercel/Railway where proxies may close idle sockets.
+    this.enableAutoRecover();
+  }
+
+  async connect(token?: string): Promise<void> {
+    const resolvedToken = await this.resolveToken(token);
+    if (!resolvedToken) {
+      throw new Error('Missing access token for WebSocket connection');
     }
 
     // If already authenticated with same token, keep connection.
     const isOpen = this.socket?.readyState === WebSocket.OPEN;
-    if (isOpen && this.token === token && this.isReady()) {
-      return Promise.resolve();
+    if (isOpen && this.token === resolvedToken && this.isReady()) return;
+
+    // Deduplicate concurrent connects for the same resolved token.
+    if (this.connectPromiseToken === resolvedToken && this.connectPromise) {
+      await this.connectPromise;
+      return;
     }
 
-    // New connect attempt (typed) 
-    this.connectPromiseToken = token;
+    this.connectPromiseToken = resolvedToken;
+
     const promise = new Promise<void>((resolve, reject) => {
       // Ensure we start from a clean state
-      this.disconnect();
+      this.disconnect(false);
 
-      this.token = token;
+      this.token = resolvedToken;
       this.setState(WsConnectionState.CONNECTING);
 
-      const wsUrl = this.getWebSocketUrl();
-      const url = `${wsUrl}?token=${encodeURIComponent(token)}`;
+      // Reset reconnect attempts on explicit connect.
+      this.reconnectAttempts = 0;
+      this.manualClose = false;
+
+      // Build a WS URL with the auth token as a query param. Backend accepts `?token=`.
+      const baseWsUrl = this.getWebSocketUrl();
+      const wsUrl = this.appendToken(baseWsUrl, resolvedToken);
+      const socket = new WebSocket(wsUrl);
+      this.socket = socket;
+
+      const seq = ++this.connectSeq;
+      const mySeq = seq;
+      const isStale = () => mySeq !== this.connectSeq;
 
       let settled = false;
-      let handshakeTimer: ReturnType<typeof setTimeout> | undefined;
-      let helloFallbackTimer: ReturnType<typeof setTimeout> | undefined;
-      let helloSent = false;
-
-      const cleanupTimers = () => {
-        if (handshakeTimer) {
-          clearTimeout(handshakeTimer);
-          handshakeTimer = undefined;
-        }
-        if (helloFallbackTimer) {
-          clearTimeout(helloFallbackTimer);
-          helloFallbackTimer = undefined;
-        }
-      };
-
       const settle = (err?: unknown) => {
         if (settled) return;
         settled = true;
-        cleanupTimers();
-        // Clear in-flight promise markers
-        this.connectPromise = undefined;
-        this.connectPromiseToken = undefined;
 
-        if (err) reject(err);
-        else resolve(undefined);
-      };
+        if (err) {
+          this.setState(WsConnectionState.ERROR);
+          reject(err);
+          return;
+        }
 
-      const sendHello = () => {
-        if (helloSent) return;
-        helloSent = true;
-        this.send({
-          event: 'HELLO',
-          data: {
-            clientInfo: {
-              userAgent:
-                typeof navigator !== 'undefined' ? navigator.userAgent : 'unknown',
-            },
-          },
-        });
+        // Authenticated handshake completed.
+        this.setState(WsConnectionState.AUTHENTICATED);
+        resolve();
       };
 
       try {
-        this.socket = new WebSocket(url);
+        socket.addEventListener('open', () => {
+          if (isStale()) return;
 
-        this.socket.addEventListener('open', () => {
-          this.setState(WsConnectionState.CONNECTED);
-          this.reconnectAttempts = 0;
+          // Immediately send HELLO. The server responds with HELLO_OK when authenticated.
+          this.send({
+            event: 'HELLO',
+            data: { token: resolvedToken, clientTimeMs: Date.now() },
+          });
 
+          // Start heartbeat after open; server can still close if auth fails.
           this.startHeartbeat();
-
-          // Prefer sending HELLO after server ACKs with CONNECTED; fallback shortly after open.
-          helloFallbackTimer = setTimeout(sendHello, 200);
-
-          // If server never replies with HELLO_OK, fail fast so the UI can recover.
-          handshakeTimer = setTimeout(() => {
-            try {
-              this.disconnect();
-            } finally {
-              settle(new Error(`WebSocket handshake timeout (missing HELLO_OK). url=${wsUrl}`));
-            }
-          }, 8000);
         });
 
-        this.socket.addEventListener('message', (event) => {
+        socket.addEventListener('message', (event) => {
+          if (isStale()) return;
+
           try {
-            const message = JSON.parse(event.data) as WsServerMessage;
+            const msg = JSON.parse(event.data as string) as WsRawMessage;
+            if (!msg || typeof msg.event !== 'string') return;
 
-            // When we receive CONNECTED, the server-side session is initialized.
-            if (message.event === 'CONNECTED' && !helloSent) {
-              if (helloFallbackTimer) {
-                clearTimeout(helloFallbackTimer);
-                helloFallbackTimer = undefined;
-              }
-              sendHello();
+            // Control messages (not forwarded to app handlers)
+            // The backend emits CONNECTED on upgrade, and HELLO_OK after HELLO.
+            if (msg.event === 'CONNECTED') {
+              const data = msg.data as any;
+              const st = data?.serverTimeMs;
+              if (typeof st === 'number') this.maybeNudgeOffsetFromServerTime(st);
+              // Socket is open; authentication still pending.
+              this.setState(WsConnectionState.CONNECTED);
+              return;
             }
 
-            // HELLO_OK completes authentication
-            if (message.event === 'HELLO_OK') {
-              this.setState(WsConnectionState.AUTHENTICATED);
-              settle();
-            }
+          // Server-side auth ok signal.
+          // The gateway responds to HELLO with HELLO_OK when the token is valid.
+          if (msg.event === 'HELLO_OK' || (msg as any).event === 'READY') {
+            const data: any = (msg as any).data as any;
+            const st = data?.serverTimeMs;
+            if (typeof st === 'number') this.maybeNudgeOffsetFromServerTime(st);
 
-            // If the server indicates an auth/session issue, fail fast.
-            if (message.event === 'ERROR') {
-              const code = (message as any)?.data?.code;
-              const msg = (message as any)?.data?.message;
-              if (code === 'NO_SESSION' || code === 'UNAUTHORIZED' || code === 'INVALID_TOKEN') {
-                try {
-                  this.disconnect();
-                } finally {
-                  settle(new Error(msg || 'WebSocket unauthorized'));
-                }
-              }
-            }
+            this.setState(WsConnectionState.AUTHENTICATED);
 
-            // Notify all handlers
-            this.messageHandlers.forEach((handler) => handler(message));
-          } catch (error) {
+            // Join any rooms requested while disconnected (and re-join after reconnect).
+            this.flushPendingJoins();
+
+            settle();
+            return;
+          }
+
+          // Errors are sent as an ERROR envelope with a code.
+          // Treat auth errors specially so the auth-bridge can refresh and we can reconnect.
+          if (msg.event === 'ERROR' || (msg as any).event === 'UNAUTHORIZED') {
+            const data: any = (msg as any).data as any;
+            const code = String(data?.code ?? '');
+            const msgText = String(data?.message ?? 'WebSocket error');
+
+            const isAuthError =
+              (msg as any).event === 'UNAUTHORIZED' ||
+              code === 'UNAUTHORIZED' ||
+              code === 'TOKEN_EXPIRED';
+
+            if (isAuthError) {
+              try {
+                socket.close();
+              } catch {}
+              settle(new Error(msgText));
+              return;
+            }
+            // Non-auth errors are forwarded to listeners below.
+          }
+
+          // Room join/leave acks.
+          if (msg.event === 'JOINED' || (msg as any).event === 'JOINED ROOM') {
+            const data: any = (msg as any).data as any;
+            const tenantId = String(data?.tenantId ?? '');
+            const auctionId = String(data?.auctionId ?? '');
+            if (tenantId && auctionId) this.joinedRooms.add(this.roomKey(tenantId, auctionId));
+            const st = data?.serverTimeMs;
+            if (typeof st === 'number') this.maybeNudgeOffsetFromServerTime(st);
+          }
+
+          if (msg.event === 'LEFT' || (msg as any).event === 'LEFT ROOM') {
+            const data: any = (msg as any).data as any;
+            const tenantId = String(data?.tenantId ?? '');
+            const auctionId = String(data?.auctionId ?? '');
+            if (tenantId && auctionId) this.joinedRooms.delete(this.roomKey(tenantId, auctionId));
+          }
+
+            // Forward all other messages to app handlers.
+            this.messageHandlers.forEach((h) => h(msg as WsServerMessage));
+          } catch (err) {
             // eslint-disable-next-line no-console
-            console.error('Failed to parse WebSocket message:', error);
+            console.error('Failed to parse WebSocket message:', err);
           }
         });
 
-        this.socket.addEventListener('close', (event) => {
+        socket.addEventListener('close', (event) => {
+          if (isStale()) return;
           this.stopHeartbeat();
+          if (this.socket === socket) {
+            this.socket = null;
+          }
           this.setState(WsConnectionState.DISCONNECTED);
 
-          // If connect() is still pending (handshake not completed), reject it.
+          this.joinedRooms.clear();
+
           if (!settled) {
             settle(
               new Error(
@@ -178,39 +295,46 @@ class WebSocketClient {
             );
           }
 
-          // Attempt reconnection if not a normal closure
-          if (event.code !== 1000 && this.reconnectAttempts < this.maxReconnectAttempts) {
+          // In cloud environments (Vercel/Railway), the connection can be closed with code=1000
+          // without being an explicit user action (e.g., proxy idle timeout).
+          // Only skip reconnect when the client intentionally closed the socket.
+          if (!this.manualClose && this.reconnectAttempts < this.maxReconnectAttempts) {
             this.scheduleReconnect();
           }
         });
 
-        this.socket.addEventListener('error', (evt) => {
-          // In browsers, WebSocket 'error' is often an opaque Event with no useful details (shows as {}).
-          // Treat it as a signal and rely on 'close' or the handshake timeout to determine failure.
+        socket.addEventListener('error', (evt) => {
+          if (isStale()) return;
+          // Browser WebSocket errors are opaque. We rely on close/timeout for the actual failure.
           // eslint-disable-next-line no-console
           console.warn('WebSocket error event:', evt);
-
-          // If we're still connecting and nothing else happens, the handshake timeout will fire.
-          // Do NOT reject here with an empty object, it creates noisy overlays.
         });
-      } catch (error) {
+      } catch (err) {
         this.setState(WsConnectionState.ERROR);
-        settle(error);
-      }
-    }).finally(() => {
-      // Ensure flags are cleared if the promise was consumed without settle() (very defensive)
-      if (this.connectPromiseToken === token && this.connectPromise) {
-        this.connectPromise = undefined;
-        this.connectPromiseToken = undefined;
+        settle(err);
       }
     });
 
     this.connectPromise = promise;
-    return promise;
+    await promise;
   }
 
-  disconnect() {
+  disconnect(manual = true) {
+    // Invalidate any in-flight socket event handlers.
+    this.activeSeq = ++this.connectSeq;
     this.stopHeartbeat();
+
+    // Explicit disconnects should not trigger reconnect.
+    this.manualClose = manual;
+
+    if (manual) {
+      // Clearing the token prevents auto-recover triggers (online/visibility) from reconnecting
+      // after an explicit logout.
+      this.token = undefined;
+      this.joinCounts.clear();
+      this.joinedRooms.clear();
+      this.pendingJoins.clear();
+    }
 
     if (this.reconnectTimer) {
       clearTimeout(this.reconnectTimer);
@@ -219,7 +343,6 @@ class WebSocketClient {
 
     if (this.socket) {
       try {
-        // Normal closure
         this.socket.close(1000, 'Client disconnect');
       } catch {
         // ignore
@@ -231,13 +354,48 @@ class WebSocketClient {
     this.setState(WsConnectionState.DISCONNECTED);
   }
 
+  setTokenProvider(provider?: TokenProvider) {
+    this.tokenProvider = provider;
+  }
+
+  private async resolveToken(explicit?: string): Promise<string | undefined> {
+    if (explicit) return explicit;
+    if (this.tokenProvider) {
+      try {
+        const t = await this.tokenProvider();
+        if (t) return t;
+      } catch {
+        // Ignore refresh errors; fallback to last known token.
+      }
+    }
+    return this.token;
+  }
+
+  enableAutoRecover() {
+    if (typeof window !== 'undefined') {
+      window.addEventListener('online', this.onOnline);
+    }
+    if (typeof document !== 'undefined') {
+      document.addEventListener('visibilitychange', this.onVisibility);
+    }
+  }
+
+  disableAutoRecover() {
+    if (typeof window !== 'undefined') {
+      window.removeEventListener('online', this.onOnline);
+    }
+    if (typeof document !== 'undefined') {
+      document.removeEventListener('visibilitychange', this.onVisibility);
+    }
+  }
+
   send(message: WsClientMessage) {
     if (this.socket?.readyState === WebSocket.OPEN) {
       this.socket.send(JSON.stringify(message));
-    } else {
-      // eslint-disable-next-line no-console
-      console.warn('Cannot send message: WebSocket not connected');
+      return;
     }
+    // eslint-disable-next-line no-console
+    console.warn('Cannot send message: WebSocket not connected');
   }
 
   onMessage(handler: MessageHandler): () => void {
@@ -246,8 +404,17 @@ class WebSocketClient {
   }
 
   onStateChange(handler: StateChangeHandler): () => void {
-    this.stateChangeHandlers.add(handler);
-    return () => this.stateChangeHandlers.delete(handler);
+    this.stateHandlers.add(handler);
+   // Immediately emit current state so late subscribers do not miss transitions.
+    try {
+      handler(this.state);
+    } catch {}
+    return () => this.stateHandlers.delete(handler);
+  }
+
+  onTimeSync(handler: TimeSyncHandler): () => void {
+    this.timeSyncHandlers.add(handler);
+    return () => this.timeSyncHandlers.delete(handler);
   }
 
   getState(): WsConnectionState {
@@ -256,6 +423,211 @@ class WebSocketClient {
 
   isReady(): boolean {
     return this.state === WsConnectionState.AUTHENTICATED && this.socket?.readyState === WebSocket.OPEN;
+  }
+
+  getServerOffsetMs(): number {
+    return this.offsetMs;
+  }
+
+  getServerRttMs(): number {
+    return this.rttMs;
+  }
+
+  /**
+   * Best-known server clock in ms, monotonic (never goes backwards).
+   */
+  getServerNowMs(): number {
+    const estimate = Date.now() + this.offsetMs;
+    if (estimate < this.lastServerNowMs) return this.lastServerNowMs;
+    this.lastServerNowMs = estimate;
+    return estimate;
+  }
+
+  /**
+   * Ref-counted join: first subscriber triggers JOIN_AUCTION.
+   */
+  joinAuction(tenantId: string, auctionId: string) {
+    const key = this.roomKey(tenantId, auctionId);
+    const prev = this.joinCounts.get(key) ?? 0;
+    this.joinCounts.set(key, prev + 1);
+
+    if (!this.isReady()) {
+      this.pendingJoins.add(key);
+      return;
+    }
+
+    if (!this.joinedRooms.has(key)) {
+      this.send({ event: 'JOIN_AUCTION', data: { tenantId, auctionId } });
+    }
+  }
+
+  /**
+   * Ref-counted leave: last subscriber triggers LEAVE_AUCTION.
+   */
+  leaveAuction(tenantId: string, auctionId: string) {
+    const key = this.roomKey(tenantId, auctionId);
+    const prev = this.joinCounts.get(key) ?? 0;
+    const next = Math.max(0, prev - 1);
+
+    if (next === 0) {
+      this.joinCounts.delete(key);
+      this.pendingJoins.delete(key);
+      this.joinedRooms.delete(key);
+      if (this.isReady()) {
+        this.send({ event: 'LEAVE_AUCTION', data: { tenantId, auctionId } });
+      }
+      return;
+    }
+
+    this.joinCounts.set(key, next);
+  }
+
+  private flushPendingJoins() {
+    if (!this.isReady()) return;
+
+    for (const [key, count] of this.joinCounts.entries()) {
+      if (count <= 0) continue;
+      const [tenantId, auctionId] = key.split(':');
+      this.send({ event: 'JOIN_AUCTION', data: { tenantId, auctionId } });
+    }
+
+    this.pendingJoins.clear();
+  }
+
+  private roomKey(tenantId: string, auctionId: string): string {
+    return `${tenantId}:${auctionId}`;
+  }
+
+  private primeTimeSync() {
+    const burst = [0, 400, 800];
+    burst.forEach((delay) => {
+      setTimeout(() => this.sendPing(), delay);
+    });
+  }
+
+  private startHeartbeat() {
+    this.stopHeartbeat();
+    this.heartbeatTimer = setInterval(() => {
+      if (this.socket?.readyState === WebSocket.OPEN) {
+        this.sendPing();
+      }
+    }, this.heartbeatIntervalMs);
+  }
+
+  private stopHeartbeat() {
+    if (this.heartbeatTimer) {
+      clearInterval(this.heartbeatTimer);
+      this.heartbeatTimer = undefined;
+    }
+  }
+
+  private sendPing() {
+    const requestId = createRequestId();
+    const clientTimeMs = Date.now();
+    this.pendingPings.set(requestId, clientTimeMs);
+
+    setTimeout(() => {
+      this.pendingPings.delete(requestId);
+    }, 20000);
+
+    this.send({
+      event: 'PING',
+      data: { requestId, clientTimeMs },
+    });
+  }
+
+  private handlePong(data: { requestId?: string; clientTimeMs?: number; serverTimeMs: number }) {
+    const now = Date.now();
+    const requestId = data?.requestId;
+
+    const sent =
+      typeof data?.clientTimeMs === 'number'
+        ? data.clientTimeMs
+        : requestId
+          ? this.pendingPings.get(requestId)
+          : undefined;
+
+    if (requestId) this.pendingPings.delete(requestId);
+    if (typeof sent !== 'number') return;
+
+    const rtt = Math.max(0, now - sent);
+    const midpoint = sent + rtt / 2;
+    const offset = data.serverTimeMs - midpoint;
+
+    this.samples.push({ offsetMs: offset, rttMs: rtt, atMs: now });
+
+    const cutoff = now - 60000;
+    while (this.samples.length > 0 && this.samples[0].atMs < cutoff) {
+      this.samples.shift();
+    }
+
+    this.updateOffsetFromSamples();
+  }
+
+  private updateOffsetFromSamples() {
+    if (this.samples.length === 0) return;
+
+    const sortedByRtt = [...this.samples].sort((a, b) => a.rttMs - b.rttMs);
+    const best = sortedByRtt.slice(0, Math.min(7, sortedByRtt.length));
+
+    const offsets = best.map((s) => s.offsetMs).sort((a, b) => a - b);
+    const median = offsets[Math.floor(offsets.length / 2)];
+    const avgRtt = Math.round(best.reduce((acc, s) => acc + s.rttMs, 0) / best.length);
+
+    const alpha = 0.2;
+    const nextOffset = Math.round(this.offsetMs * (1 - alpha) + median * alpha);
+
+    this.offsetMs = nextOffset;
+    this.rttMs = avgRtt;
+
+    const serverNowMs = this.getServerNowMs();
+    this.timeSyncHandlers.forEach((h) => h({ offsetMs: this.offsetMs, rttMs: this.rttMs, serverNowMs }));
+  }
+
+  private maybeNudgeOffsetFromServerTime(serverTimeMs: number) {
+    if (this.samples.length >= 3) return;
+    const estimated = serverTimeMs - Date.now();
+    const alpha = 0.1;
+    this.offsetMs = Math.round(this.offsetMs * (1 - alpha) + estimated * alpha);
+    const serverNowMs = this.getServerNowMs();
+    this.timeSyncHandlers.forEach((h) => h({ offsetMs: this.offsetMs, rttMs: this.rttMs, serverNowMs }));
+  }
+
+  private scheduleReconnect() {
+    if (this.reconnectTimer) return;
+
+    this.reconnectAttempts += 1;
+
+    const exp = Math.min(this.baseReconnectDelayMs * Math.pow(2, this.reconnectAttempts - 1), 30000);
+    const jitter = Math.floor(Math.random() * 250);
+    const delay = exp + jitter;
+
+    this.reconnectTimer = setTimeout(() => {
+      this.reconnectTimer = undefined;
+      if (!this.token && !this.tokenProvider) return;
+
+      this.connect(undefined).catch((err) => {
+        // eslint-disable-next-line no-console
+        console.error('Reconnection failed:', err);
+      });
+    }, delay);
+  }
+
+  private setState(state: WsConnectionState) {
+    if (this.state === state) return;
+    this.state = state;
+    this.stateHandlers.forEach((h) => h(state));
+  }
+
+  private appendToken(baseWsUrl: string, token: string): string {
+    try {
+      const u = new URL(baseWsUrl);
+      u.searchParams.set('token', token);
+      return u.toString();
+    } catch {
+      const sep = baseWsUrl.includes('?') ? '&' : '?';
+      return `${baseWsUrl}${sep}token=${encodeURIComponent(token)}`;
+    }
   }
 
   private getWebSocketUrl(): string {
@@ -277,48 +649,24 @@ class WebSocketClient {
       }
     };
 
-    // 1) Explicit WS URL (recommended)
     const explicit = process.env.NEXT_PUBLIC_WS_URL || process.env.NEXT_PUBLIC_WS_ENDPOINT;
     if (explicit) {
       const parsed = toWsUrl(explicit);
       if (parsed) return parsed;
     }
 
-    // 2) Backend URL preferred
     const backendUrl = process.env.BACKEND_URL || process.env.NEXT_PUBLIC_BACKEND_URL;
     if (backendUrl) {
       const parsed = toWsUrl(backendUrl);
       if (parsed) return parsed;
     }
 
-    // 3) API URL last resort
     const apiUrl = process.env.NEXT_PUBLIC_API_URL;
     if (apiUrl) {
       const parsed = toWsUrl(apiUrl);
-      if (parsed) {
-        // If API URL points to the same origin as the browser (often frontend :3000),
-        // assume real WS lives on backend port (default 3001).
-        if (typeof window !== 'undefined') {
-          try {
-            const a = new URL(apiUrl, window.location.origin);
-            const sameHost = a.hostname === window.location.hostname;
-            const aPort = a.port || (a.protocol === 'https:' ? '443' : '80');
-            const wPort = window.location.port || (window.location.protocol === 'https:' ? '443' : '80');
-            if (sameHost && aPort === wPort) {
-              const backendPort =
-                process.env.NEXT_PUBLIC_BACKEND_PORT || process.env.NEXT_PUBLIC_WS_PORT || '3001';
-              const proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-              return `${proto}//${window.location.hostname}:${backendPort}/ws`;
-            }
-          } catch {
-            // ignore
-          }
-        }
-        return parsed;
-      }
+      if (parsed) return parsed;
     }
 
-    // 4) Final fallback
     if (typeof window !== 'undefined') {
       const proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
       const backendPort = process.env.NEXT_PUBLIC_BACKEND_PORT || process.env.NEXT_PUBLIC_WS_PORT || '3001';
@@ -327,67 +675,15 @@ class WebSocketClient {
 
     return 'ws://localhost:3001/ws';
   }
-
-  private setState(state: WsConnectionState) {
-    if (this.state !== state) {
-      this.state = state;
-      this.stateChangeHandlers.forEach((handler) => handler(state));
-    }
-  }
-
-  private scheduleReconnect() {
-    // Avoid stacking multiple reconnect timers
-    if (this.reconnectTimer) return;
-
-    this.reconnectAttempts++;
-
-    const expDelay = Math.min(this.baseReconnectDelayMs * Math.pow(2, this.reconnectAttempts - 1), 30000);
-    // add small jitter to avoid thundering herd (0-250ms)
-    const jitter = Math.floor(Math.random() * 250);
-    const delay = expDelay + jitter;
-
-    this.reconnectTimer = setTimeout(() => {
-      this.reconnectTimer = undefined;
-      if (this.token) {
-        this.connect(this.token).catch((error) => {
-          // eslint-disable-next-line no-console
-          console.error('Reconnection failed:', error);
-        });
-      }
-    }, delay);
-  }
-
-  private startHeartbeat() {
-    this.stopHeartbeat();
-    this.heartbeatTimer = setInterval(() => {
-      if (this.socket?.readyState === WebSocket.OPEN) {
-        this.send({ event: 'PING', data: {} });
-      }
-    }, 25000);
-  }
-
-  private stopHeartbeat() {
-    if (this.heartbeatTimer) {
-      clearInterval(this.heartbeatTimer);
-      this.heartbeatTimer = undefined;
-    }
-  }
 }
 
-export const wsClient = new WebSocketClient();
-
-/**
- * Access tokens are stored in the NextAuth JWT cookie (encrypted) and are not readable
- * from document.cookie. Use `useSession()` (next-auth/react) and read `session.tokens.accessToken`.
- *
- * @deprecated Use next-auth `useSession()` and `session.tokens.accessToken`.
- */
-export function getAccessToken(): string | null {
-  if (process.env.NODE_ENV !== 'production') {
-    // eslint-disable-next-line no-console
-    console.warn(
-      'getAccessToken() is deprecated. Use useSession() and session.tokens.accessToken instead.'
-    );
-  }
-  return null;
+declare global {
+  // eslint-disable-next-line no-var
+  var __subago_wsClient: WebSocketClient | undefined;
 }
+
+// In Next.js dev mode (HMR), modules can be re-evaluated multiple times.
+// Keeping the client on globalThis avoids multiple sockets and "ghost" onclose events
+// that can incorrectly flip the UI to "disconnected".
+export const wsClient: WebSocketClient =
+  (globalThis as any).__subago_wsClient ?? ((globalThis as any).__subago_wsClient = new WebSocketClient());

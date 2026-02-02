@@ -5,17 +5,27 @@
 'use client';
 
 import { Badge } from '@suba-go/shared-components/components/ui/badge';
+import { Loader2, Users, Wifi, WifiOff } from 'lucide-react';
+import { WsConnectionState } from '@suba-go/shared-validation';
 
 interface AuctionHeaderProps {
   title: string;
   description?: string;
   status: 'ACTIVA' | 'PENDIENTE' | 'COMPLETADA' | 'CANCELADA';
+
+  // Optional realtime indicators.
+  wsState?: WsConnectionState;
+  wsRttMs?: number;
+  participantCount?: number;
 }
 
 export function AuctionHeader({
   title,
   description,
   status,
+  wsState,
+  wsRttMs,
+  participantCount,
 }: AuctionHeaderProps) {
   const statusConfig = {
     ACTIVA: {
@@ -51,8 +61,41 @@ export function AuctionHeader({
           </p>
         ) : null}
       </div>
-      <div className="shrink-0 pt-1 sm:pt-0">
+      <div className="shrink-0 pt-1 sm:pt-0 flex flex-col items-end gap-2">
         <Badge className={`${config.className} text-xs sm:text-sm`}>{config.label}</Badge>
+
+        {wsState ? (
+          <div className="flex flex-col items-end gap-1">
+            <div className="flex items-center gap-1 text-xs text-gray-600">
+              {wsState === WsConnectionState.AUTHENTICATED ? (
+                <>
+                  <Wifi className="h-3.5 w-3.5" />
+                  <span>En línea</span>
+                </>
+              ) : wsState === WsConnectionState.CONNECTING ? (
+                <>
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  <span>Conectando</span>
+                </>
+              ) : (
+                <>
+                  <WifiOff className="h-3.5 w-3.5" />
+                  <span>Sin conexión</span>
+                </>
+              )}
+              {typeof wsRttMs === 'number' && wsState === WsConnectionState.AUTHENTICATED ? (
+                <span className="ml-1">{Math.max(0, Math.round(wsRttMs))}ms</span>
+              ) : null}
+            </div>
+
+            {typeof participantCount === 'number' ? (
+              <div className="flex items-center gap-1 text-xs text-gray-600">
+                <Users className="h-3.5 w-3.5" />
+                <span>{participantCount}</span>
+              </div>
+            ) : null}
+          </div>
+        ) : null}
       </div>
     </div>
   );

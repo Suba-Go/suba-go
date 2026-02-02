@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState, useRef } from 'react';
 import { useSession } from 'next-auth/react';
+import { useWsServerClock } from '@/hooks/use-ws-server-clock';
 import Image from 'next/image';
 import { SafeImage } from '@/components/ui/safe-image';
 import { AuctionCard } from '@/components/auctions/auction-card';
@@ -78,6 +79,7 @@ interface SoldItem {
 
 export default function UserHomePage() {
   const { data: session } = useSession();
+  const clock = useWsServerClock(session?.tokens?.accessToken, 250);
   const companyContext = useCompanyContextOptional();
   const primaryColor = companyContext?.company?.principal_color || '#3B82F6';
 
@@ -403,6 +405,7 @@ useEffect(() => {
                 onUpdate={() => {
                   /* No-op for user view */
                 }}
+                clock={{ nowMs: clock.nowMs, serverOffsetMs: clock.serverOffsetMs, tickMs: 250 }}
                 imageSizes="(max-width: 768px) 100vw, (max-width: 1024px) 50vw, 33vw"
               />
               ))}
