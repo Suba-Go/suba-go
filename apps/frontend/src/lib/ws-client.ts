@@ -40,7 +40,7 @@ type WsUnauthorizedMessage = {
 };
 type WsPongMessage = {
   event: 'PONG';
-  data?: { clientTimeMs?: number; serverTimeMs?: number };
+  data?: { requestId?: string; clientTimeMs?: number; serverTimeMs?: number };
 };
 
 type WsRawMessage =
@@ -116,6 +116,19 @@ class WebSocketClient {
   private lastServerNowMs = 0;
   private readonly pendingPings = new Map<string, number>(); // requestId -> clientSendMs
 
+  // If the computed server clock would move backwards by more than this threshold,
+  // we consider it a "real" offset correction (e.g. after reconnect / better samples)
+  // and reset the monotonic guard instead of getting stuck in the future.
+  private readonly maxBackwardsJumpMs = 1200;
+
+  private resetMonotonicClock(nextServerNowMs?: number) {
+    if (typeof nextServerNowMs === 'number' && Number.isFinite(nextServerNowMs)) {
+      this.lastServerNowMs = nextServerNowMs;
+      return;
+    }
+    this.lastServerNowMs = 0;
+  }
+
   // Join ref counting
   private readonly joinCounts = new Map<string, number>(); // roomKey -> refCount
   private readonly joinedRooms = new Set<string>(); // roomKey actually joined (server-side)
@@ -148,6 +161,14 @@ class WebSocketClient {
     const promise = new Promise<void>((resolve, reject) => {
       // Ensure we start from a clean state
       this.disconnect(false);
+
+      // Each connect() starts a new "clock epoch".
+      // We keep the latest known offsetMs, but we must reset the monotonic guard;
+      // otherwise, if the offset is corrected downward after reconnect, the clock
+      // can get stuck in the future until Date.now() catches up.
+      this.resetMonotonicClock();
+      this.samples.length = 0;
+      this.pendingPings.clear();
 
       this.token = resolvedToken;
       this.setState(WsConnectionState.CONNECTING);
@@ -194,7 +215,11 @@ class WebSocketClient {
 
           // Start heartbeat after open; server can still close if auth fails.
           this.startHeartbeat();
+
+          // Kick time-sync right away so UI countdowns stabilize quickly.
+          this.primeTimeSync();
         });
+
 
         socket.addEventListener('message', (event) => {
           if (isStale()) return;
@@ -214,60 +239,79 @@ class WebSocketClient {
               return;
             }
 
-          // Server-side auth ok signal.
-          // The gateway responds to HELLO with HELLO_OK when the token is valid.
-          if (msg.event === 'HELLO_OK' || (msg as any).event === 'READY') {
-            const data: any = (msg as any).data as any;
-            const st = data?.serverTimeMs;
-            if (typeof st === 'number') this.maybeNudgeOffsetFromServerTime(st);
-
-            this.setState(WsConnectionState.AUTHENTICATED);
-
-            // Join any rooms requested while disconnected (and re-join after reconnect).
-            this.flushPendingJoins();
-
-            settle();
-            return;
-          }
-
-          // Errors are sent as an ERROR envelope with a code.
-          // Treat auth errors specially so the auth-bridge can refresh and we can reconnect.
-          if (msg.event === 'ERROR' || (msg as any).event === 'UNAUTHORIZED') {
-            const data: any = (msg as any).data as any;
-            const code = String(data?.code ?? '');
-            const msgText = String(data?.message ?? 'WebSocket error');
-
-            const isAuthError =
-              (msg as any).event === 'UNAUTHORIZED' ||
-              code === 'UNAUTHORIZED' ||
-              code === 'TOKEN_EXPIRED';
-
-            if (isAuthError) {
-              try {
-                socket.close();
-              } catch {}
-              settle(new Error(msgText));
+            // Application-level time sync.
+            if (msg.event === 'PONG') {
+              const data: any = (msg as any).data as any;
+              const st = data?.serverTimeMs;
+              if (typeof st === 'number') {
+                this.handlePong({
+                  requestId: typeof data?.requestId === 'string' ? data.requestId : undefined,
+                  clientTimeMs: typeof data?.clientTimeMs === 'number' ? data.clientTimeMs : undefined,
+                  serverTimeMs: st,
+                });
+              }
               return;
             }
-            // Non-auth errors are forwarded to listeners below.
-          }
 
-          // Room join/leave acks.
-          if (msg.event === 'JOINED' || (msg as any).event === 'JOINED ROOM') {
-            const data: any = (msg as any).data as any;
-            const tenantId = String(data?.tenantId ?? '');
-            const auctionId = String(data?.auctionId ?? '');
-            if (tenantId && auctionId) this.joinedRooms.add(this.roomKey(tenantId, auctionId));
-            const st = data?.serverTimeMs;
-            if (typeof st === 'number') this.maybeNudgeOffsetFromServerTime(st);
-          }
+            // Server-side auth ok signal.
+            // The gateway responds to HELLO with HELLO_OK (or READY) when the token is valid.
+            if (msg.event === 'HELLO_OK' || (msg as any).event === 'READY') {
+              const data: any = (msg as any).data as any;
+              const st = data?.serverTimeMs;
+              if (typeof st === 'number') this.maybeNudgeOffsetFromServerTime(st);
 
-          if (msg.event === 'LEFT' || (msg as any).event === 'LEFT ROOM') {
-            const data: any = (msg as any).data as any;
-            const tenantId = String(data?.tenantId ?? '');
-            const auctionId = String(data?.auctionId ?? '');
-            if (tenantId && auctionId) this.joinedRooms.delete(this.roomKey(tenantId, auctionId));
-          }
+              // After auth, prime time sync again so countdowns stabilize quickly.
+              this.primeTimeSync();
+
+              this.setState(WsConnectionState.AUTHENTICATED);
+
+              // Join any rooms requested while disconnected (and re-join after reconnect).
+              this.flushPendingJoins();
+
+              settle();
+              return;
+            }
+
+            // Errors are sent as an ERROR envelope with a code.
+            // Treat auth errors specially so the auth-bridge can refresh and we can reconnect.
+            if (msg.event === 'ERROR' || (msg as any).event === 'UNAUTHORIZED') {
+              const data: any = (msg as any).data as any;
+              const code = String(data?.code ?? '');
+              const msgText = String(data?.message ?? 'WebSocket error');
+
+              const isAuthError =
+                (msg as any).event === 'UNAUTHORIZED' ||
+                code === 'UNAUTHORIZED' ||
+                code === 'TOKEN_EXPIRED';
+
+              if (isAuthError) {
+                try {
+                  socket.close();
+                } catch {
+                  // ignore
+                }
+                settle(new Error(msgText));
+                return;
+              }
+              // Non-auth errors are forwarded to listeners below.
+            }
+
+            // Room join/leave acks.
+            if (msg.event === 'JOINED' || (msg as any).event === 'JOINED ROOM') {
+              const data: any = (msg as any).data as any;
+              const tenantId = String(data?.tenantId ?? '');
+              const auctionId = String(data?.auctionId ?? '');
+              if (tenantId && auctionId) this.joinedRooms.add(this.roomKey(tenantId, auctionId));
+              const st = data?.serverTimeMs;
+              if (typeof st === 'number') this.maybeNudgeOffsetFromServerTime(st);
+            }
+
+            if (msg.event === 'LEFT' || (msg as any).event === 'LEFT ROOM') {
+              const data: any = (msg as any).data as any;
+              const tenantId = String(data?.tenantId ?? '');
+              const auctionId = String(data?.auctionId ?? '');
+              if (tenantId && auctionId) this.joinedRooms.delete(this.roomKey(tenantId, auctionId));
+            }
 
             // Forward all other messages to app handlers.
             this.messageHandlers.forEach((h) => h(msg as WsServerMessage));
@@ -438,7 +482,23 @@ class WebSocketClient {
    */
   getServerNowMs(): number {
     const estimate = Date.now() + this.offsetMs;
+    if (!this.lastServerNowMs) {
+      this.lastServerNowMs = estimate;
+      return estimate;
+    }
+
+    // Normally we enforce monotonicity (no backwards jumps) to avoid timers "adding" time.
+    // However, after a reconnect or better time-sync samples, offsetMs can be corrected
+    // downward. If we *always* clamp, the clock can get stuck in the future until the
+    // local clock catches up, which is exactly the kind of bug that shows as
+    // "finalizando"/"completada" until a hard refresh.
+    if (estimate < this.lastServerNowMs - this.maxBackwardsJumpMs) {
+      this.lastServerNowMs = estimate;
+      return estimate;
+    }
+
     if (estimate < this.lastServerNowMs) return this.lastServerNowMs;
+
     this.lastServerNowMs = estimate;
     return estimate;
   }

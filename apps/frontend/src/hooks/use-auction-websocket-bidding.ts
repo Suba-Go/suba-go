@@ -16,6 +16,7 @@ import {
   WsConnectionState,
   type WsServerMessage,
 } from '@suba-go/shared-validation';
+import { getSession } from 'next-auth/react';
 
 export interface BidData {
   auctionItemId: string;
@@ -126,6 +127,16 @@ export function useAuctionWebSocketBidding(
     if (!accessToken || !auctionId || !tenantId) return;
 
     setConnectionError(null);
+
+    // Allow wsClient to refresh tokens on reconnect (e.g. token expired while the tab was idle).
+    wsClient.setTokenProvider(async () => {
+      try {
+        const session: any = await getSession();
+        return session?.tokens?.accessToken as string | undefined;
+      } catch {
+        return undefined;
+      }
+    });
 
     wsClient.connect(accessToken).catch((err) => {
       if (!mountedRef.current) return;
