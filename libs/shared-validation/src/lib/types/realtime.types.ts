@@ -9,7 +9,7 @@
  * Client-to-Server messages
  */
 export type WsClientMessage =
-  | { event: 'HELLO'; data: { clientInfo?: any } }
+  | { event: 'HELLO'; data: { token?: string; clientTimeMs?: number; clientInfo?: any } }
   | { event: 'JOIN_AUCTION'; data: { tenantId: string; auctionId: string } }
   | { event: 'LEAVE_AUCTION'; data: { tenantId: string; auctionId: string } }
   | {
@@ -135,6 +135,9 @@ export interface AuctionStatusData {
   endTime?: string;
   auction?: any; // Full auction object (optional)
   timestamp?: string;
+
+  /** Server time used by the client to compute a clock offset */
+  serverTimeMs?: number;
 }
 
 /**

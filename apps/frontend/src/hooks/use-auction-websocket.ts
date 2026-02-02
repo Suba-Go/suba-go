@@ -102,13 +102,9 @@ export function useAuctionWebSocket({
    */
   const disconnect = useCallback(() => {
     if (hasJoinedRoom) {
-      wsClient.send({
-        event: 'LEAVE_AUCTION',
-        data: { tenantId, auctionId },
-      });
+      wsClient.leaveAuction(tenantId, auctionId);
       setHasJoinedRoom(false);
     }
-    wsClient.disconnect();
     connectPromiseRef.current = null;
   }, [tenantId, auctionId, hasJoinedRoom]);
 
@@ -116,13 +112,12 @@ export function useAuctionWebSocket({
    * Join auction room after authentication
    */
   const joinAuctionRoom = useCallback(() => {
-    if (wsClient.isReady() && !hasJoinedRoom) {
-      wsClient.send({
-        event: 'JOIN_AUCTION',
-        data: { tenantId, auctionId },
-      });
-      setHasJoinedRoom(true);
-    }
+    if (!wsClient.isReady() || hasJoinedRoom) return;
+
+    // Join the per-auction room so we only receive relevant realtime updates.
+    wsClient.joinAuction(tenantId, auctionId);
+    setHasJoinedRoom(true);
+    setError(null);
   }, [tenantId, auctionId, hasJoinedRoom]);
 
   /**

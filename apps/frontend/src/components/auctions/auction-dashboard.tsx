@@ -40,12 +40,14 @@ import {
   AuctionWithItemsAndBidsDto,
 } from '@suba-go/shared-validation';
 import { useFetchData } from '@/hooks/use-fetch-data';
+import { useWsServerClock } from '@/hooks/use-ws-server-clock';
 import { darkenColor } from '@/utils/color-utils';
 import { AuctionCard } from './auction-card';
 import { AuctionCreateModal } from './auction-create-modal';
 import { AuctionEditModal } from './auction-edit-modal';
 
 interface AuctionDashboardProps {
+  accessToken?: string;
   auctions: AuctionWithItemsAndBidsDto[];
   primaryColor?: string;
   isLoading: boolean;
@@ -61,6 +63,7 @@ function toMs(v?: string | Date | null) {
 }
 
 export function AuctionDashboard({
+  accessToken,
   auctions,
   isLoading,
   primaryColor,
@@ -68,6 +71,10 @@ export function AuctionDashboard({
   subdomain,
 }: AuctionDashboardProps) {
   const router = useRouter();
+
+  // Shared, server-aligned clock for all countdowns in the dashboard.
+  // This avoids per-card timers and keeps multiple devices consistent.
+  const { nowMs: syncedNowMs, serverOffsetMs: syncedServerOffsetMs } = useWsServerClock(accessToken, 250);
 
   type StatusFilter =
     | 'ALL'
@@ -510,6 +517,7 @@ export function AuctionDashboard({
               key={auction.id}
               auction={auction}
               onUpdate={() => router.refresh()}
+              clock={{ nowMs: syncedNowMs, serverOffsetMs: syncedServerOffsetMs, tickMs: 250 }}
               imageSizes="(max-width: 768px) 100vw, (max-width: 1280px) 50vw, 33vw"
               onEdit={(a) => {
                 setSelectedAuction(a);

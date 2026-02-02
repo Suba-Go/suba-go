@@ -115,6 +115,8 @@ export function AuctionManagerPendingView({
     { serverOffsetMs }
   );
 
+  const nowMs = auctionStatus.nowMs;
+
   // NOTE: Edit button blocking depends on the reactivation timer (startTime countdown),
   // so it is computed after `canUncancel` is derived below.
 
@@ -133,22 +135,11 @@ export function AuctionManagerPendingView({
   });
 
   // Reactivation countdown (only relevant when the auction is CANCELADA).
-  const [nowMs, setNowMs] = useState(() => Date.now());
   const startTimeMs = useMemo(() => {
     const v = auction.startTime as unknown as string | Date;
     const ms = typeof v === 'string' ? Date.parse(v) : v?.getTime?.();
     return Number.isFinite(ms) ? (ms as number) : null;
   }, [auction.startTime]);
-
-  useEffect(() => {
-    if (!cancelChecked) return;
-    if (auction.type === AuctionTypeEnum.TEST) return;
-    if (!startTimeMs) return;
-    if (startTimeMs <= Date.now()) return;
-
-    const t = setInterval(() => setNowMs(Date.now()), 1000);
-    return () => clearInterval(t);
-  }, [cancelChecked, startTimeMs, auction.type]);
 
   const reactivateRemainingMs = useMemo(() => {
     if (!startTimeMs) return null;
