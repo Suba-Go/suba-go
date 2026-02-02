@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { wsClient } from '@/lib/ws-client';
 import { WsConnectionState } from '@suba-go/shared-validation';
+import { getSession } from 'next-auth/react';
 
 /**
  * Provides a server-synchronized clock for UI timers.
@@ -21,6 +22,16 @@ export function useWsServerClock(accessToken?: string, tickMs: number = 250) {
     if (!accessToken) return;
 
     let alive = true;
+
+    // Allow wsClient to refresh tokens on reconnect (e.g. token expired while the tab was idle).
+    wsClient.setTokenProvider(async () => {
+      try {
+        const session: any = await getSession();
+        return session?.tokens?.accessToken as string | undefined;
+      } catch {
+        return undefined;
+      }
+    });
 
     wsClient.connect(accessToken).catch(() => {
       // wsClient handles state transitions and retries.
