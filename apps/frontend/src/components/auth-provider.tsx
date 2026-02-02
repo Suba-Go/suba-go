@@ -3,6 +3,7 @@
 import { SessionProvider } from 'next-auth/react';
 import { ReactNode } from 'react';
 import { SessionKeeper } from './session-keeper';
+import { WsAuthBridge } from './ws-auth-bridge';
 
 interface Props {
   children: ReactNode;
@@ -20,6 +21,7 @@ const NextAuthProvider = ({ children }: Props) => {
       refetchOnWindowFocus
     >
       <SessionKeeper />
+      <WsAuthBridge />
       {children}
     </SessionProvider>
   );

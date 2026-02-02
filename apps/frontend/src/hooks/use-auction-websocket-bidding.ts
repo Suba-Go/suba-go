@@ -1,15 +1,21 @@
 /**
  * @file use-auction-websocket-bidding.ts
- * @description Hook for managing WebSocket connection for auction bidding.
+ * @description Auction realtime hook that uses the singleton wsClient.
  *
  * Key goals:
- * - One WS per (tenantId, auctionId) per browser tab.
- * - No leaked sockets when navigating (ref-counted close on last subscriber).
- * - Safe sendBid (never stuck loading when WS not ready/joined).
- * - Stable handlers (no stale-closure issues).
+ * - Exactly one WebSocket connection per browser tab (wsClient).
+ * - Ref-counted JOIN/LEAVE so multiple components can observe the same auction safely.
+ * - NTP-style server clock sync (via wsClient PING/PONG) for consistent timers across devices.
  */
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+'use client';
+
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { wsClient } from '@/lib/ws-client';
+import {
+  WsConnectionState,
+  type WsServerMessage,
+} from '@suba-go/shared-validation';
 
 export interface BidData {
   auctionItemId: string;
@@ -19,7 +25,7 @@ export interface BidData {
   bidId: string;
   requestId?: string;
   timestamp: number;
-  serverTimeMs?: number; // optional, for time sync
+  serverTimeMs?: number;
 }
 
 interface TimeExtensionData {
@@ -30,24 +36,9 @@ interface TimeExtensionData {
   serverTimeMs?: number;
 }
 
-
 export interface JoinedSnapshotData {
-  auction?: {
-    id: string;
-    status: string;
-    startTime: string;
-    endTime: string;
-  };
-  auctionItems?: Array<{
-    id: string;
-    startTime: string;
-    endTime: string;
-  }>;
-}
-
-interface WebSocketMessage {
-  event: string;
-  data: any;
+  auction?: { id: string; status: string; startTime?: string; endTime?: string };
+  auctionItems?: Array<{ id: string; startTime?: string; endTime?: string }>;
 }
 
 interface UseAuctionWebSocketBiddingProps {
@@ -68,580 +59,229 @@ interface UseAuctionWebSocketBiddingProps {
 
 interface UseAuctionWebSocketBiddingReturn {
   isConnected: boolean;
+  connectionState: WsConnectionState;
   isJoined: boolean;
   participantCount: number;
   connectionError: string | null;
   /** Difference between server clock and local clock in ms (server - local). */
   serverOffsetMs: number;
-  
   /** Best-known server clock in ms, monotonic (never goes backwards). */
   serverNowMonotonicMs: number;
-/** Returns requestId if the bid was sent. */
-  sendBid: (auctionItemId: string, amount: number) => string | null;
-}
-
-const getWebSocketUrl = (): string => {
-  const toWsEndpoint = (input: string): string | null => {
-    try {
-      const u = new URL(input, typeof window !== 'undefined' ? window.location.origin : undefined);
-      u.protocol = u.protocol === 'https:' ? 'wss:' : 'ws:';
-      u.pathname = '/ws';
-      u.search = '';
-      u.hash = '';
-      return u.toString().replace(/\/$/, '');
-    } catch {
-      return null;
-    }
-  };
-
-  const explicit = process.env.NEXT_PUBLIC_WS_URL || process.env.NEXT_PUBLIC_WS_ENDPOINT;
-  if (explicit) {
-    const parsed = toWsEndpoint(explicit);
-    if (parsed) return parsed;
-  }
-
-  const backend = process.env.BACKEND_URL || process.env.NEXT_PUBLIC_BACKEND_URL;
-  if (backend) {
-    const parsed = toWsEndpoint(backend);
-    if (parsed) return parsed;
-  }
-
-  const apiUrl = process.env.NEXT_PUBLIC_API_URL;
-  if (apiUrl) {
-    const parsed = toWsEndpoint(apiUrl);
-    if (parsed) {
-      if (typeof window !== 'undefined') {
-        try {
-          const a = new URL(apiUrl, window.location.origin);
-          const sameHost = a.hostname === window.location.hostname;
-          const samePort =
-            (a.port || (a.protocol === 'https:' ? '443' : '80')) ===
-            (window.location.port || (window.location.protocol === 'https:' ? '443' : '80'));
-          if (sameHost && samePort) {
-            const backendPort =
-              process.env.NEXT_PUBLIC_BACKEND_PORT ||
-              process.env.NEXT_PUBLIC_WS_PORT ||
-              '3001';
-            const proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-            return `${proto}//${window.location.hostname}:${backendPort}/ws`;
-          }
-        } catch {
-          // ignore
-        }
-      }
-      return parsed;
-    }
-  }
-
-  if (typeof window !== 'undefined') {
-    const proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const port =
-      process.env.NEXT_PUBLIC_BACKEND_PORT || process.env.NEXT_PUBLIC_WS_PORT || '3001';
-    return `${proto}//${window.location.hostname}:${port}/ws`;
-  }
-
-  return 'ws://localhost:3001/ws';
-};
-
-
-type Subscriber = {
-  onOpen: () => void;
-  onClose: () => void;
-  onError: (err: string) => void;
-  onMessage: (msg: WebSocketMessage) => void;
-};
-
-type ManagedConn = {
-  key: string;
-  socket: WebSocket;
-  subscribers: Set<Subscriber>;
-  refCount: number;
-  joined: boolean;
-  participantCount: number;
-  serverOffsetMs: number;
-    serverNowMonotonicMs: number;
-  timeSyncTimer: ReturnType<typeof setInterval> | null;
-  pendingPings: Map<string, number>;
-lastError: string | null;
-  closing: boolean;
-  reconnectAttempts: number;
-  reconnectTimer: ReturnType<typeof setTimeout> | null;
-  tenantId: string;
-  auctionId: string;
-  accessToken: string;
-};
-
-function updateServerClock(conn: ManagedConn, serverTimeMs: number, clientRecvAtMs: number) {
-  // Maintain a monotonic estimate of server "now" so timers never jump backwards.
-  const proposedServerNow = serverTimeMs;
-  conn.serverNowMonotonicMs = Math.max(conn.serverNowMonotonicMs, proposedServerNow);
-
-  // Offset is (server - local)
-  const proposedOffset = conn.serverNowMonotonicMs - clientRecvAtMs;
-
-  // Clamp how fast offset can move to avoid visible jumps.
-  const MAX_STEP = 250; // ms per message
-  const delta = proposedOffset - conn.serverOffsetMs;
-  conn.serverOffsetMs =
-    Math.abs(delta) <= MAX_STEP
-      ? proposedOffset
-      : conn.serverOffsetMs + Math.sign(delta) * MAX_STEP;
-}
-
-function startTimeSync(conn: ManagedConn) {
-  if (conn.timeSyncTimer) return;
-  conn.timeSyncTimer = setInterval(() => {
-    if (conn.closing) return;
-
-    const requestId =
-      (globalThis.crypto as any)?.randomUUID?.() ||
-      Math.random().toString(16).slice(2) + Date.now().toString(16);
-
-    const clientSentAtMs = Date.now();
-    conn.pendingPings.set(requestId, clientSentAtMs);
-
-    // prune stale pings
-    const cutoff = clientSentAtMs - 120_000;
-    for (const [id, t] of conn.pendingPings) {
-      if (t < cutoff) conn.pendingPings.delete(id);
-    }
-
-    try {
-      conn.socket.send(
-        JSON.stringify({
-          event: 'TIME_SYNC_PING',
-          data: { requestId, clientSentAtMs },
-        })
-      );
-    } catch {
-      // ignore
-    }
-  }, 15_000);
-}
-
-function stopTimeSync(conn: ManagedConn) {
-  if (conn.timeSyncTimer) {
-    clearInterval(conn.timeSyncTimer);
-    conn.timeSyncTimer = null;
-  }
-  conn.pendingPings.clear();
-}
-
-// Global, per-tab connection pool.
-const connections = new Map<string, ManagedConn>();
-
-function backoffMs(attempt: number): number {
-  // 0 -> 500ms, 1 -> 750ms, 2 -> 1125ms ... capped
-  const base = 500;
-  const ms = Math.floor(base * Math.pow(1.5, attempt));
-  return Math.min(ms, 8000);
-}
-
-function safeParseMessage(raw: any): WebSocketMessage | null {
-  try {
-    if (typeof raw !== 'string') return null;
-    return JSON.parse(raw) as WebSocketMessage;
-  } catch {
-    return null;
-  }
-}
-
-function createSocket(accessToken: string): WebSocket {
-  const wsEndpoint = getWebSocketUrl();
-  const wsUrl = `${wsEndpoint}?token=${encodeURIComponent(accessToken)}`;
-  return new WebSocket(wsUrl);
+  /** Measured round-trip-time to the server in ms (best effort). */
+  serverRttMs: number;
+  /**
+   * Sends a bid through WebSocket.
+   * 
+   * This method includes client-side protections:
+   * - Cooldown to prevent accidental spam-clicks.
+   * - Avoids sending when not ready or not joined.
+   */
+  sendBid: (
+    auctionItemId: string,
+    amount: number
+  ) =>
+    | { ok: true; requestId: string }
+    | { ok: false; reason: 'NOT_CONNECTED' | 'NOT_JOINED' | 'COOLDOWN'; retryAfterMs?: number };
 }
 
 function createRequestId(): string {
-  // Safer than relying on crypto.randomUUID() existing in every browser.
   try {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const c: any = typeof crypto !== 'undefined' ? (crypto as any) : undefined;
-    if (c && typeof c.randomUUID === 'function') {
-      return c.randomUUID();
-    }
+    const c: any = typeof crypto !== 'undefined' ? crypto : undefined;
+    if (c?.randomUUID) return c.randomUUID();
   } catch {
     // ignore
   }
   return `${Date.now()}-${Math.random().toString(16).slice(2)}`;
 }
 
-function attachSocketHandlers(conn: ManagedConn) {
-  const ws = conn.socket;
-
-  ws.onopen = () => {
-    conn.reconnectAttempts = 0;
-    conn.lastError = null;
-    conn.subscribers.forEach((s) => s.onOpen());
-
-    // Always (re)join on open.
-    try {
-      ws.send(
-        JSON.stringify({
-          event: 'JOIN_AUCTION',
-          data: { tenantId: conn.tenantId, auctionId: conn.auctionId },
-        })
-      );
-    } catch {
-      // If send fails here, onclose/onerror will take over.
-    }
-  };
-
-  ws.onmessage = (ev) => {
-    const msg = safeParseMessage(ev.data);
-    if (!msg) return;
-
-    // Keep minimal shared state on the connection.
-    
-if (msg.event === 'TIME_SYNC_PONG') {
-  const requestId = msg.data?.requestId as string | undefined;
-  const serverTimeMs = msg.data?.serverTimeMs as number | undefined;
-  if (requestId && typeof serverTimeMs === 'number') {
-    conn.pendingPings.delete(requestId);
-    updateServerClock(conn, serverTimeMs, Date.now());
-  }
-}
-
-if (msg.event === 'JOINED') {
-      conn.joined = true;
-      if (typeof msg.data?.participantCount === 'number') {
-        conn.participantCount = msg.data.participantCount;
-      }
-      if (typeof msg.data?.serverTimeMs === 'number') {
-        updateServerClock(conn, msg.data.serverTimeMs, Date.now());
-        startTimeSync(conn);
-      }
-    }
-
-    if (msg.event === 'PARTICIPANT_COUNT') {
-      if (typeof msg.data?.count === 'number') {
-        conn.participantCount = msg.data.count;
-      }
-    }
-
-    // IMPORTANT: if this socket got kicked because of a duplicate connection,
-    // close it to avoid leaks / zombie sockets (server only removes it from the room).
-    if (msg.event === 'KICKED_DUPLICATE') {
-      conn.joined = false;
-      try {
-        conn.socket.close(4000, 'Duplicate connection');
-      } catch {
-        // ignore
-      }
-    }
-
-    // Update server offset when available.
-    if (
-      (msg.event === 'BID_PLACED' || msg.event === 'AUCTION_TIME_EXTENDED') &&
-      typeof msg.data?.serverTimeMs === 'number'
-    ) {
-      updateServerClock(conn, msg.data.serverTimeMs, Date.now());
-    }
-if (msg.event === 'ERROR') {
-      const serverMsg =
-        typeof msg.data?.message === 'string'
-          ? msg.data.message
-          : 'Error de conexión WebSocket';
-      conn.lastError = serverMsg;
-    }
-
-    conn.subscribers.forEach((s) => s.onMessage(msg));
-  };
-
-  ws.onerror = () => {
-    conn.lastError = 'Error de conexión WebSocket';
-    conn.subscribers.forEach((s) => s.onError(conn.lastError!));
-  };
-
-  ws.onclose = () => {
-    conn.joined = false;
-    conn.subscribers.forEach((s) => s.onClose());
-
-    if (conn.closing) {
-      // Expected close (last subscriber unmounted).
-      return;
-    }
-
-    // Reconnect only if somebody still needs the connection.
-    if (conn.refCount <= 0) return;
-
-    if (conn.reconnectTimer) clearTimeout(conn.reconnectTimer);
-    const wait = backoffMs(conn.reconnectAttempts++);
-    conn.reconnectTimer = setTimeout(() => {
-      if (conn.refCount <= 0 || conn.closing) return;
-      conn.socket = createSocket(conn.accessToken);
-      attachSocketHandlers(conn);
-    }, wait);
-  };
-}
-
-function getOrCreateConnection(params: {
-  tenantId: string;
-  auctionId: string;
-  accessToken: string;
-}): ManagedConn {
-  const key = `${params.tenantId}:${params.auctionId}`;
-  const existing = connections.get(key);
-  if (existing) {
-    // If token changed, update it for future reconnects.
-    existing.accessToken = params.accessToken;
-    existing.tenantId = params.tenantId;
-    existing.auctionId = params.auctionId;
-    return existing;
-  }
-
-  const conn: ManagedConn = {
-    key,
-    socket: createSocket(params.accessToken),
-    subscribers: new Set<Subscriber>(),
-    refCount: 0,
-    joined: false,
-    participantCount: 0,
-    serverOffsetMs: 0,
-        serverNowMonotonicMs: 0,
-    timeSyncTimer: null,
-    pendingPings: new Map<string, number>(),
-lastError: null,
-    closing: false,
-    reconnectAttempts: 0,
-    reconnectTimer: null,
-    tenantId: params.tenantId,
-    auctionId: params.auctionId,
-    accessToken: params.accessToken,
-  };
-
-  attachSocketHandlers(conn);
-  connections.set(key, conn);
-  return conn;
-}
-
-export function useAuctionWebSocketBidding({
-  auctionId,
-  tenantId,
-  accessToken,
-  onBidPlaced,
-  onBidRejected,
-  onTimeExtension,
-  onStatusChanged,
-  onJoined,
-  onSnapshot,
-}: UseAuctionWebSocketBiddingProps): UseAuctionWebSocketBiddingReturn {
-  const connectionKey = useMemo(() => `${tenantId}:${auctionId}`, [tenantId, auctionId]);
+export function useAuctionWebSocketBidding(
+  props: UseAuctionWebSocketBiddingProps
+): UseAuctionWebSocketBiddingReturn {
+  const { auctionId, tenantId, accessToken } = props;
 
   const [isConnected, setIsConnected] = useState(false);
+  const [connectionState, setConnectionState] = useState<WsConnectionState>(WsConnectionState.DISCONNECTED);
   const [isJoined, setIsJoined] = useState(false);
   const [participantCount, setParticipantCount] = useState(0);
   const [connectionError, setConnectionError] = useState<string | null>(null);
   const [serverOffsetMs, setServerOffsetMs] = useState(0);
-  const [serverNowMonotonicMs, setServerNowMonotonicMs] = useState(0);
+  const [serverNowMonotonicMs, setServerNowMonotonicMs] = useState(() => Date.now());
+  const [serverRttMs, setServerRttMs] = useState(0);
 
-  const callbacksRef = useRef({
-    onBidPlaced,
-    onBidRejected,
-    onTimeExtension,
-    onStatusChanged,
-    onJoined,
-    onSnapshot,
-  });
+  // Client-side bid spam protection.
+  // Prevents accidental double-clicks and reduces websocket/message load.
+  const lastBidSentAtRef = useRef<Map<string, number>>(new Map());
+  const bidCooldownMs = 600;
 
+  const mountedRef = useRef(true);
   useEffect(() => {
-    callbacksRef.current = {
-      onBidPlaced,
-      onBidRejected,
-      onTimeExtension,
-      onStatusChanged,
-      onJoined,
-      onSnapshot,
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
     };
-  }, [onBidPlaced, onBidRejected, onTimeExtension, onStatusChanged, onJoined, onSnapshot]);
-
-  const connRef = useRef<ManagedConn | null>(null);
+  }, []);
 
   useEffect(() => {
-    if (!tenantId || !auctionId || !accessToken) {
-      setConnectionError('Faltan datos para conectar en tiempo real');
-      return;
-    }
+    if (!accessToken || !auctionId || !tenantId) return;
 
-    const conn = getOrCreateConnection({ tenantId, auctionId, accessToken });
-    connRef.current = conn;
-    conn.refCount += 1;
+    setConnectionError(null);
 
-    // Initial state sync for late subscribers.
-    setConnectionError(conn.lastError);
-    setParticipantCount(conn.participantCount);
-    setServerOffsetMs(conn.serverOffsetMs);
-    setServerNowMonotonicMs(conn.serverNowMonotonicMs);
-    setIsJoined(conn.joined);
-    setIsConnected(conn.socket.readyState === WebSocket.OPEN);
+    wsClient.connect(accessToken).catch((err) => {
+      if (!mountedRef.current) return;
+      setConnectionError(err instanceof Error ? err.message : 'WebSocket connection failed');
+    });
 
-    const subscriber: Subscriber = {
-      onOpen: () => {
-        setIsConnected(true);
-        setConnectionError(null);
-      },
-      onClose: () => {
-        setIsConnected(false);
-        setIsJoined(false);
-      },
-      onError: (err) => {
-        setConnectionError(err);
-      },
-      onMessage: (msg) => {
-        // Keep local state updated from connection shared state.
-        if (msg.event === 'JOINED') {
+    const unsubState = wsClient.onStateChange((state) => {
+      if (!mountedRef.current) return;
+      setConnectionState(state);
+      const ready = state === WsConnectionState.AUTHENTICATED;
+      setIsConnected(ready);
+      if (!ready) setIsJoined(false);
+    });
+
+    const unsubSync = wsClient.onTimeSync((info) => {
+      if (!mountedRef.current) return;
+      setServerOffsetMs(info.offsetMs);
+      setServerNowMonotonicMs(info.serverNowMs);
+      setServerRttMs(info.rttMs || 0);
+    });
+
+    wsClient.joinAuction(tenantId, auctionId);
+
+    const unsubMsg = wsClient.onMessage((message: WsServerMessage) => {
+      if (!mountedRef.current) return;
+
+      switch (message.event) {
+        case 'JOINED': {
+          const data: any = message.data as any;
+          if (data?.auctionId !== auctionId) return;
           setIsJoined(true);
-          setParticipantCount(conn.participantCount);
-          setServerOffsetMs(conn.serverOffsetMs);
-    setServerNowMonotonicMs(conn.serverNowMonotonicMs);
-          // If server provided a snapshot (auction / item clocks), sync it immediately.
-          callbacksRef.current.onSnapshot?.({
-            auction: msg.data?.auction,
-            auctionItems: msg.data?.auctionItems,
+          setParticipantCount(Number(data?.participantCount || 0));
+          props.onJoined?.();
+
+          const snap: JoinedSnapshotData = {
+            auction: data?.auction,
+            auctionItems: data?.auctionItems,
+          };
+          if (snap.auction || (snap.auctionItems && snap.auctionItems.length > 0)) {
+            props.onSnapshot?.(snap);
+          }
+          return;
+        }
+
+        case 'PARTICIPANT_COUNT': {
+          const data: any = message.data as any;
+          if (data?.auctionId !== auctionId) return;
+          setParticipantCount(Number(data?.count || 0));
+          return;
+        }
+
+        case 'BID_PLACED': {
+          const data: any = message.data as any;
+          if (data?.auctionId !== auctionId) return;
+          props.onBidPlaced?.(data as BidData);
+          return;
+        }
+
+        case 'BID_REJECTED': {
+          const data: any = message.data as any;
+          if (data?.auctionId !== auctionId) return;
+          props.onBidRejected?.({
+            auctionItemId: data?.auctionItemId,
+            reason: data?.reason || 'Bid rejected',
+            requestId: data?.requestId,
           });
-          callbacksRef.current.onJoined?.();
           return;
         }
 
-        if (msg.event === 'PARTICIPANT_COUNT') {
-          setParticipantCount(conn.participantCount);
+        case 'AUCTION_TIME_EXTENDED': {
+          const data: any = message.data as any;
+          if (data?.auctionId !== auctionId) return;
+          props.onTimeExtension?.(data as TimeExtensionData);
           return;
         }
 
-        if (msg.event === 'KICKED_DUPLICATE') {
-          setIsJoined(false);
-          setConnectionError(
-            'Se detectó otra sesión conectada a esta subasta con tu usuario.'
-          );
+        case 'AUCTION_STATUS_CHANGED': {
+          const data: any = message.data as any;
+          if (data?.auctionId !== auctionId) return;
+          if (typeof data?.status === 'string') props.onStatusChanged?.(data.status);
           return;
         }
 
-        if (msg.event === 'BID_PLACED') {
-          setServerOffsetMs(conn.serverOffsetMs);
-    setServerNowMonotonicMs(conn.serverNowMonotonicMs);
-          callbacksRef.current.onBidPlaced?.(msg.data);
+        default:
           return;
-        }
-
-        if (msg.event === 'BID_REJECTED') {
-          callbacksRef.current.onBidRejected?.(msg.data);
-          return;
-        }
-
-        if (msg.event === 'AUCTION_TIME_EXTENDED') {
-          setServerOffsetMs(conn.serverOffsetMs);
-    setServerNowMonotonicMs(conn.serverNowMonotonicMs);
-          callbacksRef.current.onTimeExtension?.(msg.data);
-          return;
-        }
-
-        if (msg.event === 'AUCTION_STATUS_CHANGED') {
-          callbacksRef.current.onStatusChanged?.(msg.data?.status);
-          return;
-        }
-
-        if (msg.event === 'ERROR') {
-          const msgText =
-            typeof msg.data?.message === 'string'
-              ? msg.data.message
-              : 'Error de conexión WebSocket';
-          setConnectionError(msgText);
-          return;
-        }
-      },
-    };
-
-    conn.subscribers.add(subscriber);
+      }
+    });
 
     return () => {
-      conn.subscribers.delete(subscriber);
-      conn.refCount = Math.max(0, conn.refCount - 1);
-
-      if (conn.refCount === 0) {
-        // Close connection cleanly when last subscriber unmounts.
-        conn.closing = true;
-        if (conn.reconnectTimer) {
-          clearTimeout(conn.reconnectTimer);
-          conn.reconnectTimer = null;
-        }
-        try {
-          if (conn.socket.readyState === WebSocket.OPEN && conn.joined) {
-            conn.socket.send(
-              JSON.stringify({
-                event: 'LEAVE_AUCTION',
-                data: { tenantId: conn.tenantId, auctionId: conn.auctionId },
-              })
-            );
-          }
-        } catch {
-          // ignore
-        }
-        try {
-          if (
-            conn.socket.readyState === WebSocket.OPEN ||
-            conn.socket.readyState === WebSocket.CONNECTING
-          ) {
-            conn.socket.close(1000, 'Unmount');
-          }
-        } catch {
-          // ignore
-        }
-
-        connections.delete(conn.key);
-      }
-
-      if (connRef.current?.key === conn.key) {
-        connRef.current = null;
-      }
+      unsubState();
+      unsubSync();
+      unsubMsg();
+      wsClient.leaveAuction(tenantId, auctionId);
     };
-  }, [tenantId, auctionId, accessToken, connectionKey]);
+  }, [auctionId, tenantId, accessToken]);
 
   const sendBid = useCallback(
-    (auctionItemId: string, amount: number): string | null => {
-      const conn = connRef.current;
-      if (!conn) {
-        return null;
+    (auctionItemId: string, amount: number) => {
+      if (!wsClient.isReady()) {
+        setConnectionError('WebSocket not ready');
+        return { ok: false as const, reason: 'NOT_CONNECTED' as const };
+      }
+      if (!isJoined) {
+        setConnectionError('WebSocket room not joined');
+        return { ok: false as const, reason: 'NOT_JOINED' as const };
       }
 
-      // Must be joined to the room.
-      if (!conn.joined) {
-        return null;
+      // Cooldown per item.
+      const now = Date.now();
+      const last = lastBidSentAtRef.current.get(auctionItemId) || 0;
+      const delta = now - last;
+      if (delta < bidCooldownMs) {
+        return {
+          ok: false as const,
+          reason: 'COOLDOWN' as const,
+          retryAfterMs: Math.max(0, bidCooldownMs - delta),
+        };
       }
-
-      const ws = conn.socket;
-      if (!ws || ws.readyState !== WebSocket.OPEN) {
-        return null;
-      }
+      lastBidSentAtRef.current.set(auctionItemId, now);
 
       const requestId = createRequestId();
-      try {
-        ws.send(
-          JSON.stringify({
-            event: 'PLACE_BID',
-            data: {
-              tenantId: conn.tenantId,
-              auctionId: conn.auctionId,
-              auctionItemId,
-              amount,
-              requestId,
-            },
-          })
-        );
-        return requestId;
-      } catch {
-        return null;
-      }
+
+      wsClient.send({
+        event: 'PLACE_BID',
+        data: {
+          tenantId,
+          auctionId,
+          auctionItemId,
+          amount,
+          requestId,
+        },
+      });
+
+      return { ok: true as const, requestId };
     },
-    []
+    [tenantId, auctionId, isJoined]
   );
+
+  useEffect(() => {
+    const t = setInterval(() => {
+      if (!mountedRef.current) return;
+      setServerNowMonotonicMs(wsClient.getServerNowMs());
+    }, 250);
+
+    return () => clearInterval(t);
+  }, []);
 
   return {
     isConnected,
+    connectionState,
     isJoined,
     participantCount,
     connectionError,
     serverOffsetMs,
     serverNowMonotonicMs,
+    serverRttMs,
     sendBid,
   };
 }

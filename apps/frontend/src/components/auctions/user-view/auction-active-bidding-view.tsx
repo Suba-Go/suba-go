@@ -428,7 +428,16 @@ useEffect(() => {
     [auction.startTime, auction.endTime]
   );
 
-  const { isJoined, connectionError, sendBid, serverOffsetMs } = useAuctionWebSocketBidding({
+  const {
+    isConnected,
+    connectionState,
+    isJoined,
+    participantCount,
+    connectionError,
+    serverRttMs,
+    sendBid,
+    serverOffsetMs,
+  } = useAuctionWebSocketBidding({
     auctionId: auction.id,
     tenantId,
     accessToken: liveAccessToken,
@@ -657,28 +666,44 @@ useEffect(() => {
       return;
     }
 
-    const requestId = sendBid(auctionItemId, amount);
+    const sendRes = sendBid(auctionItemId, amount);
 
-    // If we couldn't send (WS not connected / not joined), do NOT enter pending state
-    // otherwise the button can get stuck in loading forever.
-    if (!requestId) {
+    // If we couldn't send, do NOT enter pending state, otherwise the button can get stuck in loading forever.
+    if (!sendRes.ok) {
+      const message =
+        sendRes.reason === 'COOLDOWN'
+          ? 'Espera 0.6s antes de intentar nuevamente.'
+          : sendRes.reason === 'NOT_JOINED'
+            ? 'Aún no te conectas a la subasta en tiempo real. Reintenta.'
+            : 'Conexión en tiempo real no disponible. Reintenta en unos segundos.';
+
       setBidStates((prev) => ({
         ...prev,
         [auctionItemId]: {
           ...prev[auctionItemId],
           isPending: false,
-          error: 'Conexión en tiempo real no disponible. Reintenta en unos segundos.',
+          error: message,
           pendingRequestId: undefined,
         },
       }));
-      toast({
-        title: 'No se pudo enviar la puja',
-        description:
-          'Tu conexión en tiempo real no está lista (aún no te uniste a la subasta). Reintenta.',
-        variant: 'destructive',
-      });
+
+      // Cooldown is expected behavior: show a neutral toast to avoid alarming the user.
+      if (sendRes.reason === 'COOLDOWN') {
+        toast({
+          title: 'Espera un momento',
+          description: message,
+        });
+      } else {
+        toast({
+          title: 'No se pudo enviar la puja',
+          description: message,
+          variant: 'destructive',
+        });
+      }
       return;
     }
+
+    const requestId = sendRes.requestId;
 
     setBidStates((prev) => ({
       ...prev,
@@ -784,6 +809,9 @@ useEffect(() => {
         title={auction.title}
         description={auction.description || ''}
         status="ACTIVA"
+        wsState={connectionState}
+        wsRttMs={serverRttMs}
+        participantCount={participantCount}
       />
 
       {/* <ConnectionStatus

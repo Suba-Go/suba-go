@@ -10,6 +10,7 @@ import {
   Clock,
   Trophy,
   Edit,
+  Loader2,
   Wifi,
   WifiOff,
 } from 'lucide-react';
@@ -45,6 +46,7 @@ import {
 import { AuctionEditModal } from './auction-edit-modal';
 import { useRouter } from 'next/navigation';
 import { useAuctionStatus } from '@/hooks/use-auction-status';
+import { useWsServerClock } from '@/hooks/use-ws-server-clock';
 import { useAuctionCancelToggle } from '@/hooks/use-auction-cancel-toggle';
 import { useSession } from 'next-auth/react';
 import { useAuctionWebSocketBidding } from '@/hooks/use-auction-websocket-bidding';
@@ -58,6 +60,7 @@ import {
   ItemStateEnum,
   UserRolesEnum,
   UserSafeDto,
+  WsConnectionState
 } from '@suba-go/shared-validation';
 import { ParticipantsList } from './participants-list';
 import { ItemBidHistory } from './user-view/item-bid-history';
@@ -149,17 +152,27 @@ export function AuctionDetail({
   const effectiveAccessToken =
     ((session as any)?.tokens?.accessToken as string | undefined) ?? accessToken;
 
+  // Shared, server-aligned clock for all countdowns in this view.
+  const clock = useWsServerClock(effectiveAccessToken, 250);
+
+  // Keep the WS connection available for *all* authenticated users viewing the auction.
+  // This prevents cases where the view loads with a stale status and the UI shows
+  // "Sin conexión" until a manual refresh.
   const wsEnabled =
-    userRole === UserRolesEnum.AUCTION_MANAGER &&
     !!effectiveAccessToken &&
     !!tenantId &&
     !!auction?.id &&
     auction.status !== AuctionStatusEnum.COMPLETADA;
 
+  const wsOnlineLabel =
+    auction.status === AuctionStatusEnum.ACTIVA ? 'En vivo' : 'En línea';
+
   const {
     isConnected: isWsConnected,
+    connectionState: wsConnectionState,
     participantCount: liveParticipantCount,
     connectionError: wsConnectionError,
+    serverRttMs: wsRttMs,
   } = useAuctionWebSocketBidding({
     auctionId: wsEnabled ? auction.id : '',
     tenantId: wsEnabled ? (tenantId as string) : '',
@@ -196,7 +209,8 @@ export function AuctionDetail({
   const auctionStatus = useAuctionStatus(
     auction?.status || AuctionStatusEnum.PENDIENTE,
     auction?.startTime || new Date(),
-    auction?.endTime || new Date()
+    auction?.endTime || new Date(),
+    { nowMs: clock.nowMs, serverOffsetMs: clock.serverOffsetMs, tickMs: 250 }
   );
 
   // Optional: surface WS connection error for managers (non-blocking)
@@ -214,24 +228,14 @@ export function AuctionDetail({
     auction,
     onUpdated: onRealtimeSnapshot,
   });
-
   // Reactivation countdown (only relevant when the auction is CANCELADA).
-  const [nowMs, setNowMs] = useState(() => Date.now());
+  const nowMs = clock.nowMs;
+
   const startTimeMs = useMemo(() => {
     const v = auction.startTime as unknown as string | Date;
     const ms = typeof v === 'string' ? Date.parse(v) : v?.getTime?.();
     return Number.isFinite(ms) ? (ms as number) : null;
   }, [auction.startTime]);
-
-  useEffect(() => {
-    if (!cancelChecked) return;
-    if (auction.type === AuctionTypeEnum.TEST) return;
-    if (!startTimeMs) return;
-    if (startTimeMs <= Date.now()) return;
-
-    const t = setInterval(() => setNowMs(Date.now()), 1000);
-    return () => clearInterval(t);
-  }, [cancelChecked, startTimeMs, auction.type]);
 
   const reactivateRemainingMs = useMemo(() => {
     if (!startTimeMs) return null;
@@ -289,21 +293,30 @@ export function AuctionDetail({
               {auction.title}
             </h1>
             {getStatusBadge()}
-            {/* WebSocket connection indicator for AUCTION_MANAGER */}
-            {userRole === 'AUCTION_MANAGER' && isWsConnected && (
+            {/* WebSocket connection indicator (all viewers) */}
+            {effectiveAccessToken && wsEnabled && (
               <Badge variant="outline" className="gap-1">
-                <Wifi className="h-3 w-3 text-green-600" />
-                En vivo
+                {wsConnectionState === WsConnectionState.CONNECTED ||
+                wsConnectionState === WsConnectionState.AUTHENTICATED ? (
+                  <Wifi className="h-3 w-3 text-green-600" />
+                ) : wsConnectionState === WsConnectionState.CONNECTING ? (
+                  <Loader2 className="h-3 w-3 animate-spin text-gray-500" />
+                ) : (
+                  <WifiOff className="h-3 w-3 text-gray-400" />
+                )}
+                {wsConnectionState === WsConnectionState.CONNECTED ||
+                wsConnectionState === WsConnectionState.AUTHENTICATED
+                  ? wsOnlineLabel
+                  : wsConnectionState === WsConnectionState.CONNECTING
+                    ? 'Conectando'
+                    : 'Sin conexión'}
+                {(wsConnectionState === WsConnectionState.CONNECTED ||
+                  wsConnectionState === WsConnectionState.AUTHENTICATED) &&
+                  wsRttMs != null && (
+                  <span className="ml-1 text-[10px] text-gray-500">~{Math.round(wsRttMs)}ms</span>
+                )}
               </Badge>
             )}
-            {userRole === 'AUCTION_MANAGER' &&
-              !isWsConnected &&
-              accessToken && (
-                <Badge variant="outline" className="gap-1">
-                  <WifiOff className="h-3 w-3 text-gray-400" />
-                  Sin conexión
-                </Badge>
-              )}
           </div>
           {auction.description && (
             <p className="text-gray-600">{auction.description}</p>

@@ -102,6 +102,7 @@ export default function SubastasPage({
     <PageContainer>
       <Suspense fallback={<AuctionDashboardSkeleton />}>
         <AuctionDashboard
+          accessToken={session.tokens?.accessToken}
           auctions={auctions}
           primaryColor={primaryColor}
           isLoading={isLoading}
