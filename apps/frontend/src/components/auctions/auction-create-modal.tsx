@@ -274,6 +274,16 @@ export function AuctionCreateModal({
     >
       <DialogContent
         className="max-w-2xl max-h-[90vh] overflow-y-auto p-4 sm:p-6"
+        onInteractOutside={(e) => {
+          // UX pro: Evita cierres accidentales (incluido el file picker nativo)
+          // mientras el usuario está completando el formulario.
+          e.preventDefault();
+        }}
+        onPointerDownOutside={(e) => {
+          // Radix puede interpretar el click del file picker / overlay como "outside".
+          // Forzamos que la modal solo se cierre con acciones explícitas (Cancelar / X).
+          e.preventDefault();
+        }}
         onFocusOutside={(e) => {
           // Avoid closing the dialog when the browser opens the native file picker
           // from a nested dialog (Radix can treat that as focus outside).

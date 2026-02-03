@@ -14,7 +14,6 @@ const CHECK_INTERVAL_MS = 20 * 1000; // 20 seconds
  * SessionKeeper
  * - Proactively refreshes NextAuth session (and therefore access token)
  *   before expiry.
- * - Refreshes immediately on tab focus / visibility restore.
  * - If refresh is no longer possible (refresh token invalid), forces sign-out
  *   so the UI can recover cleanly.
  */
@@ -54,23 +53,11 @@ export function SessionKeeper() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [status, (session as any)?.tokens?.expiresIn]);
 
-  // 2) Refresh quickly when the user returns to the tab.
-  useEffect(() => {
-    if (status !== 'authenticated') return;
-
-    const onFocus = () => void safeRefresh();
-    const onVisibility = () => {
-      if (document.visibilityState === 'visible') void safeRefresh();
-    };
-
-    window.addEventListener('focus', onFocus);
-    document.addEventListener('visibilitychange', onVisibility);
-    return () => {
-      window.removeEventListener('focus', onFocus);
-      document.removeEventListener('visibilitychange', onVisibility);
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [status]);
+  // 2) NOTE: No refresh on window focus/visibility.
+  // Opening the native file picker (or other OS dialogs) triggers a blur/focus
+  // cycle that was causing NextAuth `update()` to remount parts of the UI and
+  // close open dialogs/forms (e.g. Auction → Item create).
+  // The periodic expiry check above is sufficient and avoids accidental form loss.
 
   // 3) If refresh fails (refresh token expired/revoked), NextAuth jwt callback
   // sets `session.error = 'ReauthRequired'`. In that case we sign out.
