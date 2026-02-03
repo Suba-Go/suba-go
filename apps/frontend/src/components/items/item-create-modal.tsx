@@ -178,14 +178,30 @@ export function ItemCreateModal({
         // Only close when the dialog is actually being closed.
         // This avoids accidental closes when Radix fires focus-outside events
         // (e.g. when the native file picker opens).
-        if (!open) handleClose();
+        if (!open) {
+          // Evita cerrar mientras se están subiendo archivos (dejar el estado consistente).
+          if (isUploadingFiles) return;
+          handleClose();
+        }
       }}
     >
       <DialogContent
         className="max-w-[41.5rem] max-h-[90vh] overflow-y-auto bg-white"
+        onInteractOutside={(e) => {
+          // UX pro: evita cierres accidentales mientras se completa el formulario.
+          // También cubre el caso del file picker nativo.
+          e.preventDefault();
+        }}
+        onPointerDownOutside={(e) => {
+          e.preventDefault();
+        }}
         onFocusOutside={(e) => {
           // Prevent the dialog from closing when the browser opens the native file picker.
           e.preventDefault();
+        }}
+        onEscapeKeyDown={(e) => {
+          // Bloquea ESC durante la subida para no dejar el usuario con uploads en curso.
+          if (isUploadingFiles) e.preventDefault();
         }}
       >
         <DialogHeader>
@@ -511,7 +527,12 @@ export function ItemCreateModal({
           </div>
 
           <div className="flex justify-end gap-3 pt-4 border-t">
-            <Button type="button" variant="outline" onClick={handleClose}>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={handleClose}
+              disabled={isUploadingFiles}
+            >
               Cancelar
             </Button>
             <Button
