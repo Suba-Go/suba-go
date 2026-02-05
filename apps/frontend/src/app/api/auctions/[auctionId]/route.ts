@@ -2,6 +2,11 @@ import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import superjson from 'superjson';
 
+// IMPORTANT: these endpoints back the live auction UI.
+// Force dynamic execution on Vercel and prevent fetch caching.
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
 export const GET = auth(async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ auctionId: string }> }
@@ -35,6 +40,8 @@ export const GET = auth(async function GET(
         'Content-Type': 'application/json',
         Authorization: `Bearer ${session.tokens.accessToken}`,
       },
+      cache: 'no-store',
+      next: { revalidate: 0 },
     });
 
     if (!response.ok) {
