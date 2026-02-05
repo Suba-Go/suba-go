@@ -97,21 +97,19 @@ const auctionsRef = useRef<AuctionDto[]>([]);
 const roomKey = (tenantId: string, auctionId: string) => `${tenantId}:${auctionId}`;
 
 const syncRooms = (auctions: AuctionDto[]) => {
-  if (wsStateRef.current !== WsConnectionState.AUTHENTICATED) return;
+  // Keep the wsClient join ref-count in sync with the auctions shown on this page.
+  // IMPORTANT: do not call wsClient.send('JOIN_AUCTION') directly; use wsClient.joinAuction()
+  // to avoid duplicate JOINs and to support controlled re-join on reconnect.
+  if (!companyTenantId) return;
 
-  const desired = new Set<string>(
-    auctions.map((a) => roomKey(a.tenantId, a.id))
-  );
+  const desired = new Set<string>(auctions.map((a) => roomKey(a.tenantId, a.id)));
 
   // Join missing
   for (const a of auctions) {
     const key = roomKey(a.tenantId, a.id);
     if (joinedRoomsRef.current.has(key)) continue;
 
-    wsClient.send({
-      event: 'JOIN_AUCTION',
-      data: { tenantId: a.tenantId, auctionId: a.id },
-    });
+    wsClient.joinAuction(a.tenantId, a.id);
     joinedRoomsRef.current.add(key);
   }
 
@@ -120,10 +118,7 @@ const syncRooms = (auctions: AuctionDto[]) => {
     if (desired.has(key)) continue;
 
     const [tenantId, auctionId] = key.split(':');
-    wsClient.send({
-      event: 'LEAVE_AUCTION',
-      data: { tenantId, auctionId },
-    });
+    wsClient.leaveAuction(tenantId, auctionId);
     joinedRoomsRef.current.delete(key);
   }
 };
@@ -132,7 +127,7 @@ const leaveAuctionRoom = (tenantId: string, auctionId: string) => {
   const key = roomKey(tenantId, auctionId);
   if (!joinedRoomsRef.current.has(key)) return;
 
-  wsClient.send({ event: 'LEAVE_AUCTION', data: { tenantId, auctionId } });
+  wsClient.leaveAuction(tenantId, auctionId);
   joinedRoomsRef.current.delete(key);
 };
 
@@ -279,7 +274,7 @@ useEffect(() => {
     // Leave rooms joined from this page
     for (const key of Array.from(joinedRoomsRef.current)) {
       const [tenantId, auctionId] = key.split(':');
-      wsClient.send({ event: 'LEAVE_AUCTION', data: { tenantId, auctionId } });
+      wsClient.leaveAuction(tenantId, auctionId);
     }
     joinedRoomsRef.current.clear();
   };

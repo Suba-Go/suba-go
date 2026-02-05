@@ -65,6 +65,10 @@ interface TokenBucket {
  * - Auction status changes
  * - Participant count tracking
  */
+type BidResponseCacheEntry =
+  | { ts: number; ok: true; itemId: string; data: any }
+  | { ts: number; ok: false; itemId: string; reason: string };
+
 @WebSocketGateway({ path: '/ws' })
 export class AuctionsGateway
   implements OnGatewayInit, OnGatewayConnection, OnGatewayDisconnect
@@ -84,6 +88,31 @@ export class AuctionsGateway
   private readonly itemBidBuckets = new Map<string, TokenBucket>();
   // requestId de-dup for a short window (so retries don't get rate-limited)
   private readonly recentBidRequestIds = new Map<string, number>();
+
+  /**
+   * Response cache by requestId (per instance).
+   *
+   * Goal: make WS bidding idempotent for both SUCCESS and FAILURE.
+   *
+   * Why: some clients retry the same requestId after a reconnect, browser freeze,
+   * or when they didn't receive the ACK due to transient network issues.
+   *
+   * The BidRealtimeService already handles SUCCESS idempotency (duplicate requestId
+   * returns createdNow=false + bidPlacedData). This cache extends idempotency to
+   * FAILURE cases too, so we don't re-run validations/DB lookups and we avoid
+   * confusing UI sequences like "accepted" then "failed" for the same requestId.
+   */
+  private readonly bidResponseCache = new Map<string, BidResponseCacheEntry>();
+
+  /**
+   * In-flight de-duplication for bid requests (per instance).
+   *
+   * Why: some clients can emit the same WS bid message twice (double click,
+   * React StrictMode double-invocation in dev, or reconnect edge-cases). Without
+   * this guard, we may run two concurrent validations/transactions for the same
+   * requestId on the same WS connection, producing confusing logs and UI states.
+   */
+  private readonly inFlightBidRequestIds = new Set<string>();
 
   // Tunables (env)
   private readonly wsBidUserRatePerSec = Number(
@@ -538,60 +567,90 @@ export class AuctionsGateway
       return;
     }
 
-    // Rate-limit (USER + ITEM) to avoid flooding and weird edge-case overloads.
-    // IMPORTANT: don't punish idempotent retries -> if we already saw this requestId recently,
-    // skip rate-limits and forward to the service (which is idempotent by requestId).
+    // Opportunistically prune in-memory limiter state + response cache.
     const nowMs = Date.now();
     this.pruneRateLimitState(nowMs);
-    if (!this.recentBidRequestIds.has(data.requestId)) {
-      this.recentBidRequestIds.set(data.requestId, nowMs);
 
-      const userKey = `${meta.tenantId ?? data.tenantId}:${meta.userId}`;
-      const itemKey = `${data.tenantId}:${data.auctionItemId}`;
-
-      const userOk = this.consumeToken(
-        this.userBidBuckets,
-        userKey,
-        this.wsBidUserRatePerSec,
-        this.wsBidUserBurst,
-        nowMs
+    // Fast-path: if we already processed this requestId, immediately reply with the same outcome.
+    // This makes WS bidding idempotent for both SUCCESS and FAILURE.
+    const cached = this.bidResponseCache.get(data.requestId);
+    if (cached) {
+      this.logger.debug(
+        `[${this.instanceId}] Returning cached bid outcome req=${data.requestId} ok=${cached.ok} user=${meta.email}`
       );
-      if (!userOk) {
-        this.sendBidRejected(
-          client,
-          data.auctionItemId,
-          'Estás pujando muy rápido. Intenta nuevamente en un momento.',
-          data.requestId
-        );
-        return;
+      if (cached.ok === true) {
+        this.sendMessage(client, { event: 'BID_PLACED', data: cached.data });
+      } else {
+        this.sendBidRejected(client, cached.itemId, cached.reason, data.requestId);
       }
-
-      const itemOk = this.consumeToken(
-        this.itemBidBuckets,
-        itemKey,
-        this.wsBidItemRatePerSec,
-        this.wsBidItemBurst,
-        nowMs
-      );
-      if (!itemOk) {
-        this.sendBidRejected(
-          client,
-          data.auctionItemId,
-          'Hay muchas pujas para este ítem. Intenta nuevamente en un momento.',
-          data.requestId
-        );
-        return;
-      }
+      return;
     }
 
-    // Log the bid attempt with instance identifier
-    this.logger.log(
-      `[${this.instanceId}] Bid attempt req=${data.requestId}: ${meta.email} - $${data.amount} on item ${data.auctionItemId}`
-    );
+    // In-flight de-dup (same requestId received twice before the first finishes).
+    // We intentionally do NOT send BID_REJECTED here; the first request will
+    // either broadcast BID_PLACED (success) or send BID_REJECTED (failure).
+    if (this.inFlightBidRequestIds.has(data.requestId)) {
+      this.logger.debug(
+        `[${this.instanceId}] Duplicate in-flight bid ignored req=${data.requestId} user=${meta.email}`
+      );
+      return;
+    }
+    this.inFlightBidRequestIds.add(data.requestId);
 
-    // Call BidRealtimeService to process the bid
-    // The service will validate, save to DB with requestId, and broadcast
     try {
+      // Rate-limit (USER + ITEM) to avoid flooding and weird edge-case overloads.
+      // IMPORTANT: don't punish idempotent retries -> if we already saw this requestId recently,
+      // skip rate-limits and forward to the service (which is idempotent by requestId).
+      // Rate-limit (USER + ITEM) to avoid flooding and weird edge-case overloads.
+      // NOTE: prune already ran above.
+      if (!this.recentBidRequestIds.has(data.requestId)) {
+        this.recentBidRequestIds.set(data.requestId, nowMs);
+
+        const userKey = `${meta.tenantId ?? data.tenantId}:${meta.userId}`;
+        const itemKey = `${data.tenantId}:${data.auctionItemId}`;
+
+        const userOk = this.consumeToken(
+          this.userBidBuckets,
+          userKey,
+          this.wsBidUserRatePerSec,
+          this.wsBidUserBurst,
+          nowMs
+        );
+        if (!userOk) {
+          this.sendBidRejected(
+            client,
+            data.auctionItemId,
+            'Estás pujando muy rápido. Intenta nuevamente en un momento.',
+            data.requestId
+          );
+          return;
+        }
+
+        const itemOk = this.consumeToken(
+          this.itemBidBuckets,
+          itemKey,
+          this.wsBidItemRatePerSec,
+          this.wsBidItemBurst,
+          nowMs
+        );
+        if (!itemOk) {
+          this.sendBidRejected(
+            client,
+            data.auctionItemId,
+            'Hay muchas pujas para este ítem. Intenta nuevamente en un momento.',
+            data.requestId
+          );
+          return;
+        }
+      }
+
+      // Log the bid attempt with instance identifier
+      this.logger.log(
+        `[${this.instanceId}] Bid attempt req=${data.requestId}: ${meta.email} - $${data.amount} on item ${data.auctionItemId}`
+      );
+
+      // Call BidRealtimeService to process the bid
+      // The service will validate, save to DB with requestId, and broadcast
       if (!this.bidRealtimeService) {
         this.logger.error('BidRealtimeService not injected!');
         this.sendError(
@@ -610,29 +669,53 @@ export class AuctionsGateway
         data.requestId
       );
 
+      // Cache SUCCESS outcome (idempotent by requestId).
+      this.bidResponseCache.set(data.requestId, {
+        ts: Date.now(),
+        ok: true,
+        itemId: data.auctionItemId,
+        data: result.bidPlacedData,
+      });
+
+      // Log *the accepted amount* from the service (not the raw client payload)
+      // to avoid confusing logs when the client retries with a different amount.
       this.logger.log(
-        `[${this.instanceId}] Bid accepted req=${data.requestId} for item ${data.auctionItemId} amount=$${data.amount}`
+        `[${this.instanceId}] Bid accepted req=${data.requestId} for item ${data.auctionItemId} amount=$${result.bidPlacedData.amount} createdNow=${result.createdNow}`
       );
 
       // Success:
       // - When createdNow=true, the service already broadcasted BID_PLACED to the room.
       // - When createdNow=false (duplicate requestId), we must still ACK the bidder so the UI stops loading.
       if (result && result.createdNow === false) {
-        this.sendMessage(client, { event: 'BID_PLACED', data: result.bidPlacedData });
+        this.sendMessage(client, {
+          event: 'BID_PLACED',
+          data: result.bidPlacedData,
+        });
       }
     } catch (error: unknown) {
       const message =
         error instanceof Error ? error.message : 'Error al procesar la puja';
       this.logger.error(
-        `Bid placement failed [req=${data.requestId}] user=${meta?.email ?? 'unknown'} tenant=${data.tenantId ?? 'unknown'} auction=${data.auctionId ?? 'unknown'} item=${data.auctionItemId}: ${message}`,
+        `Bid placement failed [req=${data.requestId}] user=${meta?.email ?? 'unknown'} tenant=${data.tenantId ?? 'unknown'} auction=${data.auctionId ?? 'unknown'} item=${data.auctionItemId}: ${message}`
       );
 
       // IMPORTANT: reply with BID_REJECTED so the frontend can stop the loading state.
       if (data?.auctionItemId) {
+        // Cache FAILURE outcome (idempotent by requestId).
+        if (data?.requestId) {
+          this.bidResponseCache.set(data.requestId, {
+            ts: Date.now(),
+            ok: false,
+            itemId: data.auctionItemId,
+            reason: message,
+          });
+        }
         this.sendBidRejected(client, data.auctionItemId, message, data.requestId);
       } else {
         this.sendError(client, WsErrorCode.INVALID_BID, message);
       }
+    } finally {
+      this.inFlightBidRequestIds.delete(data.requestId);
     }
   }
 
@@ -930,6 +1013,11 @@ export class AuctionsGateway
     // requestId TTL cleanup
     for (const [reqId, ts] of this.recentBidRequestIds) {
       if (ts < cutoff) this.recentBidRequestIds.delete(reqId);
+    }
+
+    // response cache TTL cleanup
+    for (const [reqId, entry] of this.bidResponseCache) {
+      if (entry.ts < cutoff) this.bidResponseCache.delete(reqId);
     }
 
     // bucket cleanup (inactive keys)
