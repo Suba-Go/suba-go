@@ -2,6 +2,11 @@ import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import superjson from 'superjson';
 
+// IMPORTANT: this endpoint powers the live auction list.
+// Force dynamic execution on Vercel and prevent fetch caching.
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
 async function readBackendError(response: Response): Promise<string> {
   try {
     const contentType = response.headers.get('content-type') || '';
@@ -55,6 +60,7 @@ export const GET = auth(async function GET(request: any) {
 
     const response = await fetch(backendUrl, {
       method: 'GET',
+      next: { revalidate: 0 },
       headers: {
         'Content-Type': 'application/json',
         Authorization: `Bearer ${accessToken}`,
