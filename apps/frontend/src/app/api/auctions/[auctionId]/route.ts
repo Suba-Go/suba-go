@@ -7,6 +7,12 @@ import superjson from 'superjson';
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
+const LIVE_NO_STORE_HEADERS = {
+  'Cache-Control': 'no-store, max-age=0',
+  'CDN-Cache-Control': 'no-store',
+  'Vercel-CDN-Cache-Control': 'no-store',
+} as const;
+
 export const GET = auth(async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ auctionId: string }> }
@@ -18,7 +24,10 @@ export const GET = auth(async function GET(
     const session = (request as any).auth;
 
     if (!session || !session.user) {
-      return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
+      return NextResponse.json(
+        { error: 'No autorizado' },
+        { status: 401, headers: LIVE_NO_STORE_HEADERS }
+      );
     }
 
     // Tenant is normally available on the session, but under token-refresh races
@@ -48,13 +57,13 @@ export const GET = auth(async function GET(
       if (response.status === 404) {
         return NextResponse.json(
           { error: 'Subasta no encontrada' },
-          { status: 404 }
+          { status: 404, headers: LIVE_NO_STORE_HEADERS }
         );
       }
       // Return error response instead of throwing
       return NextResponse.json(
         { error: `Error del backend: ${response.status}` },
-        { status: response.status }
+        { status: response.status, headers: LIVE_NO_STORE_HEADERS }
       );
     }
 
@@ -73,15 +82,18 @@ export const GET = auth(async function GET(
 
     // Verify the auction belongs to the user's tenant (when we have tenantId)
     if (tenantId && deserializedData?.tenantId && deserializedData.tenantId !== tenantId) {
-      return NextResponse.json({ error: 'Acceso denegado' }, { status: 403 });
+      return NextResponse.json(
+        { error: 'Acceso denegado' },
+        { status: 403, headers: LIVE_NO_STORE_HEADERS }
+      );
     }
 
-    return NextResponse.json(deserializedData);
+    return NextResponse.json(deserializedData, { headers: LIVE_NO_STORE_HEADERS });
   } catch (error) {
     console.error('Error fetching auction:', error);
     return NextResponse.json(
       { error: 'Error interno del servidor' },
-      { status: 500 }
+      { status: 500, headers: LIVE_NO_STORE_HEADERS }
     );
   }
 });

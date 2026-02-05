@@ -65,6 +65,33 @@ export type WsServerMessage =
       };
     }
   | {
+      /**
+       * Snapshot of the latest auction state.
+       *
+       * Sent to late-joining clients and/or immediately after JOIN to ensure
+       * they see the current status even if they missed prior broadcasts.
+       */
+      event: 'AUCTION_SNAPSHOT';
+      data: {
+        room: string;
+        auctionId: string;
+        participantCount: number;
+        /** Server time used by the client to compute a clock offset */
+        serverTimeMs?: number;
+        auction?: {
+          id: string;
+          status: string;
+          startTime: string;
+          endTime: string;
+        };
+        auctionItems?: Array<{
+          id: string;
+          startTime: string;
+          endTime: string;
+        }>;
+      };
+    }
+  | {
       /** Out-of-room notification when a user is invited/registered to an auction */
       event: 'AUCTION_INVITED';
       data: {

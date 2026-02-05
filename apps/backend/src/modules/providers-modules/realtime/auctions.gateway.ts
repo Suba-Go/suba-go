@@ -460,6 +460,31 @@ export class AuctionsGateway
       },
     });
 
+    // PRO: also send an explicit snapshot event. This covers cases where the client
+    // joins *after* a status broadcast (e.g. manager opens the page late) and
+    // wants to apply the latest state immediately without relying on polling.
+    // The payload mirrors JOINED for maximum compatibility.
+    this.sendMessage(client, {
+      event: 'AUCTION_SNAPSHOT',
+      data: {
+        room: roomKey,
+        auctionId,
+        participantCount,
+        serverTimeMs: Date.now(),
+        auction: {
+          id: auction.id,
+          status: auction.status,
+          startTime: auction.startTime.toISOString(),
+          endTime: auction.endTime.toISOString(),
+        },
+        auctionItems: auctionItems.map((ai) => ({
+          id: ai.id,
+          startTime: (ai.startTime ?? auction.startTime).toISOString(),
+          endTime: (ai.endTime ?? auction.endTime).toISOString(),
+        })),
+      },
+    });
+
     // Broadcast participant count to all room members
     this.broadcastToRoom(roomKey, {
       event: 'PARTICIPANT_COUNT',

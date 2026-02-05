@@ -101,6 +101,13 @@ export function AuctionManagerPendingView({
       // Status changed on backend; let parent refetch and route to the correct view.
       onRealtimeSnapshot?.();
     },
+    onSnapshot: (snap) => {
+      // Apply snapshot immediately if we joined late and the backend is already ACTIVE.
+      const nextStatus = (snap as any)?.auction?.status;
+      if (typeof nextStatus === 'string' && nextStatus !== auction.status) {
+        onRealtimeSnapshot?.();
+      }
+    },
     onJoined: onRealtimeSnapshot,
   });
 
