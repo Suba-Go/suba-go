@@ -115,6 +115,15 @@ export function AuctionManagerPendingView({
     { serverOffsetMs }
   );
 
+  // Safety net: when the start time has passed but the backend hasn't flipped the status yet,
+  // aggressively refetch so the manager view doesn't get stuck on "Iniciando" due to missed WS events
+  // or proxy caching. This stops automatically once the parent reroutes to ACTIVA.
+  useEffect(() => {
+    if (!auctionStatus.isStarting) return;
+    const id = setInterval(() => onRealtimeSnapshot?.(), 1000);
+    return () => clearInterval(id);
+  }, [auctionStatus.isStarting, onRealtimeSnapshot]);
+
   const nowMs = auctionStatus.nowMs;
 
   // NOTE: Edit button blocking depends on the reactivation timer (startTime countdown),

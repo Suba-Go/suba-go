@@ -5,7 +5,7 @@
 'use client';
 
 import { SafeImage } from '@/components/ui/safe-image';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { Alert, AlertDescription } from '@suba-go/shared-components/components/ui/alert';
 import { Button } from '@suba-go/shared-components/components/ui/button';
@@ -62,6 +62,15 @@ export function AuctionPendingView({
     auction.endTime,
     { serverOffsetMs }
   );
+
+  // Safety net: when the start time has passed but the backend hasn't flipped the status yet,
+  // aggressively refetch so the user doesn't get stuck on "Iniciando" due to missed WS events
+  // or proxy caching. This stops automatically once the parent reroutes to ACTIVA.
+  useEffect(() => {
+    if (!auctionStatus.isStarting) return;
+    const id = setInterval(() => onRealtimeSnapshot?.(), 1000);
+    return () => clearInterval(id);
+  }, [auctionStatus.isStarting, onRealtimeSnapshot]);
 
   const filteredItems = useMemo(() => {
     const q = query.trim().toLowerCase();
