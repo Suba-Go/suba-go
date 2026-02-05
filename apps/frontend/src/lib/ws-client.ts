@@ -132,6 +132,7 @@ class WebSocketClient {
   // Join ref counting
   private readonly joinCounts = new Map<string, number>(); // roomKey -> refCount
   private readonly joinedRooms = new Set<string>(); // roomKey actually joined (server-side)
+  private readonly joiningRooms = new Set<string>(); // roomKey JOIN sent, awaiting JOINED
   private readonly pendingJoins = new Set<string>(); // roomKey waiting for AUTH
 
   constructor() {
@@ -302,6 +303,7 @@ class WebSocketClient {
               const tenantId = String(data?.tenantId ?? '');
               const auctionId = String(data?.auctionId ?? '');
               if (tenantId && auctionId) this.joinedRooms.add(this.roomKey(tenantId, auctionId));
+              if (tenantId && auctionId) this.joiningRooms.delete(this.roomKey(tenantId, auctionId));
               const st = data?.serverTimeMs;
               if (typeof st === 'number') this.maybeNudgeOffsetFromServerTime(st);
             }
@@ -311,6 +313,7 @@ class WebSocketClient {
               const tenantId = String(data?.tenantId ?? '');
               const auctionId = String(data?.auctionId ?? '');
               if (tenantId && auctionId) this.joinedRooms.delete(this.roomKey(tenantId, auctionId));
+              if (tenantId && auctionId) this.joiningRooms.delete(this.roomKey(tenantId, auctionId));
             }
 
             // Forward all other messages to app handlers.
@@ -330,6 +333,13 @@ class WebSocketClient {
           this.setState(WsConnectionState.DISCONNECTED);
 
           this.joinedRooms.clear();
+          this.joiningRooms.clear();
+
+          // After a disconnect, server-side rooms are lost. Mark current desired rooms for re-join.
+          if (!this.manualClose) {
+            this.pendingJoins.clear();
+            for (const k of this.joinCounts.keys()) this.pendingJoins.add(k);
+          }
 
           if (!settled) {
             settle(
@@ -511,14 +521,17 @@ class WebSocketClient {
     const prev = this.joinCounts.get(key) ?? 0;
     this.joinCounts.set(key, prev + 1);
 
+    // If we're not authenticated yet, remember that we need this room once we're ready.
     if (!this.isReady()) {
       this.pendingJoins.add(key);
       return;
     }
 
-    if (!this.joinedRooms.has(key)) {
-      this.send({ event: 'JOIN_AUCTION', data: { tenantId, auctionId } });
-    }
+    // Avoid duplicate JOIN spam while we're waiting for the JOINED ack.
+    if (this.joinedRooms.has(key) || this.joiningRooms.has(key)) return;
+
+    this.send({ event: 'JOIN_AUCTION', data: { tenantId, auctionId } });
+    this.joiningRooms.add(key);
   }
 
   /**
@@ -533,6 +546,7 @@ class WebSocketClient {
       this.joinCounts.delete(key);
       this.pendingJoins.delete(key);
       this.joinedRooms.delete(key);
+      this.joiningRooms.delete(key);
       if (this.isReady()) {
         this.send({ event: 'LEAVE_AUCTION', data: { tenantId, auctionId } });
       }
@@ -545,14 +559,21 @@ class WebSocketClient {
   private flushPendingJoins() {
     if (!this.isReady()) return;
 
-    for (const [key, count] of this.joinCounts.entries()) {
+    // Only join rooms that were requested while disconnected (pendingJoins) or
+    // explicitly marked for re-join after a reconnect.
+    for (const key of Array.from(this.pendingJoins)) {
+      const count = this.joinCounts.get(key) ?? 0;
       if (count <= 0) continue;
+      if (this.joinedRooms.has(key) || this.joiningRooms.has(key)) continue;
+
       const [tenantId, auctionId] = key.split(':');
       this.send({ event: 'JOIN_AUCTION', data: { tenantId, auctionId } });
+      this.joiningRooms.add(key);
     }
 
     this.pendingJoins.clear();
   }
+
 
   private roomKey(tenantId: string, auctionId: string): string {
     return `${tenantId}:${auctionId}`;

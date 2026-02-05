@@ -80,6 +80,12 @@ export class BidRealtimeService {
     const SOFT_CLOSE_EXTENSION_MS = 30 * 1000;
 
     const txResult = await this.prisma.client.$transaction(async (tx) => {
+      // ✅ Serialize duplicates by requestId *even before the bid row exists*.
+      // Why: if the same requestId arrives twice concurrently, the second transaction
+      // may not see the first bid yet (still uncommitted), re-run validations
+      // against a newer price, and incorrectly reject the retry with a "mínimo" error.
+      // pg_advisory_xact_lock gives us a lightweight, transaction-scoped mutex.
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock((hashtext(${requestId}))::bigint)`;
       // ✅ Idempotency inside the transaction (avoids race between "find" and "insert")
       const existing = await tx.bid.findUnique({
         where: { requestId },
