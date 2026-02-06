@@ -2,12 +2,26 @@ import { NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import superjson from 'superjson';
 
+// IMPORTANT: this endpoint backs the live user auction list.
+// Force dynamic execution on Vercel and prevent caching.
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
+const LIVE_NO_STORE_HEADERS = {
+  'Cache-Control': 'no-store, max-age=0',
+  'CDN-Cache-Control': 'no-store',
+  'Vercel-CDN-Cache-Control': 'no-store',
+} as const;
+
 export const GET = auth(async function GET(request: any) {
   try {
     const session = (request as any).auth;
 
     if (!session) {
-      return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
+      return NextResponse.json(
+        { error: 'No autorizado' },
+        { status: 401, headers: LIVE_NO_STORE_HEADERS }
+      );
     }
 
     // Forward request to backend - use new endpoint that gets current user's registrations
@@ -15,6 +29,8 @@ export const GET = auth(async function GET(request: any) {
 
     const response = await fetch(backendUrl, {
       method: 'GET',
+      cache: 'no-store',
+      next: { revalidate: 0 },
       headers: {
         'Content-Type': 'application/json',
         Authorization: `Bearer ${session.tokens.accessToken}`,
@@ -28,7 +44,7 @@ export const GET = auth(async function GET(request: any) {
         errorText.substring(0, 200)
       );
       // Return empty array instead of error to prevent UI breaking
-      return NextResponse.json([]);
+      return NextResponse.json([], { headers: LIVE_NO_STORE_HEADERS });
     }
 
     const data = await response.json();
@@ -47,10 +63,10 @@ export const GET = auth(async function GET(request: any) {
     // Ensure we return an array
     const result = Array.isArray(deserializedData) ? deserializedData : [];
 
-    return NextResponse.json(result);
+    return NextResponse.json(result, { headers: LIVE_NO_STORE_HEADERS });
   } catch (error) {
     console.error('Error fetching user registrations:', error);
     // Return empty array instead of error to prevent UI breaking
-    return NextResponse.json([]);
+    return NextResponse.json([], { headers: LIVE_NO_STORE_HEADERS });
   }
 });

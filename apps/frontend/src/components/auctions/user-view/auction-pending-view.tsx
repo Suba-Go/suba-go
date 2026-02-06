@@ -50,6 +50,12 @@ export function AuctionPendingView({
       // If auction turns active, parent should refetch and reroute view
       onRealtimeSnapshot?.();
     },
+    onSnapshot: (snap) => {
+      const nextStatus = (snap as any)?.auction?.status;
+      if (typeof nextStatus === 'string' && nextStatus !== auction.status) {
+        onRealtimeSnapshot?.();
+      }
+    },
     onJoined: onRealtimeSnapshot,
   });
 

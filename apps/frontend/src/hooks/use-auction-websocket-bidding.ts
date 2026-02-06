@@ -164,12 +164,19 @@ export function useAuctionWebSocketBidding(
       if (!mountedRef.current) return;
 
       switch (message.event) {
-        case 'JOINED': {
+        case 'JOINED':
+        case 'AUCTION_SNAPSHOT': {
           const data: any = message.data as any;
           if (data?.auctionId !== auctionId) return;
-          setIsJoined(true);
+          // JOINED is sent once when the server confirms the room join.
+          // AUCTION_SNAPSHOT can be sent on join and/or reconnection to ensure
+          // late-joining clients immediately apply the latest state.
+          if (message.event === 'JOINED') {
+            setIsJoined(true);
+            props.onJoined?.();
+          }
+
           setParticipantCount(Number(data?.participantCount || 0));
-          props.onJoined?.();
 
           const snap: JoinedSnapshotData = {
             auction: data?.auction,
