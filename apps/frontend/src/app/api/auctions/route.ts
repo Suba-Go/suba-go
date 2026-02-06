@@ -7,6 +7,12 @@ import superjson from 'superjson';
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
+const LIVE_NO_STORE_HEADERS = {
+  'Cache-Control': 'no-store, max-age=0',
+  'CDN-Cache-Control': 'no-store',
+  'Vercel-CDN-Cache-Control': 'no-store',
+} as const;
+
 async function readBackendError(response: Response): Promise<string> {
   try {
     const contentType = response.headers.get('content-type') || '';
@@ -31,19 +37,28 @@ export const GET = auth(async function GET(request: any) {
     const session = (request as any).auth;
 
     if (!session) {
-      return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
+      return NextResponse.json(
+        { error: 'No autorizado' },
+        { status: 401, headers: LIVE_NO_STORE_HEADERS }
+      );
     }
 
     const accessToken = session.tokens?.accessToken;
     if (!accessToken) {
       // Evita enviar "Bearer undefined" al backend y convertir el 401 en 500
-      return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
+      return NextResponse.json(
+        { error: 'No autorizado' },
+        { status: 401, headers: LIVE_NO_STORE_HEADERS }
+      );
     }
 
     // Get tenant from user session
     const tenantId = session.user.tenantId;
     if (!tenantId) {
-      return NextResponse.json({ error: 'Usuario sin tenant' }, { status: 400 });
+      return NextResponse.json(
+        { error: 'Usuario sin tenant' },
+        { status: 400, headers: LIVE_NO_STORE_HEADERS }
+      );
     }
 
     // Client requirement: USER must not list all tenant auctions
@@ -51,7 +66,7 @@ export const GET = auth(async function GET(request: any) {
     if (session.user.role === 'USER') {
       return NextResponse.json(
         { error: 'Acceso restringido. Usa /api/auctions/my-registrations' },
-        { status: 403 }
+        { status: 403, headers: LIVE_NO_STORE_HEADERS }
       );
     }
 
@@ -70,7 +85,10 @@ export const GET = auth(async function GET(request: any) {
 
     if (!response.ok) {
       const message = await readBackendError(response);
-      return NextResponse.json({ error: message }, { status: response.status });
+      return NextResponse.json(
+        { error: message },
+        { status: response.status, headers: LIVE_NO_STORE_HEADERS }
+      );
     }
 
     const data = await response.json();
@@ -86,12 +104,12 @@ export const GET = auth(async function GET(request: any) {
       }
     }
 
-    return NextResponse.json(deserializedData);
+    return NextResponse.json(deserializedData, { headers: LIVE_NO_STORE_HEADERS });
   } catch (error) {
     console.error('Error fetching auctions:', error);
     return NextResponse.json(
       { error: 'Error interno del servidor' },
-      { status: 500 }
+      { status: 500, headers: LIVE_NO_STORE_HEADERS }
     );
   }
 });
