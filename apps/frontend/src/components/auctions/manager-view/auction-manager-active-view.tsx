@@ -431,8 +431,17 @@ export function AuctionManagerActiveView({
 
       timeout = setTimeout(() => {
         const next = Date.now() + offset;
-        // Monotonic: never allow perceived server time to go backwards.
-        setNowMs((prev) => (next > prev ? next : prev));
+        // Monotonic (with safe reset): normally avoid going backwards (prevents jitter),
+        // but if we detect a large backwards correction (e.g. offset re-sync after reconnect),
+        // allow a reset so the UI doesn't get stuck "in the future" and end early.
+        const RESET_BACKWARD_THRESHOLD_MS = 1500;
+        setNowMs((prev) =>
+          next >= prev
+            ? next
+            : prev - next > RESET_BACKWARD_THRESHOLD_MS
+              ? next
+              : prev
+        );
         schedule();
       }, alignedDelay);
     };
@@ -440,7 +449,12 @@ export function AuctionManagerActiveView({
     // Prime immediate tick, then schedule.
     setNowMs((prev) => {
       const next = Date.now() + (wsServerOffsetMs || 0);
-      return next > prev ? next : prev;
+      const RESET_BACKWARD_THRESHOLD_MS = 1500;
+      return next >= prev
+        ? next
+        : prev - next > RESET_BACKWARD_THRESHOLD_MS
+          ? next
+          : prev;
     });
     schedule();
 
