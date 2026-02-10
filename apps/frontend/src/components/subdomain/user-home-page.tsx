@@ -21,6 +21,7 @@ import { WsConnectionState, type WsServerMessage, type AuctionStatusData } from 
 import Link from 'next/link';
 import { Button } from '@suba-go/shared-components/components/ui/button';
 import { darkenColor } from '@/utils/color-utils';
+import { getPrimaryPhotoUrl } from '@/lib/auction-utils';
 import {
   Select,
   SelectContent,
@@ -555,19 +556,7 @@ useEffect(() => {
                   <div className="aspect-video relative bg-gray-100">
                     {item.photos ? (
                       <SafeImage
-                        src={
-                          ((): string => {
-                            try {
-                              const parsed = JSON.parse(item.photos);
-                              if (Array.isArray(parsed) && parsed[0]) {
-                                return String(parsed[0]);
-                              }
-                            } catch {
-                              // ignore
-                            }
-                            return item.photos?.split(',')[0]?.trim() || '/placeholder-car.png';
-                          })()
-                        }
+                        src={getPrimaryPhotoUrl(item.photos)}
                         alt={`${item.brand} ${item.model}`}
                         fill
                         className="object-cover"
