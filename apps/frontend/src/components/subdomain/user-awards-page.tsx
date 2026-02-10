@@ -16,6 +16,7 @@ import {
 import { useFetchData } from '@/hooks/use-fetch-data';
 import { useCompanyContextOptional } from '@/contexts/company-context';
 import { darkenColor } from '@/utils/color-utils';
+import { getPrimaryPhotoUrl } from '@/lib/auction-utils';
 
 import { Button } from '@suba-go/shared-components/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@suba-go/shared-components/components/ui/card';
@@ -74,19 +75,7 @@ function toMs(v?: string | Date | null) {
   return Number.isFinite(ms) ? ms : 0;
 }
 
-function parseFirstPhoto(photos?: string | null): string {
-  if (!photos) return '/placeholder-car.png';
-
-  try {
-    const parsed = JSON.parse(photos);
-    if (Array.isArray(parsed) && parsed[0]) return String(parsed[0]);
-  } catch {
-    // ignore
-  }
-
-  const first = photos.split(',')[0]?.trim();
-  return first || '/placeholder-car.png';
-}
+// NOTE: la lógica para obtener la imagen principal está centralizada en getPrimaryPhotoUrl
 
 export default function UserAwardsPage() {
   const { data: session } = useSession();
@@ -290,7 +279,7 @@ export default function UserAwardsPage() {
             <Card key={item.id} className="overflow-hidden hover:shadow-md transition-shadow">
               <div className="aspect-video relative bg-gray-100">
                 <SafeImage
-                  src={parseFirstPhoto(item.photos)}
+                  src={getPrimaryPhotoUrl(item.photos)}
                   alt={`${item.brand} ${item.model}`}
                   fill
                   className="object-cover"

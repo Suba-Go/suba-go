@@ -26,7 +26,7 @@ export default function CompanyLoginForm({
 }: CompanyLoginFormProps) {
   const router = useRouter();
   const [formData, setFormData] = useState({
-    email: prefilledEmail || '',
+    email: (prefilledEmail || '').toLowerCase(),
     password: '',
   });
   const [showPassword, setShowPassword] = useState(false);
@@ -39,7 +39,7 @@ export default function CompanyLoginForm({
   // Update email if prefilledEmail changes
   useEffect(() => {
     if (prefilledEmail) {
-      setFormData((prev) => ({ ...prev, email: prefilledEmail }));
+      setFormData((prev) => ({ ...prev, email: prefilledEmail.toLowerCase() }));
     }
   }, [prefilledEmail]);
 
@@ -238,7 +238,9 @@ export default function CompanyLoginForm({
   const handleInputChange =
     (field: 'email' | 'password') =>
     (e: React.ChangeEvent<HTMLInputElement>) => {
-      setFormData({ ...formData, [field]: e.target.value });
+      const raw = e.target.value;
+      const normalizedValue = field === 'email' ? raw.toLowerCase() : raw;
+      setFormData({ ...formData, [field]: normalizedValue });
       if (errors[field]) {
         setErrors({ ...errors, [field]: undefined });
       }

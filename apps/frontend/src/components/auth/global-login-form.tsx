@@ -127,7 +127,7 @@ export default function GlobalLoginForm() {
             formatType="email"
             onChange={(val) => {
               const v = (val ?? '').toString();
-              setEmail(v);
+              setEmail(v.toLowerCase());
               if (errors.email) {
                 setErrors({ ...errors, email: undefined });
               }
