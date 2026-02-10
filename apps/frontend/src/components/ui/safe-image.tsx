@@ -37,14 +37,13 @@ function normalizeSrc(src?: string | null): string | undefined {
   // URL absoluta
   if (/^https?:\/\//i.test(trimmed)) return trimmed;
 
-  // URL relativa al protocolo 
+  // URL con esquema omitido 
   if (trimmed.startsWith('//')) return `https:${trimmed}`;
 
-  // URL sin esquema (muy común cuando se guarda )
-  // Si detectamos un dominio, le agregamos https://
-  if (/^[a-z0-9][a-z0-9.-]*\.[a-z]{2,}(\/|$)/i.test(trimmed)) {
-    return `https://${trimmed}`;
-  }
+  // URL sin esquema pero con dominio 
+  // si el primer segmento contiene un punto, asumimos que es un host.
+  const firstSegment = trimmed.split('/')[0] ?? '';
+  if (firstSegment.includes('.')) return `https://${trimmed}`;
 
   // Si viene tipo "uploads/xxx.png", lo hacemos absoluto para evitar rutas relativas rotas
   if (!trimmed.startsWith('/')) return `/${trimmed}`;
