@@ -31,7 +31,8 @@ export default function LoginForm() {
   const [errors, setErrors] = useState<Partial<LoginFormData>>({});
 
   const handleInputChange = (field: keyof LoginFormData, value: string) => {
-    setFormData((prev) => ({ ...prev, [field]: value }));
+    const normalizedValue = field === 'email' ? value.toLowerCase() : value;
+    setFormData((prev) => ({ ...prev, [field]: normalizedValue }));
     // Clear error when user starts typing
     if (errors[field]) {
       setErrors((prev) => ({ ...prev, [field]: undefined }));
@@ -85,7 +86,7 @@ export default function LoginForm() {
 
     try {
       const result = await signIn('credentials', {
-        email: formData.email,
+        email: formData.email.toLowerCase(),
         password: formData.password,
         redirect: false,
       });
@@ -106,7 +107,7 @@ export default function LoginForm() {
         // Get user's company domain and redirect
         try {
           const domainResult = await getUserCompanyDomainTrpcAction(
-            formData.email
+            formData.email.toLowerCase()
           );
 
           if (domainResult.success && domainResult.data?.domain) {

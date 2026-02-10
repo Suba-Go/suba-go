@@ -37,10 +37,33 @@ export function parsePhotos(photosJson: string | null | undefined): string[] {
   if (!photosJson) return [];
   try {
     const parsed = JSON.parse(photosJson);
-    return Array.isArray(parsed) ? parsed : [];
-  } catch {
+    if (Array.isArray(parsed)) return parsed.map(String).filter(Boolean);
+
+    
+    if (typeof parsed === 'string') return [parsed].map(String).filter(Boolean);
+
     return [];
+  } catch {
+    // Fallback: histórico "url1,url2" (CSV)
+    return String(photosJson)
+      .split(',')
+      .map((s) => s.trim())
+      .filter(Boolean);
   }
+}
+
+/**
+ * Obtiene la primera foto de forma robusta.
+ * Soporta:
+ *  - JSON array: ["url1","url2"]
+ *  - JSON string: "url1"
+ *  - CSV: "url1,url2"
+ */
+export function getPrimaryPhotoUrl(photos: string | null | undefined): string {
+  const list = parsePhotos(photos);
+  const first = list[0] ?? '';
+  const cleaned = String(first).trim().replace(/^"+|"+$/g, '');
+  return cleaned || '/placeholder-car.png';
 }
 
 /**

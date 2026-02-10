@@ -258,7 +258,7 @@ export function AuctionActiveBiddingView({
         toast({
           description:
             'Tu puja se realizó con éxito, estás ganando hasta el momento.',
-          duration: 1300,
+          duration: 3000,
         });
       }
     },
@@ -574,6 +574,7 @@ useEffect(() => {
         toast({
           title: '¡Felicitaciones! 🎉',
           description: `Ganaste el ítem ${plate}.`,
+          duration: 3000,
         });
       }
 
@@ -706,12 +707,14 @@ useEffect(() => {
         toast({
           title: 'Espera un momento',
           description: message,
+          duration: 3000,
         });
       } else {
         toast({
           title: 'No se pudo enviar la puja',
           description: message,
           variant: 'destructive',
+          duration: 3000,
         });
       }
       return;
