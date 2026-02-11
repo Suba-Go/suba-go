@@ -51,6 +51,7 @@ export default function ManagerInvitePage() {
 
   const handleGenerate = async (e: React.FormEvent) => {
     e.preventDefault();
+    const normalizedEmail = email.trim().toLowerCase();
     setLoading(true);
     setInviteLink(null);
     setCopied(false);
@@ -59,7 +60,7 @@ export default function ManagerInvitePage() {
       const res = await apiFetch('/api/users/invite', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email }),
+        body: JSON.stringify({ email: normalizedEmail }),
       });
       const data = await res.json();
 
@@ -110,7 +111,7 @@ export default function ManagerInvitePage() {
           <label className="text-sm text-gray-700">Email</label>
           <Input
             value={email}
-            onChange={(e) => setEmail(e.target.value)}
+            onChange={(e) => setEmail(e.target.value.toLowerCase())}
             placeholder="usuario@correo.com"
             className="mt-1 border-gray-300"
             style={
