@@ -36,6 +36,7 @@ import {
 } from '@suba-go/shared-components/components/ui/tabs';
 import { useToast } from '@suba-go/shared-components/components/ui/toaster';
 import { apiFetch } from '@/lib/api/api-fetch';
+import { getPrimaryPhotoUrl, parsePhotos } from '@/lib/auction-utils';
 import { ItemCreateModal } from './item-create-modal';
 import { ItemEditModal } from './item-edit-modal';
 import { ItemsDashboardSkeleton } from './items-dashboard-skeleton';
@@ -482,19 +483,28 @@ export function ItemsDashboard({ subdomain }: ItemsDashboardProps) {
             <div className="relative h-48 overflow-hidden rounded-t-lg bg-gray-100">
               {item.photos ? (
                 <>
+                  {(() => {
+                    const photoList = parsePhotos(item.photos);
+                    const primary = getPrimaryPhotoUrl(item.photos);
+                    const extraCount = Math.max(0, photoList.length - 1);
+                    return (
+                      <>
                   <SafeImage
-                    src={item.photos.split(',')[0]?.trim()}
+                    src={primary}
                     alt={`${item.brand} ${item.model}`}
                     fill
                     sizes="(max-width: 768px) 100vw, (max-width: 1024px) 50vw, 33vw"
                     quality={82}
                     className="object-cover"
                   />
-                  {item.photos.split(',').length > 1 && (
+                  {extraCount > 0 && (
                     <div className="absolute top-2 right-2 bg-black bg-opacity-60 text-white text-xs px-2 py-1 rounded">
-                      +{item.photos.split(',').length - 1} más
+                      +{extraCount} más
                     </div>
                   )}
+                      </>
+                    );
+                  })()}
                 </>
               ) : (
                 <div className="w-full h-full flex items-center justify-center bg-gray-100">

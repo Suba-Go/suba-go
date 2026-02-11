@@ -10,6 +10,7 @@ import {
   Image as ImageIcon,
 } from 'lucide-react';
 import { ItemDto, ItemStateEnum } from '@suba-go/shared-validation';
+import { parsePhotos } from '@/lib/auction-utils';
 import {
   Dialog,
   DialogContent,
@@ -68,9 +69,7 @@ export function ItemDetailModal({
     });
   };
 
-  const photoUrls = item.photos
-    ? item.photos.split(',').map((url) => url.trim())
-    : [];
+  const photoUrls = item.photos ? parsePhotos(item.photos) : [];
   const docUrls = item.docs
     ? item.docs.split(',').map((url) => url.trim())
     : [];

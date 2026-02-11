@@ -14,6 +14,7 @@ import {
   AuctionDto,
   AuctionItemWithItmeAndBidsDto,
 } from '@suba-go/shared-validation';
+import { getPrimaryPhotoUrl } from '@/lib/auction-utils';
 import { AlertCircle, Clock, Search } from 'lucide-react';
 
 import { CountdownTimer } from '../countdown-timer';
@@ -115,14 +116,7 @@ export function AuctionPendingView({
   const getCoverUrl = (ai: AuctionItemWithItmeAndBidsDto) => {
     const item: any = ai.item;
     if (item?.imageUrl) return item.imageUrl as string;
-    if (typeof item?.photos === 'string' && item.photos.trim().length > 0) {
-      const first = item.photos
-        .split(',')
-        .map((s: string) => s.trim())
-        .filter(Boolean)[0];
-      if (first) return first;
-    }
-    return '';
+    return getPrimaryPhotoUrl(item?.photos ?? null);
   };
 
   return (

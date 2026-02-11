@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { SafeImage } from '@/components/ui/safe-image';
+import { parsePhotos } from '@/lib/auction-utils';
 import {
   Car,
   X,
@@ -121,7 +122,7 @@ export function ItemEditModal({
 
       // Load existing photos and docs
       if (item.photos) {
-        const photos = item.photos.split(',').map((url) => url.trim());
+        const photos = parsePhotos(item.photos);
         setPhotoUrls(photos);
       } else {
         setPhotoUrls([]);
