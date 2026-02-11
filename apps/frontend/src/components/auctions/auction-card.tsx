@@ -6,6 +6,7 @@ import { Clock, Users, Car, MoreVertical, Edit } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { useCompanyContextOptional } from '@/contexts/company-context';
 import { darkenColor } from '@/utils/color-utils';
+import { getPrimaryPhotoUrl } from '@/lib/auction-utils';
 import {
   Card,
   CardContent,
