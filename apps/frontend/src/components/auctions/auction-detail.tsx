@@ -1,6 +1,7 @@
 'use client';
 
 import { SafeImage } from '@/components/ui/safe-image';
+import { getPrimaryPhotoUrl } from '@/lib/auction-utils';
 import { useState, useEffect, useRef, useMemo } from 'react';
 
 import {
@@ -602,7 +603,7 @@ export function AuctionDetail({
                       {auctionItem.item?.photos && (
                         <div className="relative h-48 overflow-hidden rounded-t-lg bg-gray-100">
                           <SafeImage
-                            src={auctionItem.item.photos.split(',')[0]?.trim()}
+                            src={getPrimaryPhotoUrl(auctionItem.item.photos)}
                             alt={`${auctionItem.item.brand} ${auctionItem.item.model}`}
                             fill
                             className="object-cover"

@@ -44,27 +44,6 @@ import {
 } from '@suba-go/shared-validation';
 import { useFetchData } from '@/hooks/use-fetch-data';
 
-function getPrimaryPhoto(photos?: string | null): string | null {
-  if (!photos) return null;
-  const raw = photos.trim();
-  if (!raw) return null;
-
-  // Supports either JSON array string or comma-separated list
-  try {
-    if (raw.startsWith('[')) {
-      const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed) && parsed.length > 0) {
-        const url = String(parsed[0] ?? '').trim();
-        return url || null;
-      }
-    }
-  } catch {
-    // ignore
-  }
-
-  const first = raw.split(',')[0]?.trim();
-  return first || null;
-}
 
 interface AuctionCardProps {
   auction: AuctionDto | any; // accepts AuctionWithItemsAndBidsDto as well
@@ -140,7 +119,7 @@ export function AuctionCard({
 
   const coverImage = useMemo(() => {
     const firstItem = auctionItems?.[0]?.item;
-    const url = getPrimaryPhoto(firstItem?.photos as any);
+    const url = getPrimaryPhotoUrl(firstItem?.photos as any);
     return url || '/placeholder-car.png';
   }, [auctionItems]);
 
