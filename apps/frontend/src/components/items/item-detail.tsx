@@ -23,6 +23,7 @@ import {
   getAuctionBadgeColor,
   getAuctionStatusLabel,
 } from '@/lib/auction-badge-colors';
+import { parsePhotos } from '@/lib/auction-utils';
 import { Button } from '@suba-go/shared-components/components/ui/button';
 import { Badge } from '@suba-go/shared-components/components/ui/badge';
 import {
@@ -278,9 +279,7 @@ export function ItemDetail({ itemId, userRole }: ItemDetailProps) {
     );
   }
 
-  const photoUrls = item.photos
-    ? item.photos.split(',').map((url: string) => url.trim())
-    : [];
+  const photoUrls = item.photos ? parsePhotos(item.photos) : [];
   const docUrls = item.docs
     ? item.docs.split(',').map((url: string) => url.trim())
     : [];

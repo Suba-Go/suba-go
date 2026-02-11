@@ -1,6 +1,7 @@
 'use client';
 
 import { SafeImage } from '@/components/ui/safe-image';
+import { parsePhotos } from '@/lib/auction-utils';
 import { useState, useEffect } from 'react';
 import {
   Car,
@@ -238,9 +239,7 @@ export function AuctionItemDetailModal({
 
   if (!item) return null;
 
-  const photoUrls = item.photos
-    ? item.photos.split(',').map((url: string) => url.trim())
-    : [];
+  const photoUrls = item.photos ? parsePhotos(item.photos) : [];
   const docUrls = item.docs
     ? item.docs.split(',').map((url: string) => url.trim())
     : [];

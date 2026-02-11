@@ -1,6 +1,7 @@
 'use client';
 
 import { SafeImage } from '@/components/ui/safe-image';
+import { parsePhotos } from '@/lib/auction-utils';
 import { useState, useMemo, useEffect } from 'react';
 import {
   Car,
@@ -172,9 +173,7 @@ export function ItemSelector({
     setCurrentPage(1);
   }, [searchPlate]);
 
-  const photoUrls = previewItem?.photos
-    ? previewItem.photos.split(',').map((url) => url.trim())
-    : [];
+  const photoUrls = previewItem?.photos ? parsePhotos(previewItem.photos) : [];
 
   if (isLoading) {
     return (

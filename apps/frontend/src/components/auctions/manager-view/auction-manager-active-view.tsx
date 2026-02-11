@@ -1,6 +1,7 @@
 'use client';
 
 import { SafeImage } from '@/components/ui/safe-image';
+import { getPrimaryPhotoUrl } from '@/lib/auction-utils';
 import { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { ArrowLeft, Clock, Wifi, WifiOff, Trophy } from 'lucide-react';
@@ -724,7 +725,7 @@ export function AuctionManagerActiveView({
                       {auctionItem.item?.photos && (
                         <div className="relative h-48 overflow-hidden rounded-t-lg bg-gray-100">
                           <SafeImage
-                            src={auctionItem.item.photos.split(',')[0]?.trim()}
+                            src={getPrimaryPhotoUrl(auctionItem.item.photos)}
                             alt={`${auctionItem.item.brand} ${auctionItem.item.model}`}
                             fill
                             className="object-cover"

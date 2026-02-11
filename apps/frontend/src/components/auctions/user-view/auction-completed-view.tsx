@@ -24,6 +24,7 @@ import {
   AuctionDto,
   AuctionItemWithItmeAndBidsDto,
 } from '@suba-go/shared-validation';
+import { getPrimaryPhotoUrl } from '@/lib/auction-utils';
 import { AuctionCompletedItemCard } from './auction-completed-item-card';
 import { AuctionItemDetailModal } from '../auction-item-detail-modal';
 import { useCompany } from '@/hooks/use-company';
@@ -31,14 +32,6 @@ import { useCompany } from '@/hooks/use-company';
 const FALLBACK_IMAGE_DATA_URL =
   'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgdmlld0JveD0iMCAwIDIwMCAyMDAiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxyZWN0IHdpZHRoPSIyMDAiIGhlaWdodD0iMjAwIiBmaWxsPSIjRjNGNEY2Ii8+CjxwYXRoIGQ9Ik04MCA2MEgxMjBWODBIODBWNjBaIiBmaWxsPSIjOUI5QkEwIi8+CjxwYXRoIGQ9Ik02MCA4MEgxNDBWMTQwSDYwVjgwWiIgZmlsbD0iIzlCOUJBMCIvPgo8L3N2Zz4K';
 
-function getPrimaryPhoto(photos?: string | null): string | null {
-  if (!photos) return null;
-  const first = photos
-    .split(',')
-    .map((u) => u.trim())
-    .find(Boolean);
-  return first || null;
-}
 
 interface AuctionCompletedViewProps {
   auction: AuctionDto;
@@ -100,7 +93,7 @@ export function AuctionCompletedView({
         })[0]
     ?? auctionItems?.[0];
 
-  const highlightPhotoUrl = getPrimaryPhoto((highlightItem?.item as any)?.photos ?? null);
+  const highlightPhotoUrl = getPrimaryPhotoUrl((highlightItem?.item as any)?.photos ?? null);
 
   return (
     <div className="space-y-6">

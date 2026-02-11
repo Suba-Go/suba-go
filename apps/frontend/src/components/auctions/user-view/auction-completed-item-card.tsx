@@ -15,6 +15,7 @@ import { Badge } from '@suba-go/shared-components/components/ui/badge';
 import { Button } from '@suba-go/shared-components/components/ui/button';
 import { Trophy, Eye, XCircle } from 'lucide-react';
 import { AuctionItemWithItmeAndBidsDto } from '@suba-go/shared-validation';
+import { getPrimaryPhotoUrl } from '@/lib/auction-utils';
 
 interface AuctionCompletedItemCardProps {
   auctionItem: AuctionItemWithItmeAndBidsDto;
@@ -33,21 +34,13 @@ const formatCurrency = (amount: number) => {
 const FALLBACK_IMAGE_DATA_URL =
   'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgdmlld0JveD0iMCAwIDIwMCAyMDAiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxyZWN0IHdpZHRoPSIyMDAiIGhlaWdodD0iMjAwIiBmaWxsPSIjRjNGNEY2Ii8+CjxwYXRoIGQ9Ik04MCA2MEgxMjBWODBIODBWNjBaIiBmaWxsPSIjOUI5QkEwIi8+CjxwYXRoIGQ9Ik02MCA4MEgxNDBWMTQwSDYwVjgwWiIgZmlsbD0iIzlCOUJBMCIvPgo8L3N2Zz4K';
 
-function getPrimaryPhoto(photos?: string | null): string | null {
-  if (!photos) return null;
-  const first = photos
-    .split(',')
-    .map((u) => u.trim())
-    .find(Boolean);
-  return first || null;
-}
 
 export function AuctionCompletedItemCard({
   auctionItem,
   isWon,
   onViewDetails,
 }: AuctionCompletedItemCardProps) {
-  const photoUrl = getPrimaryPhoto((auctionItem.item as any)?.photos ?? null);
+  const photoUrl = getPrimaryPhotoUrl((auctionItem.item as any)?.photos ?? null);
   const highBid = auctionItem.bids?.[0];
   const hasWinner = highBid && Number(highBid.offered_price) > 0;
   const finalPrice = hasWinner
