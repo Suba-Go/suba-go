@@ -80,15 +80,30 @@ export function SafeImage(props: SafeImageProps) {
   const initial = normalizeSrc(src) ?? fallbackSrc;
   const [currentSrc, setCurrentSrc] = React.useState<string>(initial);
   const hasErroredRef = React.useRef(false);
+  const retryRef = React.useRef(0);
 
   // Si cambia src externo, reseteamos
   React.useEffect(() => {
     const next = normalizeSrc(src) ?? fallbackSrc;
     hasErroredRef.current = false;
+    retryRef.current = 0;
     setCurrentSrc(next);
   }, [src, fallbackSrc]);
 
   const handleError: React.ReactEventHandler<HTMLImageElement> = (e) => {
+    // First retry: fix very common Vercel Blob case-sensitivity issue (/Uploads/ vs /uploads/)
+    // before falling back to placeholder.
+    if (retryRef.current === 0) {
+      const fixed = currentSrc
+        .replaceAll('/Uploads/', '/uploads/')
+        .replace(/%2FUploads%2F/gi, '%2Fuploads%2F');
+      if (fixed !== currentSrc) {
+        retryRef.current = 1;
+        setCurrentSrc(fixed);
+        return;
+      }
+    }
+
     if (!hasErroredRef.current) {
       hasErroredRef.current = true;
       setCurrentSrc(fallbackSrc);

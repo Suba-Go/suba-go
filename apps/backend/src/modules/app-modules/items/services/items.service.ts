@@ -24,6 +24,61 @@ type ItemWithRelations = Item & {
 export class ItemsService {
   constructor(private readonly itemRepository: ItemPrismaRepository) {}
 
+  private normalizePhotoUrl(url: string): string {
+    let u = String(url).trim();
+    if (!u) return u;
+
+    // Vercel Blob paths are case-sensitive; historically some records were saved with "/Uploads/".
+    u = u.replaceAll('/Uploads/', '/uploads/');
+    u = u.replace(/%2FUploads%2F/gi, '%2Fuploads%2F');
+
+    // Add scheme when omitted (common when saving host/path)
+    if (u.startsWith('//')) u = `https:${u}`;
+    else if (!/^https?:\/\//i.test(u)) {
+      const first = u.split('/')[0] ?? '';
+      if (first.includes('.')) u = `https://${u}`;
+    }
+
+    return u;
+  }
+
+  private normalizePhotosField(photos?: string | null): string | undefined {
+    if (!photos) return undefined;
+    const raw = String(photos).trim();
+    if (!raw) return undefined;
+
+    // First fix easy string-replace issues at the whole-string level.
+    const fixedRaw = raw
+      .replaceAll('/Uploads/', '/uploads/')
+      .replace(/%2FUploads%2F/gi, '%2Fuploads%2F');
+
+    // If it's a JSON array string, normalize each element.
+    if (fixedRaw.startsWith('[')) {
+      try {
+        const arr = JSON.parse(fixedRaw);
+        if (Array.isArray(arr)) {
+          const normalized = arr
+            .filter((x) => typeof x === 'string' && String(x).trim().length > 0)
+            .map((x) => this.normalizePhotoUrl(String(x)));
+          return JSON.stringify(normalized);
+        }
+      } catch {
+        // fallthrough
+      }
+    }
+
+    // Otherwise treat it as CSV or single URL string.
+    const parts = fixedRaw
+      .split(',')
+      .map((p) => p.trim())
+      .filter(Boolean)
+      .map((p) => this.normalizePhotoUrl(p));
+
+    if (parts.length === 0) return undefined;
+    if (parts.length === 1) return JSON.stringify([parts[0]]);
+    return JSON.stringify(parts);
+  }
+
   async createItem(
     createItemDto: CreateItemDto,
     tenantId: string
@@ -96,7 +151,8 @@ export class ItemsService {
       version: itemData.version,
       kilometraje: itemData.kilometraje,
       basePrice: itemData.basePrice,
-      photos: itemData.photos,
+      // Normalize photos to avoid broken Vercel Blob URLs (case sensitivity, missing scheme, CSV vs JSON)
+      photos: this.normalizePhotosField(itemData.photos),
       docs: itemData.docs,
       state,
       legal_status: legalStatus,
@@ -193,7 +249,14 @@ export class ItemsService {
       }
     }
 
-    return this.itemRepository.update(id, updateItemDto);
+    const normalizedUpdate: UpdateItemDto = {
+      ...updateItemDto,
+      ...(updateItemDto.photos !== undefined
+        ? { photos: this.normalizePhotosField(updateItemDto.photos) }
+        : {}),
+    };
+
+    return this.itemRepository.update(id, normalizedUpdate);
   }
 
   async deleteItem(id: string, tenantId: string): Promise<void> {
@@ -248,36 +311,9 @@ export class ItemsService {
     // Process photos field to ensure consistent array format
     // This is needed because sometimes photos might be stored as stringified JSON or plain string
     return items.map((item) => {
-      // Create a shallow copy to modify photos property
       const processedItem = { ...item };
-      
-      if (processedItem.photos) {
-        try {
-          // If it looks like a JSON array, parse it
-          if (processedItem.photos.trim().startsWith('[')) {
-            // It's already good if it's a valid JSON array string
-            // But we keep it as string for frontend to parse or we could return object if DTO allows
-            // Currently DTO expects string, so we leave it as is if it's valid JSON
-            // Just validation here
-            JSON.parse(processedItem.photos);
-          } else if (
-            processedItem.photos.startsWith('http') ||
-            processedItem.photos.startsWith('/')
-          ) {
-            // If it's a single URL string, wrap it in a JSON array string
-            processedItem.photos = JSON.stringify([processedItem.photos]);
-          }
-        } catch (e) {
-          // If parsing failed or other error, and it looks like a url, wrap it
-          if (
-            processedItem.photos.startsWith('http') ||
-            processedItem.photos.startsWith('/')
-          ) {
-            processedItem.photos = JSON.stringify([processedItem.photos]);
-          }
-        }
-      }
-      
+      // Ensure we always return a consistent JSON array string and fix common URL issues.
+      processedItem.photos = this.normalizePhotosField(processedItem.photos) as any;
       return processedItem;
     });
   }
