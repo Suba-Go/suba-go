@@ -24,6 +24,7 @@ import { useLiveAccessToken } from '@/hooks/use-live-access-token';
 import {
   AuctionDto,
   AuctionItemWithItmeAndBidsDto,
+  computeBidConstraints,
 } from '@suba-go/shared-validation';
 
 interface AuctionActiveBiddingViewProps {
@@ -186,6 +187,15 @@ export function AuctionActiveBiddingView({
     return Math.max(highestApiBid, Number(ai.startingBid || 0));
   };
 
+  const hasPreviousBidForItem = (
+    ai: AuctionItemWithItmeAndBidsDto | undefined,
+    history: Array<{ amount: number }> | undefined
+  ) => {
+    const hasHistory = !!(history && history.length > 0);
+    const hasApiBids = !!(ai && ai.bids && ai.bids.length > 0);
+    return hasHistory || hasApiBids;
+  };
+
   const getHighestBidderFromApi = (ai: AuctionItemWithItmeAndBidsDto) => {
     if (!ai.bids || ai.bids.length === 0) return undefined;
     // toma la puja más alta
@@ -280,12 +290,18 @@ export function AuctionActiveBiddingView({
       // force a snapshot refresh and bump the suggested amount to the
       // latest minimum according to the freshest data we currently have.
       const ai = auctionItems?.find((i) => i.id === auctionItemId);
-      const historyHighest = bidHistory?.[auctionItemId]?.[0]?.amount;
+      const itemHistory = bidHistory?.[auctionItemId];
+      const historyHighest = itemHistory?.[0]?.amount;
       const apiHighest = ai ? getHighestFromApi(ai as any) : 0;
       const currentHighest =
         historyHighest !== undefined ? historyHighest : apiHighest;
       const bidIncrement = Number(auction.bidIncrement || 50000);
-      const minNextBid = Number(currentHighest) + bidIncrement;
+      const hasPreviousBid = hasPreviousBidForItem(ai, itemHistory as any);
+      const { minimumBid: minNextBid } = computeBidConstraints({
+        base: Number(currentHighest),
+        bidIncrement,
+        hasPreviousBid,
+      });
 
       setBidStates((prev) => {
         const current = prev[auctionItemId];
@@ -610,15 +626,20 @@ useEffect(() => {
     setBidStates((prev) => {
       const next: BidState = { ...prev };
       auctionItems.forEach((ai) => {
-        const historyHighest = bidHistory[ai.id]?.[0]?.amount;
+        const itemHistory = bidHistory[ai.id];
+        const historyHighest = itemHistory?.[0]?.amount;
         const apiHighest = getHighestFromApi(ai);
         const currentHighest =
           historyHighest !== undefined ? historyHighest : apiHighest;
         const bidIncrement = Number(auction.bidIncrement || 50000);
-        const minNextBid = currentHighest + bidIncrement;
+        const { minimumBid } = computeBidConstraints({
+          base: Number(currentHighest),
+          bidIncrement,
+          hasPreviousBid: hasPreviousBidForItem(ai, itemHistory as any),
+        });
         if (!next[ai.id]) {
           next[ai.id] = {
-            amount: minNextBid.toString(),
+            amount: minimumBid.toString(),
             isPending: false,
             error: null,
           };
@@ -634,24 +655,29 @@ useEffect(() => {
     setBidStates((prev) => {
       const next: BidState = { ...prev };
       auctionItems.forEach((ai) => {
-        const historyHighest = bidHistory[ai.id]?.[0]?.amount;
+        const itemHistory = bidHistory[ai.id];
+        const historyHighest = itemHistory?.[0]?.amount;
         const apiHighest = getHighestFromApi(ai);
         const currentHighest =
           historyHighest !== undefined ? historyHighest : apiHighest;
         const bidIncrement = Number(auction.bidIncrement || 50000);
-        const minNextBid = currentHighest + bidIncrement;
+        const { minimumBid } = computeBidConstraints({
+          base: Number(currentHighest),
+          bidIncrement,
+          hasPreviousBid: hasPreviousBidForItem(ai, itemHistory as any),
+        });
 
         const prevAmount = next[ai.id]?.amount
           ? Number(next[ai.id].amount)
           : undefined;
         const shouldUpdateAmount =
           prevAmount === undefined ||
-          (!next[ai.id]?.isPending && prevAmount < minNextBid);
+          (!next[ai.id]?.isPending && prevAmount < minimumBid);
 
         next[ai.id] = {
           amount: shouldUpdateAmount
-            ? minNextBid.toString()
-            : next[ai.id]?.amount || minNextBid.toString(),
+            ? minimumBid.toString()
+            : next[ai.id]?.amount || minimumBid.toString(),
           isPending: next[ai.id]?.isPending || false,
           error: next[ai.id]?.error || null,
           pendingRequestId: next[ai.id]?.pendingRequestId,
@@ -790,7 +816,14 @@ useEffect(() => {
           0
       );
       const bidIncrement = Number(auction.bidIncrement || 50000);
-      const minNextBid = currentHighest + bidIncrement;
+      const ai = auctionItems?.find((i) => i.id === auctionItemId) as
+        | AuctionItemWithItmeAndBidsDto
+        | undefined;
+      const { minimumBid: minNextBid } = computeBidConstraints({
+        base: currentHighest,
+        bidIncrement,
+        hasPreviousBid: hasPreviousBidForItem(ai, itemHistory as any),
+      });
 
       setPendingAutoBid({ auctionItemId, maxPrice: minNextBid * 2 });
     }
@@ -853,7 +886,11 @@ useEffect(() => {
               itemHistory[0]?.amount ?? getHighestFromApi(auctionItem)
             );
             const bidIncrement = Number(auction.bidIncrement || 50000);
-            const minNextBid = currentHighest + bidIncrement;
+            const { minimumBid: minNextBid } = computeBidConstraints({
+              base: currentHighest,
+              bidIncrement,
+              hasPreviousBid: hasPreviousBidForItem(auctionItem, itemHistory as any),
+            });
             const bidState = bidStates[auctionItem.id] || {
               amount: minNextBid.toString(),
               isPending: false,

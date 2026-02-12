@@ -15,7 +15,7 @@ import { BidPrismaService } from './bid-prisma.service';
 import { AuctionsGateway } from '../../../providers-modules/realtime/auctions.gateway';
 import { PrismaService } from '../../../providers-modules/prisma/prisma.service';
 import type { Bid, AuctionItem, Auction, Item, User } from '@prisma/client';
-import { BidPlacedData } from '@suba-go/shared-validation';
+import { BidPlacedData, validateBidAmount } from '@suba-go/shared-validation';
 
 type BidWithRelations = Bid & {
   user: User;
@@ -227,18 +227,26 @@ export class BidRealtimeService {
       const base = max !== null ? Number(max) : Number(row.startingBid);
       const minimumBid = max !== null ? base + bidIncrement : base;
 
-      if (amount < minimumBid) {
-        throw new BadRequestException(
-          `La puja debe ser al menos $${minimumBid.toLocaleString()}`
-        );
-      }
+      // Keep frontend/back...: share the same validator.
+      const validation = validateBidAmount({
+        amount,
+        base,
+        minimumBid,
+        bidIncrement,
+      });
 
-      const diff = amount - base;
-      // diff can be 0 only when max is null (first bid equals startingBid)
-      if (diff % bidIncrement !== 0) {
-        const nextValid = base + Math.ceil(diff / bidIncrement) * bidIncrement;
+      // NOTE: Depending on how types are re-exported across libs, some TS configs
+      // may not narrow unions on `!validation.ok`. Use a robust guard.
+      if (validation.ok === false) {
+        if ('reason' in validation && validation.reason === 'BELOW_MIN') {
+          throw new BadRequestException(
+            `La puja debe ser al menos $${minimumBid.toLocaleString()}`
+          );
+        }
+
+        // NOT_MULTIPLE
         throw new BadRequestException(
-          `La puja debe respetar el incremento de $${bidIncrement.toLocaleString()}. Próxima puja válida: $${nextValid.toLocaleString()}`
+          `La puja debe respetar el incremento de $${bidIncrement.toLocaleString()}. Próxima puja válida: $${validation.nextValid.toLocaleString()}`
         );
       }
 
