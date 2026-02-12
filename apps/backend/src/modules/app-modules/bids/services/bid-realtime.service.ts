@@ -15,7 +15,7 @@ import { BidPrismaService } from './bid-prisma.service';
 import { AuctionsGateway } from '../../../providers-modules/realtime/auctions.gateway';
 import { PrismaService } from '../../../providers-modules/prisma/prisma.service';
 import type { Bid, AuctionItem, Auction, Item, User } from '@prisma/client';
-import { BidPlacedData, validateBidAmount } from '@suba-go/shared-validation';
+import { BidPlacedData } from '@suba-go/shared-validation';
 
 type BidWithRelations = Bid & {
   user: User;
@@ -220,35 +220,20 @@ export class BidRealtimeService {
       const max = maxRows?.[0]?.max ?? null;
       const bidIncrement = Math.max(1, Number(row.bidIncrement) || 1);
 
-      // Minimum/step rules:
+      // Minimum rules:
       // - If there is a previous bid, the next minimum is max + bidIncrement.
       // - Otherwise the first minimum is startingBid.
-      // - Always enforce increments (you can jump multiple increments, but must align to the step).
+      // NOTE: We intentionally do NOT enforce "multiple of bidIncrement" anymore; any amount >= minimumBid is allowed.
       const base = max !== null ? Number(max) : Number(row.startingBid);
       const minimumBid = max !== null ? base + bidIncrement : base;
 
-      // Keep frontend/back...: share the same validator.
-      const validation = validateBidAmount({
-        amount,
-        base,
-        minimumBid,
-        bidIncrement,
-      });
-
-      // NOTE: Depending on how types are re-exported across libs, some TS configs
-      // may not narrow unions on `!validation.ok`. Use a robust guard.
-      if (validation.ok === false) {
-        if ('reason' in validation && validation.reason === 'BELOW_MIN') {
-          throw new BadRequestException(
-            `La puja debe ser al menos $${minimumBid.toLocaleString()}`
-          );
-        }
-
-        // NOT_MULTIPLE
+      if (amount < minimumBid) {
         throw new BadRequestException(
-          `La puja debe respetar el incremento de $${bidIncrement.toLocaleString()}. Próxima puja válida: $${validation.nextValid.toLocaleString()}`
+          `La puja debe ser al menos $${minimumBid.toLocaleString()}`
         );
       }
+
+      // We still keep bidIncrement for the *minimum* calculation, but we allow any amount above it.
 
       // Soft-close extension:
       // If we're within the last 30 seconds and someone bids, the product timer must go back to 30 seconds.
