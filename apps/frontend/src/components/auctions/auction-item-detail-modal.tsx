@@ -40,6 +40,8 @@ import {
   AuctionItemWithItmeAndBidsDto,
   BidDto,
   BidWithUserDto,
+  computeBidConstraints,
+  validateBidAmount,
 } from '@suba-go/shared-validation';
 import { useCompanyContextOptional } from '@/contexts/company-context';
 import { darkenColor } from '@/utils/color-utils';
@@ -106,7 +108,15 @@ export function AuctionItemDetailModal({
   const [photoCarouselApi, setPhotoCarouselApi] = useState<CarouselApi>();
   const [currentPhotoIndex, setCurrentPhotoIndex] = useState(0);
   const [photoCount, setPhotoCount] = useState(0);
-  const [bidAmount, setBidAmount] = useState(currentHighestBid + bidIncrement);
+  const hasPreviousBid = (auctionItem.bids?.length ?? 0) > 0;
+  const { base: bidBase, minimumBid, bidIncrement: bidStep } =
+    computeBidConstraints({
+      base: currentHighestBid,
+      bidIncrement,
+      hasPreviousBid,
+    });
+
+  const [bidAmount, setBidAmount] = useState(minimumBid);
   const [isMobile, setIsMobile] = useState(false);
 
   const item = auctionItem.item;
@@ -161,8 +171,8 @@ export function AuctionItemDetailModal({
 
   // Update bid amount when currentHighestBid changes
   useEffect(() => {
-    setBidAmount(currentHighestBid + bidIncrement);
-  }, [currentHighestBid, bidIncrement]);
+    setBidAmount(minimumBid);
+  }, [minimumBid]);
 
   // Track carousel changes
   useEffect(() => {
@@ -220,9 +230,20 @@ export function AuctionItemDetailModal({
   };
 
   const handlePlaceBid = () => {
-    if (onPlaceBid && bidAmount >= currentHighestBid + bidIncrement) {
-      onPlaceBid(bidAmount);
+    if (!onPlaceBid) return;
+    const r = validateBidAmount({
+      amount: bidAmount,
+      base: bidBase,
+      minimumBid,
+      bidIncrement: bidStep,
+    });
+    if (!r.ok) {
+      // Keep UI aligned with server rules: bump to next valid amount.
+      setBidAmount(r.nextValid);
+      return;
     }
+
+    onPlaceBid(bidAmount);
   };
 
   const getLegalStatusLabel = (status?: string) => {
@@ -529,7 +550,7 @@ export function AuctionItemDetailModal({
                     setBidAmount(Number(numericValue) || 0);
                   }}
                   className="text-lg"
-                  placeholder={formatPrice(currentHighestBid + bidIncrement)}
+                  placeholder={formatPrice(minimumBid)}
                   style={
                     primaryColor
                       ? {
@@ -552,7 +573,14 @@ export function AuctionItemDetailModal({
                 />
                 <Button
                   onClick={handlePlaceBid}
-                  disabled={bidAmount < currentHighestBid + bidIncrement}
+                  disabled={
+                    !validateBidAmount({
+                      amount: bidAmount,
+                      base: bidBase,
+                      minimumBid,
+                      bidIncrement: bidStep,
+                    }).ok
+                  }
                   className="whitespace-nowrap text-white"
                   style={
                     primaryColor

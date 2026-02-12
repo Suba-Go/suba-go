@@ -5,7 +5,7 @@
  */
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useAuctionWebSocket } from '@/hooks/use-auction-websocket';
 import { Button } from '@suba-go/shared-components/components/ui/button';
 import { useCompanyContextOptional } from '@/contexts/company-context';
@@ -18,6 +18,7 @@ import {
 } from '@suba-go/shared-components/components/ui/card';
 import { Badge } from '@suba-go/shared-components/components/ui/badge';
 import { Users, Wifi, WifiOff, AlertCircle } from 'lucide-react';
+import { computeBidConstraints, validateBidAmount } from '@suba-go/shared-validation';
 
 interface AuctionLiveBidsProps {
   tenantId: string;
@@ -40,7 +41,7 @@ export function AuctionLiveBids({
 }: AuctionLiveBidsProps) {
   const companyContext = useCompanyContextOptional();
   const primaryColor = companyContext?.company?.principal_color;
-  const [bidAmount, setBidAmount] = useState(currentHighestBid + bidIncrement);
+  const [bidAmount, setBidAmount] = useState(0);
 
   const {
     bids,
@@ -55,16 +56,30 @@ export function AuctionLiveBids({
     enabled: true,
   });
 
+  const { minimumBid, base: bidBase, bidIncrement: bidStep } = computeBidConstraints({
+    base: currentHighestBid,
+    bidIncrement,
+    hasPreviousBid: bids.length > 0,
+  });
+
+  // Keep input aligned with the latest constraints (e.g. initial load / reconnect)
+  useEffect(() => {
+    if (minimumBid <= 0) return;
+    setBidAmount((prev) => (prev < minimumBid ? minimumBid : prev));
+  }, [minimumBid]);
+
   const handlePlaceBid = () => {
-    if (bidAmount < currentHighestBid + bidIncrement) {
-      alert(`La puja mínima es $${currentHighestBid + bidIncrement}`);
+    const r = validateBidAmount({ amount: bidAmount, base: bidBase, minimumBid, bidIncrement: bidStep });
+    if (!r.ok) {
+      alert(`Puja mínima: $${minimumBid.toLocaleString()}`);
+      setBidAmount(r.nextValid);
       return;
     }
 
     placeBid(auctionItemId, bidAmount);
     
     // Increment for next bid
-    setBidAmount(bidAmount + bidIncrement);
+    setBidAmount(bidAmount + bidStep);
   };
 
   const formatCurrency = (amount: number) => {
