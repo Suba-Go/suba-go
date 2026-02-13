@@ -705,19 +705,18 @@ export function AuctionItemDetailModal({
                 showRealNames={showBidderRealNames}
                 sortMode="recent"
                 title={recentLoading ? 'Cargando historial...' : 'Últimas 100 pujas'}
+                titleAction={
+                  <Button
+                    variant="outline"
+                    className="rounded-full border-green-600 text-green-700 hover:bg-green-50"
+                    onClick={() => setFullHistoryOpen(true)}
+                  >
+                    Ver historial completo
+                  </Button>
+                }
                 maxItems={100}
                 maxHeight="max-h-96"
               />
-
-              <div className="flex justify-end">
-                <Button
-                  variant="outline"
-                  className="rounded-full border-green-600 text-green-700 hover:bg-green-50"
-                  onClick={() => setFullHistoryOpen(true)}
-                >
-                  Ver historial completo
-                </Button>
-              </div>
 
               <Dialog open={fullHistoryOpen} onOpenChange={setFullHistoryOpen}>
                 <DialogContent className="max-w-2xl">

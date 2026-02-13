@@ -15,7 +15,11 @@ import { BidPrismaService } from './bid-prisma.service';
 import { AuctionsGateway } from '../../../providers-modules/realtime/auctions.gateway';
 import { PrismaService } from '../../../providers-modules/prisma/prisma.service';
 import type { Bid, AuctionItem, Auction, Item, User } from '@prisma/client';
-import { BidPlacedData } from '@suba-go/shared-validation';
+import {
+  BidPlacedData,
+  computeBidConstraints,
+  validateBidAmount,
+} from '@suba-go/shared-validation';
 
 type BidWithRelations = Bid & {
   user: User;
@@ -220,25 +224,24 @@ export class BidRealtimeService {
       const max = maxRows?.[0]?.max ?? null;
       const bidIncrement = Math.max(1, Number(row.bidIncrement) || 1);
 
-      // Minimum/step rules:
-      // - If there is a previous bid, the next minimum is max + bidIncrement.
-      // - Otherwise the first minimum is startingBid.
-      // - Always enforce increments (you can jump multiple increments, but must align to the step).
+      // Shared bidding rule (frontend + backend):
+      // - minimum bid is startingBid (first bid) OR currentMax + bidIncrement (subsequent bids)
+      // - user can bid ANY amount >= minimumBid (no step alignment)
       const base = max !== null ? Number(max) : Number(row.startingBid);
-      const minimumBid = max !== null ? base + bidIncrement : base;
-
-      if (amount < minimumBid) {
+      const constraints = computeBidConstraints({
+        base,
+        bidIncrement,
+        hasPreviousBid: max !== null,
+      });
+      const validation = validateBidAmount({
+        amount,
+        base: constraints.base,
+        minimumBid: constraints.minimumBid,
+        bidIncrement: constraints.bidIncrement,
+      });
+      if (!validation.ok) {
         throw new BadRequestException(
-          `La puja debe ser al menos $${minimumBid.toLocaleString()}`
-        );
-      }
-
-      const diff = amount - base;
-      // diff can be 0 only when max is null (first bid equals startingBid)
-      if (diff % bidIncrement !== 0) {
-        const nextValid = base + Math.ceil(diff / bidIncrement) * bidIncrement;
-        throw new BadRequestException(
-          `La puja debe respetar el incremento de $${bidIncrement.toLocaleString()}. Próxima puja válida: $${nextValid.toLocaleString()}`
+          `La puja debe ser al menos $${constraints.minimumBid.toLocaleString()}`
         );
       }
 
