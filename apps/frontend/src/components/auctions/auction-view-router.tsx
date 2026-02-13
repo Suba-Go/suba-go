@@ -5,7 +5,7 @@
  */
 'use client';
 
-import { useCallback } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Alert, AlertDescription } from '@suba-go/shared-components/components/ui/alert';
 import { AlertCircle } from 'lucide-react';
 
@@ -79,94 +79,207 @@ export function AuctionViewRouter({
     refetchAuctionItems();
   }, [refetchAuction, refetchAuctionItems]);
 
+  // --- Offline-friendly UX ---
+  // Keep the last known good snapshot so the page doesn't "die" on temporary network loss.
+  const storageKeyAuction = useMemo(() => `auction:last:${auctionId}`, [auctionId]);
+  const storageKeyItems = useMemo(() => `auction:lastItems:${auctionId}`, [auctionId]);
+
+  const [lastAuction, setLastAuction] = useState<AuctionDto | null>(null);
+  const [lastAuctionItems, setLastAuctionItems] =
+    useState<AuctionItemWithItmeAndBidsDto[] | null>(null);
+  const [isOnline, setIsOnline] = useState<boolean>(
+    typeof navigator !== 'undefined' ? navigator.onLine : true
+  );
+
+  // Persist last good data (in-memory + sessionStorage) for mobile offline scenarios.
+  useEffect(() => {
+    if (auction) {
+      setLastAuction(auction);
+      try {
+        sessionStorage.setItem(storageKeyAuction, JSON.stringify(auction));
+      } catch {
+        // ignore
+      }
+    }
+  }, [auction, storageKeyAuction]);
+
+  useEffect(() => {
+    if (auctionItems) {
+      setLastAuctionItems(auctionItems);
+      try {
+        sessionStorage.setItem(storageKeyItems, JSON.stringify(auctionItems));
+      } catch {
+        // ignore
+      }
+    }
+  }, [auctionItems, storageKeyItems]);
+
+  // Load cached snapshot on mount (useful if user goes offline after having joined before).
+  useEffect(() => {
+    try {
+      const a = sessionStorage.getItem(storageKeyAuction);
+      const i = sessionStorage.getItem(storageKeyItems);
+      if (!lastAuction && a) setLastAuction(JSON.parse(a));
+      if (!lastAuctionItems && i) setLastAuctionItems(JSON.parse(i));
+    } catch {
+      // ignore
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [storageKeyAuction, storageKeyItems]);
+
+  // Track online/offline and refetch immediately when coming back online.
+  useEffect(() => {
+    const onOnline = () => {
+      setIsOnline(true);
+      handleRealtimeSnapshot();
+    };
+    const onOffline = () => setIsOnline(false);
+    window.addEventListener('online', onOnline);
+    window.addEventListener('offline', onOffline);
+    return () => {
+      window.removeEventListener('online', onOnline);
+      window.removeEventListener('offline', onOffline);
+    };
+  }, [handleRealtimeSnapshot]);
+
+  const hasNetworkError = !!(errorAuction || errorAuctionItems);
+  const showOfflineBanner = !isOnline || hasNetworkError;
+
+  // Use live data if present; otherwise fall back to cached snapshot.
+  const effectiveAuction = auction ?? lastAuction;
+  const effectiveAuctionItems = auctionItems ?? lastAuctionItems;
+
   if (isLoadingAuction || isLoadingAuctionItems) {
     return <AuctionDetailSkeleton />;
   }
 
-  if (errorAuction || errorAuctionItems || !auction || !auctionItems) {
+  // If we have *no* snapshot to render (first load offline), show a friendly offline state.
+  if (
+    (!effectiveAuction || !effectiveAuctionItems) &&
+    (errorAuction || errorAuctionItems || !isOnline)
+  ) {
     return (
       <Alert variant="destructive">
         <AlertCircle className="h-4 w-4" />
-        <AlertDescription>{'No se pudo cargar la subasta'}</AlertDescription>
+        <AlertDescription>
+          {!isOnline
+            ? 'Sin conexión. Intentando reconectar…'
+            : 'No se pudo cargar la subasta'}
+        </AlertDescription>
       </Alert>
     );
   }
 
+  // At this point we can render using either live or cached snapshot.
+  const auctionToRender = effectiveAuction as AuctionDto;
+  const itemsToRender = effectiveAuctionItems as AuctionItemWithItmeAndBidsDto[];
+
+  const OfflineBanner = showOfflineBanner ? (
+    <div className="mb-3">
+      <Alert className="border-amber-200 bg-amber-50 text-amber-900">
+        <AlertCircle className="h-4 w-4" />
+        <AlertDescription>
+          {!isOnline
+            ? 'Sin conexión. Mostrando la última información disponible. Reintentando…'
+            : 'Conexión inestable. Reintentando sincronización…'}
+        </AlertDescription>
+      </Alert>
+    </div>
+  ) : null;
+
   // AUCTION_MANAGER view
   if (userRole === UserRolesEnum.AUCTION_MANAGER) {
-    switch (auction.status) {
+    switch (auctionToRender.status) {
       case AuctionStatusEnum.ACTIVA:
         return (
-          <AuctionManagerActiveView
-            auction={auction}
-            auctionItems={auctionItems}
-            accessToken={accessToken}
-            tenantId={tenantId}
-            onRealtimeSnapshot={handleRealtimeSnapshot}
-            primaryColor={primaryColor}
-          />
+          <>
+            {OfflineBanner}
+            <AuctionManagerActiveView
+              auction={auctionToRender}
+              auctionItems={itemsToRender}
+              accessToken={accessToken}
+              tenantId={tenantId}
+              onRealtimeSnapshot={handleRealtimeSnapshot}
+              primaryColor={primaryColor}
+            />
+          </>
         );
 
       case AuctionStatusEnum.COMPLETADA:
         return (
-          <AuctionManagerCompletedView
-            auction={auction}
-            auctionItems={auctionItems}
-            primaryColor={primaryColor}
-          />
+          <>
+            {OfflineBanner}
+            <AuctionManagerCompletedView
+              auction={auctionToRender}
+              auctionItems={itemsToRender}
+              primaryColor={primaryColor}
+            />
+          </>
         );
 
       case AuctionStatusEnum.CANCELADA:
       case AuctionStatusEnum.PENDIENTE:
       default:
         return (
-          <AuctionManagerPendingView
-            auction={auction}
-            auctionItems={auctionItems}
-            accessToken={accessToken}
-            tenantId={tenantId}
-            onRealtimeSnapshot={handleRealtimeSnapshot}
-            primaryColor={primaryColor}
-          />
+          <>
+            {OfflineBanner}
+            <AuctionManagerPendingView
+              auction={auctionToRender}
+              auctionItems={itemsToRender}
+              accessToken={accessToken}
+              tenantId={tenantId}
+              onRealtimeSnapshot={handleRealtimeSnapshot}
+              primaryColor={primaryColor}
+            />
+          </>
         );
     }
   }
 
   // USER view
   if (userRole === UserRolesEnum.USER) {
-    switch (auction.status) {
+    switch (auctionToRender.status) {
       case AuctionStatusEnum.ACTIVA:
         return (
-          <AuctionActiveBiddingView
-            auction={auction}
-            auctionItems={auctionItems}
-            accessToken={accessToken}
-            tenantId={tenantId}
-            userId={userId}
-            onRealtimeSnapshot={handleRealtimeSnapshot}
-          />
+          <>
+            {OfflineBanner}
+            <AuctionActiveBiddingView
+              auction={auctionToRender}
+              auctionItems={itemsToRender}
+              accessToken={accessToken}
+              tenantId={tenantId}
+              userId={userId}
+              onRealtimeSnapshot={handleRealtimeSnapshot}
+            />
+          </>
         );
 
       case AuctionStatusEnum.COMPLETADA:
         return (
-          <AuctionCompletedView
-            auction={auction}
-            auctionItems={auctionItems}
-            userId={userId}
-          />
+          <>
+            {OfflineBanner}
+            <AuctionCompletedView
+              auction={auctionToRender}
+              auctionItems={itemsToRender}
+              userId={userId}
+            />
+          </>
         );
 
       case AuctionStatusEnum.CANCELADA:
       case AuctionStatusEnum.PENDIENTE:
       default:
         return (
-          <AuctionPendingView
-            auction={auction}
-            auctionItems={auctionItems}
-            accessToken={accessToken}
-            tenantId={tenantId}
-            onRealtimeSnapshot={handleRealtimeSnapshot}
-          />
+          <>
+            {OfflineBanner}
+            <AuctionPendingView
+              auction={auctionToRender}
+              auctionItems={itemsToRender}
+              accessToken={accessToken}
+              tenantId={tenantId}
+              onRealtimeSnapshot={handleRealtimeSnapshot}
+            />
+          </>
         );
     }
   }
