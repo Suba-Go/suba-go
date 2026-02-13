@@ -578,6 +578,12 @@ useEffect(() => {
                   </CardHeader>
                   <CardContent>
                     <p className="text-sm text-gray-600 mb-2">{item.version}</p>
+                    <p className="text-sm text-gray-600 mb-2">
+                      Patente:{' '}
+                      <span className="font-semibold text-gray-900">
+                        {item.plate || 'Sin patente'}
+                      </span>
+                    </p>
                     <p className="text-sm font-medium text-gray-900">
                       Adjudicado por: ${item.soldPrice.toLocaleString('es-CL')}
                     </p>

@@ -2,7 +2,7 @@
 
 import { SafeImage } from '@/components/ui/safe-image';
 import { parsePhotos } from '@/lib/auction-utils';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import {
   Car,
   Calendar,
@@ -40,8 +40,6 @@ import {
   AuctionItemWithItmeAndBidsDto,
   BidDto,
   BidWithUserDto,
-  computeBidConstraints,
-  validateBidAmount,
 } from '@suba-go/shared-validation';
 import { useCompanyContextOptional } from '@/contexts/company-context';
 import { darkenColor } from '@/utils/color-utils';
@@ -108,16 +106,17 @@ export function AuctionItemDetailModal({
   const [photoCarouselApi, setPhotoCarouselApi] = useState<CarouselApi>();
   const [currentPhotoIndex, setCurrentPhotoIndex] = useState(0);
   const [photoCount, setPhotoCount] = useState(0);
-  const hasPreviousBid = (auctionItem.bids?.length ?? 0) > 0;
-  const { base: bidBase, minimumBid, bidIncrement: bidStep } =
-    computeBidConstraints({
-      base: currentHighestBid,
-      bidIncrement,
-      hasPreviousBid,
-    });
-
-  const [bidAmount, setBidAmount] = useState(minimumBid);
+  const [bidAmount, setBidAmount] = useState(currentHighestBid + bidIncrement);
   const [isMobile, setIsMobile] = useState(false);
+
+  // Live bid history for this item (recent, by time). We keep this separate from
+  // the bidding logic which might sort by amount.
+  const [recentBids, setRecentBids] = useState<any[]>([]);
+  const [fullHistoryOpen, setFullHistoryOpen] = useState(false);
+  const [fullHistoryItems, setFullHistoryItems] = useState<any[]>([]);
+  const [fullHistoryCursor, setFullHistoryCursor] = useState<string | null>(null);
+  const [fullHistoryLoading, setFullHistoryLoading] = useState(false);
+  const [recentLoading, setRecentLoading] = useState(false);
 
   const item = auctionItem.item;
 
@@ -171,8 +170,95 @@ export function AuctionItemDetailModal({
 
   // Update bid amount when currentHighestBid changes
   useEffect(() => {
-    setBidAmount(minimumBid);
-  }, [minimumBid]);
+    setBidAmount(currentHighestBid + bidIncrement);
+  }, [currentHighestBid, bidIncrement]);
+
+  // Fetch last 100 bids (recent by time) when opening the modal.
+  useEffect(() => {
+    if (!isOpen) return;
+    let cancelled = false;
+    const run = async () => {
+      try {
+        setRecentLoading(true);
+        const res = await fetch(`/api/bids/item/${auctionItem.id}?limit=100`, {
+          cache: 'no-store',
+        });
+        if (!res.ok) return;
+        const data = await res.json();
+        if (cancelled) return;
+        if (Array.isArray(data)) setRecentBids(data);
+      } catch {
+        // swallow: UI will just not show history
+      } finally {
+        if (!cancelled) setRecentLoading(false);
+      }
+    };
+    run();
+    return () => {
+      cancelled = true;
+    };
+  }, [isOpen, auctionItem.id]);
+
+  // When "Historial completo" opens, load first page.
+  useEffect(() => {
+    if (!fullHistoryOpen) return;
+    let cancelled = false;
+    const loadFirst = async () => {
+      setFullHistoryItems([]);
+      setFullHistoryCursor(null);
+      setFullHistoryLoading(true);
+      try {
+        const res = await fetch(
+          `/api/bids/item/${auctionItem.id}/paged?limit=50`,
+          { cache: 'no-store' }
+        );
+        if (!res.ok) return;
+        const data = await res.json();
+        if (cancelled) return;
+        const items = Array.isArray(data?.items) ? data.items : [];
+        setFullHistoryItems(items);
+        setFullHistoryCursor(typeof data?.nextCursor === 'string' ? data.nextCursor : null);
+      } catch {
+        // ignore
+      } finally {
+        if (!cancelled) setFullHistoryLoading(false);
+      }
+    };
+    loadFirst();
+    return () => {
+      cancelled = true;
+    };
+  }, [fullHistoryOpen, auctionItem.id]);
+
+  const canLoadMoreHistory = !!fullHistoryCursor && !fullHistoryLoading;
+
+  const loadMoreHistory = async () => {
+    if (!fullHistoryCursor || fullHistoryLoading) return;
+    setFullHistoryLoading(true);
+    try {
+      const res = await fetch(
+        `/api/bids/item/${auctionItem.id}/paged?limit=50&cursor=${encodeURIComponent(
+          fullHistoryCursor
+        )}`,
+        { cache: 'no-store' }
+      );
+      if (!res.ok) return;
+      const data = await res.json();
+      const items = Array.isArray(data?.items) ? data.items : [];
+      setFullHistoryItems((prev) => {
+        const seen = new Set(prev.map((b: any) => String(b.id)));
+        const next = [...prev];
+        for (const it of items) {
+          const id = String((it as any).id ?? '');
+          if (id && !seen.has(id)) next.push(it);
+        }
+        return next;
+      });
+      setFullHistoryCursor(typeof data?.nextCursor === 'string' ? data.nextCursor : null);
+    } finally {
+      setFullHistoryLoading(false);
+    }
+  };
 
   // Track carousel changes
   useEffect(() => {
@@ -230,20 +316,9 @@ export function AuctionItemDetailModal({
   };
 
   const handlePlaceBid = () => {
-    if (!onPlaceBid) return;
-    const r = validateBidAmount({
-      amount: bidAmount,
-      base: bidBase,
-      minimumBid,
-      bidIncrement: bidStep,
-    });
-    if (!r.ok) {
-      // Keep UI aligned with server rules: bump to next valid amount.
-      setBidAmount(r.nextValid);
-      return;
+    if (onPlaceBid && bidAmount >= currentHighestBid + bidIncrement) {
+      onPlaceBid(bidAmount);
     }
-
-    onPlaceBid(bidAmount);
   };
 
   const getLegalStatusLabel = (status?: string) => {
@@ -292,6 +367,11 @@ export function AuctionItemDetailModal({
     );
     return sorted[0]?.userId as string | undefined;
   })();
+
+  // Prefer fetched "recent" bids for time-sorted history in the modal.
+  const recentBidsForDisplay = useMemo(() => {
+    return Array.isArray(recentBids) && recentBids.length > 0 ? recentBids : (bidHistory as any[]);
+  }, [recentBids, bidHistory]);
 
   const isUserWinning = !!userId && !!highestBidderId && highestBidderId === userId;
 
@@ -434,6 +514,16 @@ export function AuctionItemDetailModal({
               </div>
             )}
 
+           {item.plate && (
+              <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
+                <Car className="h-5 w-5 text-gray-600" />
+                <div>
+                  <p className="text-sm text-gray-600">Patente</p>
+                  <p className="font-semibold">{item.plate}</p>
+                </div>
+              </div>
+            )}
+
             {item.year && (
               <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
                 <Calendar className="h-5 w-5 text-gray-600" />
@@ -550,7 +640,7 @@ export function AuctionItemDetailModal({
                     setBidAmount(Number(numericValue) || 0);
                   }}
                   className="text-lg"
-                  placeholder={formatPrice(minimumBid)}
+                  placeholder={formatPrice(currentHighestBid + bidIncrement)}
                   style={
                     primaryColor
                       ? {
@@ -573,14 +663,7 @@ export function AuctionItemDetailModal({
                 />
                 <Button
                   onClick={handlePlaceBid}
-                  disabled={
-                    !validateBidAmount({
-                      amount: bidAmount,
-                      base: bidBase,
-                      minimumBid,
-                      bidIncrement: bidStep,
-                    }).ok
-                  }
+                  disabled={bidAmount < currentHighestBid + bidIncrement}
                   className="whitespace-nowrap text-white"
                   style={
                     primaryColor
@@ -614,25 +697,65 @@ export function AuctionItemDetailModal({
           )}
 
           {/* Bid History Section */}
-          {showBidHistory &&
-            (bidHistory.length > 0 ||
-              (auctionItem.bids && auctionItem.bids.length > 0)) && (
+          {showBidHistory && (
+            <div className="space-y-3">
               <ItemBidHistory
-                bids={
-                  (bidHistory.length > 0
-                    ? bidHistory
-                    : auctionItem.bids || []) as BidWithUserDto[]
-                }
+                bids={(recentBids.length > 0 ? recentBids : (auctionItem.bids || [])) as BidWithUserDto[]}
                 currentUserId={userId}
                 showRealNames={showBidderRealNames}
-                title={
-                  bidHistory.length > 0
-                    ? 'Historial de Pujas'
-                    : 'Pujas Anteriores'
-                }
+                sortMode="recent"
+                title={recentLoading ? 'Cargando historial...' : 'Últimas 100 pujas'}
+                maxItems={100}
                 maxHeight="max-h-96"
               />
-            )}
+
+              <div className="flex justify-end">
+                <Button
+                  variant="outline"
+                  className="rounded-full border-green-600 text-green-700 hover:bg-green-50"
+                  onClick={() => setFullHistoryOpen(true)}
+                >
+                  Ver historial completo
+                </Button>
+              </div>
+
+              <Dialog open={fullHistoryOpen} onOpenChange={setFullHistoryOpen}>
+                <DialogContent className="max-w-2xl">
+                  <DialogHeader>
+                    <DialogTitle>Historial completo de pujas</DialogTitle>
+                  </DialogHeader>
+
+                  <ItemBidHistory
+                    bids={fullHistoryItems as any}
+                    currentUserId={userId}
+                    showRealNames={showBidderRealNames}
+                    sortMode="recent"
+                    title="Todas las pujas"
+                    maxItems={undefined}
+                    maxHeight="max-h-[60vh]"
+                  />
+
+                  <div className="flex items-center justify-between gap-2 pt-2">
+                    <div className="text-xs text-gray-500">
+                      {fullHistoryLoading
+                        ? 'Cargando...'
+                        : canLoadMoreHistory
+                          ? 'Más resultados disponibles'
+                          : 'Fin del historial'}
+                    </div>
+                    <Button
+                      variant="outline"
+                      disabled={!canLoadMoreHistory}
+                      className="border-green-600 text-green-700 hover:bg-green-50"
+                      onClick={loadMoreHistory}
+                    >
+                      Cargar más
+                    </Button>
+                  </div>
+                </DialogContent>
+              </Dialog>
+            </div>
+          )}
         </div>
       </DialogContent>
     </Dialog>

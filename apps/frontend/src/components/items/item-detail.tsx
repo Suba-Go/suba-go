@@ -17,6 +17,7 @@ import {
   Shield,
   Package,
   Gavel,
+  Tag,
 } from 'lucide-react';
 import { ItemStateEnum } from '@suba-go/shared-validation';
 import {
@@ -56,7 +57,7 @@ export function ItemDetail({ itemId, userRole }: ItemDetailProps) {
   const primaryColor = companyContext?.company?.principal_color;
   const router = useRouter();
   const { toast } = useToast();
-  const { formatPrice } = useAutoFormat();
+  const { formatPrice, formatPlate } = useAutoFormat();
   const [item, setItem] = useState<any | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
@@ -412,6 +413,16 @@ export function ItemDetail({ itemId, userRole }: ItemDetailProps) {
 
         {/* Product Details */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {item.plate && (
+            <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
+              <Tag className="h-5 w-5 text-gray-600" />
+              <div>
+                <p className="text-sm text-gray-600">Patente</p>
+                <p className="font-semibold">{formatPlate(item.plate)}</p>
+              </div>
+            </div>
+          )}
+
           {item.brand && (
             <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
               <Car className="h-5 w-5 text-gray-600" />

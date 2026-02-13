@@ -586,10 +586,15 @@ useEffect(() => {
       const winnerId = history[0]?.userId ?? getHighestBidderFromApi(ai);
 
       if (winnerId && winnerId === userId) {
-        const plate = ai.item?.plate || 'este ítem';
+        const plate = ai.item?.plate;
+        const brand = ai.item?.brand;
+        const model = ai.item?.model;
+
+        const nameModel = [brand, model].filter(Boolean).join(' ');
+        const itemLabel = [nameModel, plate].filter(Boolean).join(' - ') || 'este ítem';
         toast({
           title: '¡Felicitaciones! 🎉',
-          description: `Ganaste el ítem ${plate}.`,
+          description: `Ganaste el ítem ${itemLabel}.`,
           duration: 3000,
         });
       }
