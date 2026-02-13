@@ -671,6 +671,17 @@ export function AuctionDetail({
                               <ItemBidHistory
                                 bids={auctionItem.bids || []}
                                 maxItems={5}
+                                showRealNames={userRole === 'AUCTION_MANAGER' || userRole === 'ADMIN'}
+                                titleAction={
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    className="h-8 rounded-full border-green-600 text-green-700 hover:bg-green-50"
+                                    onClick={() => setSelectedItemForDetail(auctionItem)}
+                                  >
+                                    Ver historial
+                                  </Button>
+                                }
                               />
                             </>
                           )}

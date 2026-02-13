@@ -15,10 +15,11 @@ import { AlertCircle } from 'lucide-react';
 import { AuctionItemDetailModal } from '../auction-item-detail-modal';
 import { AuctionHeader } from './auction-header';
 import { AuctionFinalizingOverlay } from '../auction-finalizing-overlay';
-// import { ConnectionStatus } from './connection-status';
+import { ConnectionStatus } from './connection-status';
 import { AuctionItemCard } from './auction-item-card';
 import { SelfBidWarningDialog, AutoBidConfirmDialog } from './bidding-dialogs';
 import { useAuctionWebSocketBidding } from '@/hooks/use-auction-websocket-bidding';
+import { useLiveFallbackSnapshot } from '@/hooks/use-live-fallback-snapshot';
 import { useAutoBidSettings } from '@/hooks/use-auto-bid-settings';
 import { useLiveAccessToken } from '@/hooks/use-live-access-token';
 import {
@@ -494,6 +495,14 @@ useEffect(() => {
     onJoined: onRealtimeSnapshot,
   });
 
+  // Fallback HTTP snapshot while WS is reconnecting.
+  // This avoids the UI getting "stuck" on mobile/WiFi hiccups.
+  useLiveFallbackSnapshot({
+    enabled: !!onRealtimeSnapshot && (!isConnected || !isJoined),
+    onSnapshot: onRealtimeSnapshot,
+    intervalMs: 2500,
+  });
+
   // Shared, server-synced clock for the whole view (prevents per-item timer drift and avoids N intervals).
   const [nowMs, setNowMs] = useState(() => Date.now() + (serverOffsetMs || 0));
 
@@ -869,11 +878,11 @@ useEffect(() => {
         participantCount={participantCount}
       />
 
-      {/* <ConnectionStatus
+      <ConnectionStatus
         isConnected={isConnected}
         isJoined={isJoined}
         participantCount={participantCount}
-      /> */}
+      />
 
       {connectionError && (
         <Alert variant="destructive">

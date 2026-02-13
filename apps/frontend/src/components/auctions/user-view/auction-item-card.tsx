@@ -254,6 +254,16 @@ export function AuctionItemCard({
             title={
               bidHistory.length > 0 ? 'Historial de Pujas' : 'Pujas Anteriores'
             }
+            titleAction={
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-8 rounded-full border-green-600 text-green-700 hover:bg-green-50"
+                onClick={onViewDetails}
+              >
+                Ver historial
+              </Button>
+            }
             maxHeight="max-h-40"
           />
         )}
