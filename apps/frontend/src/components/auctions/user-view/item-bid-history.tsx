@@ -28,6 +28,12 @@ interface ItemBidHistoryProps {
   title?: string;
   maxHeight?: string;
   /**
+   * Sorting mode:
+   * - 'highest': sort by amount DESC (default, used for "Ganando"/highest-bid UX)
+   * - 'recent': sort by time DESC (used for chronological history lists)
+   */
+  sortMode?: 'highest' | 'recent';
+  /**
    * When true, prefer real user names (AUCTION_MANAGER / ADMIN views).
    * When false, show only pseudonyms (USER view).
    */
@@ -48,6 +54,7 @@ export function ItemBidHistory({
   maxItems,
   title = 'Historial de Pujas',
   maxHeight = 'max-h-40',
+  sortMode = 'highest',
   showRealNames = false,
 }: ItemBidHistoryProps) {
   if (!bids || bids.length === 0) {
@@ -81,8 +88,10 @@ export function ItemBidHistory({
     return acc;
   }, [] as (AnyBid & { amount: number; ts?: number })[]);
 
-  // Sort bids by amount (highest first)
   const sortedBids = [...uniqueBids].sort((a, b) => {
+    if (sortMode === 'recent') {
+      return (b.ts ?? 0) - (a.ts ?? 0);
+    }
     const amountA = a.amount ?? a.offered_price ?? 0;
     const amountB = b.amount ?? b.offered_price ?? 0;
     if (amountB !== amountA) return amountB - amountA;
@@ -93,7 +102,11 @@ export function ItemBidHistory({
 
   return (
     <div className="border-t pt-4">
-      <h4 className="text-sm font-medium text-gray-700 mb-2 flex items-center gap-2">
+      <h4
+        className={`text-sm font-medium mb-2 flex items-center gap-2 ${
+          sortMode === 'recent' ? 'text-green-700' : 'text-gray-700'
+        }`}
+      >
         <TrendingUp className="h-4 w-4" />
         {title}
       </h4>
@@ -111,7 +124,10 @@ export function ItemBidHistory({
                 'Usuario'
               : bid.user?.public_name || bid.userName || 'Usuario';
             const isCurrentUser = bid.userId === currentUserId;
-            const isWinning = index === 0;
+            // Keep the same green highlight UX for the most relevant entry.
+            // - highest: top row is the current winning bid
+            // - recent: top row is the most recent bid
+            const isHighlighted = index === 0;
 
             // Create unique key based on bid content to avoid duplicates
             const uniqueKey = bid.id
@@ -122,7 +138,7 @@ export function ItemBidHistory({
               <div
                 key={uniqueKey}
                 className={`flex items-center justify-between text-sm p-2 rounded ${
-                  isWinning
+                  isHighlighted
                     ? 'bg-green-50 border border-green-200'
                     : 'bg-gray-50'
                 }`}
@@ -131,7 +147,7 @@ export function ItemBidHistory({
                   <User className="h-3 w-3 text-gray-500" />
                   <span
                     className={
-                      isWinning
+                      isHighlighted
                         ? 'font-semibold text-green-900'
                         : 'text-gray-700'
                     }
@@ -141,7 +157,7 @@ export function ItemBidHistory({
                 </div>
                 <span
                   className={
-                    isWinning
+                    isHighlighted
                       ? 'font-bold text-green-900'
                       : 'font-medium text-gray-900'
                   }

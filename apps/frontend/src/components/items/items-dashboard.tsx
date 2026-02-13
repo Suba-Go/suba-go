@@ -539,6 +539,10 @@ export function ItemsDashboard({ subdomain }: ItemsDashboardProps) {
             <CardContent className="space-y-3">
               <div className="space-y-1">
                 <p className="text-sm text-gray-600">
+                  <span className="font-medium">Patente:</span>{' '}
+                  {item.plate || 'N/A'}
+                </p>
+                <p className="text-sm text-gray-600">
                   <span className="font-medium">Marca:</span>{' '}
                   {item.brand || 'N/A'}
                 </p>
