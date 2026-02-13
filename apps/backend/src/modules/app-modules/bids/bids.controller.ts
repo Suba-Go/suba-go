@@ -72,6 +72,41 @@ export class BidsController {
     );
   }
 
+  @Get('item/:auctionItemId/paged')
+  @ApiOperation({ summary: 'Obtener historial paginado de pujas de un item' })
+  @ApiParam({ name: 'auctionItemId', description: 'ID del item de subasta' })
+  @ApiQuery({
+    name: 'limit',
+    required: false,
+    description: 'Límite de pujas a retornar (por página)',
+    type: Number,
+  })
+  @ApiQuery({
+    name: 'cursor',
+    required: false,
+    description:
+      'Cursor para paginación. Formato: <ISO_BID_TIME>|<BID_ID> (ej: 2026-02-10T12:34:56.000Z|uuid)',
+    type: String,
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Historial paginado de pujas del item',
+  })
+  async getItemBidHistoryPaged(
+    @Param('auctionItemId') auctionItemId: string,
+    @Query('limit') limit: string,
+    @Query('cursor') cursor: string | undefined,
+    @Request() req: AuthenticatedRequest
+  ) {
+    const tenantId = req.user.tenantId;
+    const limitNum = limit ? Math.max(1, Math.min(parseInt(limit, 10), 200)) : 50;
+    return this.bidRealtimeService.getBidHistoryPaged(
+      auctionItemId,
+      tenantId,
+      { limit: limitNum, cursor }
+    );
+  }
+
   @Get('user/my-bids')
   @ApiOperation({ summary: 'Obtener las pujas del usuario actual' })
   @ApiResponse({

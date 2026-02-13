@@ -220,10 +220,10 @@ export class BidRealtimeService {
       const max = maxRows?.[0]?.max ?? null;
       const bidIncrement = Math.max(1, Number(row.bidIncrement) || 1);
 
-      // Minimum rules:
+      // Minimum/step rules:
       // - If there is a previous bid, the next minimum is max + bidIncrement.
       // - Otherwise the first minimum is startingBid.
-      // NOTE: We intentionally do NOT enforce "multiple of bidIncrement" anymore; any amount >= minimumBid is allowed.
+      // - Always enforce increments (you can jump multiple increments, but must align to the step).
       const base = max !== null ? Number(max) : Number(row.startingBid);
       const minimumBid = max !== null ? base + bidIncrement : base;
 
@@ -233,7 +233,14 @@ export class BidRealtimeService {
         );
       }
 
-      // We still keep bidIncrement for the *minimum* calculation, but we allow any amount above it.
+      const diff = amount - base;
+      // diff can be 0 only when max is null (first bid equals startingBid)
+      if (diff % bidIncrement !== 0) {
+        const nextValid = base + Math.ceil(diff / bidIncrement) * bidIncrement;
+        throw new BadRequestException(
+          `La puja debe respetar el incremento de $${bidIncrement.toLocaleString()}. Próxima puja válida: $${nextValid.toLocaleString()}`
+        );
+      }
 
       // Soft-close extension:
       // If we're within the last 30 seconds and someone bids, the product timer must go back to 30 seconds.
@@ -455,6 +462,84 @@ export class BidRealtimeService {
     });
 
     return bids as BidWithRelations[];
+  }
+
+  /**
+   * Paged bid history for an auction item.
+   *
+   * Cursor format: <ISO_BID_TIME>|<BID_ID>
+   *
+   * We sort by bid_time DESC, then id DESC.
+   */
+  async getBidHistoryPaged(
+    auctionItemId: string,
+    tenantId: string,
+    options: { limit: number; cursor?: string }
+  ): Promise<{ items: BidWithRelations[]; nextCursor: string | null }> {
+    const limit = Math.max(1, Math.min(options.limit ?? 50, 200));
+
+    let cursorTime: Date | null = null;
+    let cursorId: string | null = null;
+
+    if (options.cursor) {
+      const [iso, id] = String(options.cursor).split('|');
+      const dt = iso ? new Date(iso) : null;
+      if (dt && !Number.isNaN(dt.getTime()) && id) {
+        cursorTime = dt;
+        cursorId = id;
+      }
+    }
+
+    const where: any = {
+      auctionItemId,
+      tenantId,
+      isDeleted: false,
+    };
+
+    if (cursorTime && cursorId) {
+      // Fetch bids strictly older than the cursor (stable pagination)
+      where.OR = [
+        { bid_time: { lt: cursorTime } },
+        { bid_time: cursorTime, id: { lt: cursorId } },
+      ];
+    }
+
+    const bids = await this.prisma.bid.findMany({
+      where,
+      distinct: ['id'],
+      include: {
+        user: {
+          select: {
+            id: true,
+            email: true,
+            name: true,
+            public_name: true,
+          },
+        },
+        auctionItem: {
+          include: {
+            auction: true,
+            item: true,
+          },
+        },
+      },
+      orderBy: [{ bid_time: 'desc' }, { id: 'desc' }],
+      take: limit + 1,
+    });
+
+    const hasMore = bids.length > limit;
+    const items = (hasMore ? bids.slice(0, limit) : bids) as BidWithRelations[];
+
+    let nextCursor: string | null = null;
+    if (hasMore && items.length > 0) {
+      const last = items[items.length - 1] as any;
+      const lastTime = last?.bid_time ? new Date(last.bid_time) : null;
+      if (lastTime && !Number.isNaN(lastTime.getTime()) && last?.id) {
+        nextCursor = `${lastTime.toISOString()}|${String(last.id)}`;
+      }
+    }
+
+    return { items, nextCursor };
   }
 
   /**
