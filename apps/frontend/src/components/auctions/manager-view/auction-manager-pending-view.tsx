@@ -23,6 +23,7 @@ import {
 } from '@suba-go/shared-components/components/ui/tabs';
 import { useFetchData } from '@/hooks/use-fetch-data';
 import { useAuctionWebSocketBidding } from '@/hooks/use-auction-websocket-bidding';
+import { useLiveFallbackSnapshot } from '@/hooks/use-live-fallback-snapshot';
 import { useLiveAccessToken } from '@/hooks/use-live-access-token';
 import {
   getAuctionBadgeColor,
@@ -32,6 +33,7 @@ import { AuctionEditModal } from '../auction-edit-modal';
 import { useAuctionStatus } from '@/hooks/use-auction-status';
 import { useAuctionCancelToggle } from '@/hooks/use-auction-cancel-toggle';
 import { AuctionStartingOverlay } from '../auction-starting-overlay';
+import { ConnectionStatus } from '../user-view/connection-status';
 import {
   AuctionDto,
   AuctionItemWithItmeAndBidsDto,
@@ -94,7 +96,13 @@ export function AuctionManagerPendingView({
     fallbackData: [],
   });
 
-  const { connectionError, serverOffsetMs: wsServerOffsetMs } = useAuctionWebSocketBidding({
+  const {
+    connectionError,
+    isConnected,
+    isJoined,
+    participantCount,
+    serverOffsetMs: wsServerOffsetMs,
+  } = useAuctionWebSocketBidding({
     auctionId: auction.id,
     tenantId,
     accessToken: liveAccessToken,
@@ -110,6 +118,13 @@ export function AuctionManagerPendingView({
       }
     },
     onJoined: onRealtimeSnapshot,
+  });
+
+  // Fallback HTTP snapshot while WS is reconnecting.
+  useLiveFallbackSnapshot({
+    enabled: !!onRealtimeSnapshot && (!isConnected || !isJoined),
+    onSnapshot: onRealtimeSnapshot,
+    intervalMs: 2500,
   });
 
   useEffect(() => {
@@ -195,6 +210,12 @@ export function AuctionManagerPendingView({
           {connectionError}
         </div>
       )}
+
+      <ConnectionStatus
+        isConnected={isConnected}
+        isJoined={isJoined}
+        participantCount={participantCount}
+      />
       {/* Header */}
       <div className="flex flex-col gap-4 md:flex-row md:items-start md:gap-6">
         <div className="flex items-center gap-4">

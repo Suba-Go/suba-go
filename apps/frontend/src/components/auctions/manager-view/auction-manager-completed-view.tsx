@@ -282,6 +282,16 @@ export function AuctionManagerCompletedView({
                                 bids={auctionItem.bids || []}
                                 maxItems={5}
                                 showRealNames
+                                titleAction={
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    className="h-8 rounded-full border-green-600 text-green-700 hover:bg-green-50"
+                                    onClick={() => setSelectedItemForDetail(auctionItem)}
+                                  >
+                                    Ver historial
+                                  </Button>
+                                }
                               />
                             </>
                           )}

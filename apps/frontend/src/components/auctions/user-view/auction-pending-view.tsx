@@ -20,7 +20,9 @@ import { AlertCircle, Clock, Search } from 'lucide-react';
 import { CountdownTimer } from '../countdown-timer';
 import { AuctionStartingOverlay } from '../auction-starting-overlay';
 import { AuctionItemDetailModal } from '../auction-item-detail-modal';
+import { ConnectionStatus } from './connection-status';
 import { useAuctionWebSocketBidding } from '@/hooks/use-auction-websocket-bidding';
+import { useLiveFallbackSnapshot } from '@/hooks/use-live-fallback-snapshot';
 import { useAuctionStatus } from '@/hooks/use-auction-status';
 import { useLiveAccessToken } from '@/hooks/use-live-access-token';
 
@@ -43,7 +45,14 @@ export function AuctionPendingView({
   const [query, setQuery] = useState('');
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
 
-  const { connectionError, serverOffsetMs } = useAuctionWebSocketBidding({
+  const {
+    connectionError,
+    serverOffsetMs,
+    isConnected,
+    isJoined,
+    participantCount,
+    connectionState,
+  } = useAuctionWebSocketBidding({
     auctionId: auction.id,
     tenantId,
     accessToken: liveAccessToken,
@@ -58,6 +67,13 @@ export function AuctionPendingView({
       }
     },
     onJoined: onRealtimeSnapshot,
+  });
+
+  // Fallback HTTP snapshot while WS is reconnecting.
+  useLiveFallbackSnapshot({
+    enabled: !!onRealtimeSnapshot && (!isConnected || !isJoined),
+    onSnapshot: onRealtimeSnapshot,
+    intervalMs: 2500,
   });
 
   // Use a single, server-synced notion of time for all status/timer UI.
@@ -136,6 +152,14 @@ export function AuctionPendingView({
           <AlertDescription>{connectionError}</AlertDescription>
         </Alert>
       )}
+
+      <div className="mb-6">
+        <ConnectionStatus
+          isConnected={isConnected}
+          isJoined={isJoined}
+          participantCount={participantCount}
+        />
+      </div>
 
       <div className="mb-6">
         <h1 className="text-2xl font-bold mb-2">{auction.title}</h1>

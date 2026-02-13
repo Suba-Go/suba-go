@@ -30,6 +30,8 @@ import {
   useAuctionWebSocketBidding,
   BidData,
 } from '@/hooks/use-auction-websocket-bidding';
+import { useLiveFallbackSnapshot } from '@/hooks/use-live-fallback-snapshot';
+import { ConnectionStatus } from '../user-view/connection-status';
 import { useLiveAccessToken } from '@/hooks/use-live-access-token';
 import {
   AuctionDto,
@@ -348,7 +350,15 @@ export function AuctionManagerActiveView({
     [auction.startTime, auction.endTime]
   );
 
-  const { isConnected, participantCount, serverOffsetMs: wsServerOffsetMs } = useAuctionWebSocketBidding({
+  const {
+    isConnected,
+    isJoined,
+    connectionState,
+    participantCount,
+    connectionError,
+    serverRttMs,
+    serverOffsetMs: wsServerOffsetMs,
+  } = useAuctionWebSocketBidding({
     auctionId: auction.id,
     tenantId: tenantId || '',
     accessToken: liveAccessToken || '',
@@ -388,6 +398,13 @@ export function AuctionManagerActiveView({
       onRealtimeSnapshot?.();
     },
     onJoined: onRealtimeSnapshot,
+  });
+
+  // Fallback HTTP snapshot while WS is reconnecting.
+  useLiveFallbackSnapshot({
+    enabled: !!onRealtimeSnapshot && (!isConnected || !isJoined),
+    onSnapshot: onRealtimeSnapshot,
+    intervalMs: 2500,
   });
 
   useEffect(() => {
@@ -573,6 +590,21 @@ export function AuctionManagerActiveView({
           )}
         </div>
       </div>
+
+      {connectionError && (
+        <Card className="border-red-200 bg-red-50">
+          <CardContent className="pt-6">
+            <div className="text-red-900 font-medium">Error de conexión</div>
+            <div className="text-red-800 text-sm mt-1">{connectionError}</div>
+          </CardContent>
+        </Card>
+      )}
+
+      <ConnectionStatus
+        isConnected={isConnected}
+        isJoined={isJoined}
+        participantCount={participantCount}
+      />
 
       {/* Countdown */}
       {auctionStatus.timeRemainingDetailed && (
@@ -820,6 +852,16 @@ export function AuctionManagerActiveView({
                                 bids={auctionItem.bids as BidWithUserDto[]}
                                 maxItems={5}
                                 showRealNames
+                                titleAction={
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    className="h-8 rounded-full border-green-600 text-green-700 hover:bg-green-50"
+                                    onClick={() => setSelectedItemForDetail(auctionItem)}
+                                  >
+                                    Ver historial
+                                  </Button>
+                                }
                               />
                             </>
                           )}

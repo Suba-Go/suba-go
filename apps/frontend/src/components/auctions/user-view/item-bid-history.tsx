@@ -4,6 +4,7 @@
  */
 'use client';
 
+import type { ReactNode } from 'react';
 import { TrendingUp, User } from 'lucide-react';
 import { ScrollArea } from '@suba-go/shared-components/components/ui/scroll-area';
 
@@ -27,6 +28,8 @@ interface ItemBidHistoryProps {
   maxItems?: number;
   title?: string;
   maxHeight?: string;
+  /** Optional element rendered to the right of the title (e.g. "Ver historial completo"). */
+  titleAction?: ReactNode;
   /**
    * Sorting mode:
    * - 'highest': sort by amount DESC (default, used for "Ganando"/highest-bid UX)
@@ -54,6 +57,7 @@ export function ItemBidHistory({
   maxItems,
   title = 'Historial de Pujas',
   maxHeight = 'max-h-40',
+  titleAction,
   sortMode = 'highest',
   showRealNames = false,
 }: ItemBidHistoryProps) {
@@ -102,14 +106,17 @@ export function ItemBidHistory({
 
   return (
     <div className="border-t pt-4">
-      <h4
-        className={`text-sm font-medium mb-2 flex items-center gap-2 ${
-          sortMode === 'recent' ? 'text-green-700' : 'text-gray-700'
-        }`}
-      >
-        <TrendingUp className="h-4 w-4" />
-        {title}
-      </h4>
+      <div className="mb-2 flex items-center justify-between gap-2">
+        <h4
+          className={`text-sm font-medium flex items-center gap-2 ${
+            sortMode === 'recent' ? 'text-green-700' : 'text-gray-700'
+          }`}
+        >
+          <TrendingUp className="h-4 w-4" />
+          {title}
+        </h4>
+        {titleAction ? <div className="shrink-0">{titleAction}</div> : null}
+      </div>
       <ScrollArea className={`${maxHeight} overflow-y-auto`}>
         <div className="space-y-2">
           {displayBids.map((bid, index) => {
