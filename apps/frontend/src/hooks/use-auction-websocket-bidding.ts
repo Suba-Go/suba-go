@@ -17,6 +17,7 @@ import {
   type WsServerMessage,
 } from '@suba-go/shared-validation';
 import { getSession } from 'next-auth/react';
+import { trackTelemetry } from '../lib/telemetry';
 
 export interface BidData {
   auctionItemId: string;
@@ -82,7 +83,7 @@ interface UseAuctionWebSocketBiddingReturn {
     amount: number
   ) =>
     | { ok: true; requestId: string }
-    | { ok: false; reason: 'NOT_CONNECTED' | 'NOT_JOINED' | 'COOLDOWN'; retryAfterMs?: number };
+    | { ok: false; reason: 'OFFLINE' | 'NOT_CONNECTED' | 'NOT_JOINED' | 'COOLDOWN'; retryAfterMs?: number };
 }
 
 function createRequestId(): string {
@@ -149,6 +150,8 @@ export function useAuctionWebSocketBidding(
       const ready = state === WsConnectionState.AUTHENTICATED;
       setIsConnected(ready);
       if (!ready) setIsJoined(false);
+
+      trackTelemetry('ws_state', { auctionId, state });
     });
 
     const unsubSync = wsClient.onTimeSync((info) => {
@@ -174,6 +177,7 @@ export function useAuctionWebSocketBidding(
           if (message.event === 'JOINED') {
             setIsJoined(true);
             props.onJoined?.();
+            trackTelemetry('ws_join', { auctionId });
           }
 
           setParticipantCount(Number(data?.participantCount || 0));
@@ -199,6 +203,7 @@ export function useAuctionWebSocketBidding(
           const data: any = message.data as any;
           if (data?.auctionId !== auctionId) return;
           props.onBidPlaced?.(data as BidData);
+          trackTelemetry('bid_placed', { auctionId, auctionItemId: data?.auctionItemId, requestId: data?.requestId });
           return;
         }
 
@@ -210,6 +215,7 @@ export function useAuctionWebSocketBidding(
             reason: data?.reason || 'Bid rejected',
             requestId: data?.requestId,
           });
+          trackTelemetry('bid_rejected', { auctionId, auctionItemId: data?.auctionItemId, requestId: data?.requestId, reason: data?.reason });
           return;
         }
 
@@ -242,12 +248,18 @@ export function useAuctionWebSocketBidding(
 
   const sendBid = useCallback(
     (auctionItemId: string, amount: number) => {
+      if (typeof navigator !== 'undefined' && navigator.onLine === false) {
+        trackTelemetry('bid_send_failed', { auctionId, auctionItemId, reason: 'OFFLINE' });
+        return { ok: false as const, reason: 'OFFLINE' as const };
+      }
       if (!wsClient.isReady()) {
         setConnectionError('WebSocket not ready');
+        trackTelemetry('bid_send_failed', { auctionId, auctionItemId, reason: 'NOT_CONNECTED' });
         return { ok: false as const, reason: 'NOT_CONNECTED' as const };
       }
       if (!isJoined) {
         setConnectionError('WebSocket room not joined');
+        trackTelemetry('bid_send_failed', { auctionId, auctionItemId, reason: 'NOT_JOINED' });
         return { ok: false as const, reason: 'NOT_JOINED' as const };
       }
 
@@ -256,6 +268,7 @@ export function useAuctionWebSocketBidding(
       const last = lastBidSentAtRef.current.get(auctionItemId) || 0;
       const delta = now - last;
       if (delta < bidCooldownMs) {
+        trackTelemetry('bid_send_failed', { auctionId, auctionItemId, reason: 'COOLDOWN' });
         return {
           ok: false as const,
           reason: 'COOLDOWN' as const,
@@ -276,6 +289,8 @@ export function useAuctionWebSocketBidding(
           requestId,
         },
       });
+
+      trackTelemetry('bid_send', { auctionId, auctionItemId, requestId, amount });
 
       return { ok: true as const, requestId };
     },

@@ -2,6 +2,7 @@
 
 import { useEffect, useRef } from 'react';
 import { signOut, useSession } from 'next-auth/react';
+import { ensureSessionFresh } from '@/lib/ensure-session-fresh';
 
 // How early (ms) we try to refresh the access token before it expires.
 const REFRESH_SKEW_MS = 2 * 60 * 1000; // 2 minutes
@@ -22,13 +23,9 @@ export function SessionKeeper() {
   const lastRefreshRef = useRef<number>(0);
 
   const safeRefresh = async () => {
-    // Avoid calling update too often (can happen with multiple triggers)
-    const now = Date.now();
-    if (now - lastRefreshRef.current < 5_000) return;
-    lastRefreshRef.current = now;
-
     try {
-      await update();
+      // Avoid parallel refresh storms across the app.
+      await ensureSessionFresh(() => update(), 5_000);
     } catch {
       // ignore here; we handle unrecoverable cases below via session.error
     }
