@@ -604,6 +604,7 @@ export function AuctionManagerActiveView({
         isConnected={isConnected}
         isJoined={isJoined}
         participantCount={participantCount}
+        rttMs={serverRttMs}
       />
 
       {/* Countdown */}

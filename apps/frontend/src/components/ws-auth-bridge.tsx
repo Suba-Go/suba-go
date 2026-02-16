@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef } from 'react';
 import { useSession } from 'next-auth/react';
 import { wsClient } from '@/lib/ws-client';
 import { WsConnectionState } from '@suba-go/shared-validation';
+import { ensureSessionFresh } from '@/lib/ensure-session-fresh';
 
 // How early (ms) we try to refresh the access token before it expires
 // specifically for WebSocket reconnects.
@@ -38,7 +39,7 @@ export function WsAuthBridge() {
 
   const safeUpdate = async () => {
     if (refreshInFlightRef.current) return refreshInFlightRef.current;
-    refreshInFlightRef.current = update().finally(() => {
+    refreshInFlightRef.current = ensureSessionFresh(() => update(), 5_000).finally(() => {
       refreshInFlightRef.current = null;
     });
     return refreshInFlightRef.current;

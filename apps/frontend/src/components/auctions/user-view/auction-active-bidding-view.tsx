@@ -22,6 +22,7 @@ import { useAuctionWebSocketBidding } from '@/hooks/use-auction-websocket-biddin
 import { useLiveFallbackSnapshot } from '@/hooks/use-live-fallback-snapshot';
 import { useAutoBidSettings } from '@/hooks/use-auto-bid-settings';
 import { useLiveAccessToken } from '@/hooks/use-live-access-token';
+import { useNetworkStatus } from '@/hooks/use-network-status';
 import {
   AuctionDto,
   AuctionItemWithItmeAndBidsDto,
@@ -66,6 +67,7 @@ export function AuctionActiveBiddingView({
   userId,
   onRealtimeSnapshot,
 }: AuctionActiveBiddingViewProps) {
+  const { isOnline } = useNetworkStatus();
   // The access token received from the Server Component can become stale if the
   // user stays on this page for a long time (live auctions). Always prefer the
   // most recent token from NextAuth session.
@@ -728,6 +730,8 @@ useEffect(() => {
       const message =
         sendRes.reason === 'COOLDOWN'
           ? 'Espera 0.6s antes de intentar nuevamente.'
+          : sendRes.reason === 'OFFLINE'
+            ? 'Sin conexión a Internet. Reintentaremos al reconectar.'
           : sendRes.reason === 'NOT_JOINED'
             ? 'Aún no te conectas a la subasta en tiempo real. Reintenta.'
             : 'Conexión en tiempo real no disponible. Reintenta en unos segundos.';
@@ -746,6 +750,12 @@ useEffect(() => {
       if (sendRes.reason === 'COOLDOWN') {
         toast({
           title: 'Espera un momento',
+          description: message,
+          duration: 3000,
+        });
+      } else if (sendRes.reason === 'OFFLINE') {
+        toast({
+          title: 'Sin conexión',
           description: message,
           duration: 3000,
         });
@@ -882,6 +892,7 @@ useEffect(() => {
         isConnected={isConnected}
         isJoined={isJoined}
         participantCount={participantCount}
+        rttMs={serverRttMs}
       />
 
       {connectionError && (
@@ -931,6 +942,7 @@ useEffect(() => {
                 bidState={bidState}
                 autoBidSetting={autoBidSettings[auctionItem.id]}
                 isJoined={isJoined}
+                canBid={isOnline && isConnected && isJoined}
                 bidHistory={itemHistory}
                 userId={userId}
                 onBidAmountChange={(value) =>
@@ -983,6 +995,7 @@ useEffect(() => {
           isUserView={true}
           userId={userId}
           bidHistory={bidHistory[selectedItemForDetail.id] || []}
+          canBid={isOnline && isConnected && isJoined}
         />
       )}
     </div>

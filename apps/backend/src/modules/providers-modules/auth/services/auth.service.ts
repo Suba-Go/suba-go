@@ -150,16 +150,22 @@ export class AuthService {
       throw new UnauthorizedException('Tenant bloqueado');
     }
 
-    // Rotate: revoke current, create replacement
-    const { refreshToken: newRefreshToken, refreshTokenId: newId } =
-      await this.issueAndStoreRefreshToken(userId, ctx);
-
+    /**
+     * IMPORTANT (stability): Do NOT rotate refresh tokens on every refresh.
+     *
+     * Token rotation is a good security practice, but in Next.js environments
+     * (server components, parallel requests, multiple tabs) it's very common
+     * to have concurrent refresh calls. With rotation enabled, the first call
+     * revokes the token and the others immediately fail with
+     * "Refresh token already revoked", which looks like random logouts.
+     *
+     * Instead, we keep the same refresh token valid until it expires or the
+     * user logs out, and only mint a new access token here.
+     */
+    // Touch the record to keep an audit trail (optional).
     await (this.prisma as any).refreshToken.update({
       where: { id: tokenId },
-      data: {
-        revokedAt: new Date(),
-        replacedByTokenId: newId,
-      },
+      data: { updatedAt: new Date() },
     });
 
     const newAccessToken = this.generateJwtToken({
@@ -172,7 +178,8 @@ export class AuthService {
 
     return {
       accessToken: newAccessToken,
-      refreshToken: newRefreshToken,
+      // Keep the same refresh token to avoid concurrent-rotation logout issues.
+      refreshToken,
       expiresIn: this.generateAccessExpiryTime(),
     };
   }

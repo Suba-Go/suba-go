@@ -5,7 +5,6 @@
 'use client';
 
 import { Badge } from '@suba-go/shared-components/components/ui/badge';
-import { Loader2, Users, Wifi, WifiOff } from 'lucide-react';
 import { WsConnectionState } from '@suba-go/shared-validation';
 
 interface AuctionHeaderProps {
@@ -13,7 +12,7 @@ interface AuctionHeaderProps {
   description?: string;
   status: 'ACTIVA' | 'PENDIENTE' | 'COMPLETADA' | 'CANCELADA';
 
-  // Optional realtime indicators.
+  /** Optional realtime info (WebSocket). */
   wsState?: WsConnectionState;
   wsRttMs?: number;
   participantCount?: number;
@@ -48,6 +47,22 @@ export function AuctionHeader({
 
   const config = statusConfig[status] || statusConfig.ACTIVA;
 
+  const wsLabel = (() => {
+    if (!wsState) return null;
+    switch (wsState) {
+      case WsConnectionState.AUTHENTICATED:
+        return { label: 'En vivo', className: 'bg-green-600 text-white border-green-600' };
+      case WsConnectionState.CONNECTING:
+      case WsConnectionState.CONNECTED:
+        return { label: 'Conectando…', className: 'bg-yellow-100 text-yellow-800 border-yellow-300' };
+      case WsConnectionState.DISCONNECTED:
+        return { label: 'Desconectado', className: 'bg-gray-100 text-gray-700 border-gray-300' };
+      case WsConnectionState.ERROR:
+      default:
+        return { label: 'Error WS', className: 'bg-red-100 text-red-800 border-red-300' };
+    }
+  })();
+
   return (
     // Always keep the status badge on the right (especially important on mobile)
     <div className="flex flex-row items-start justify-between gap-3">
@@ -64,35 +79,20 @@ export function AuctionHeader({
       <div className="shrink-0 pt-1 sm:pt-0 flex flex-col items-end gap-2">
         <Badge className={`${config.className} text-xs sm:text-sm`}>{config.label}</Badge>
 
-        {wsState ? (
+        {(wsLabel || typeof participantCount === 'number' || typeof wsRttMs === 'number') ? (
           <div className="flex flex-col items-end gap-1">
-            <div className="flex items-center gap-1 text-xs text-gray-600">
-              {wsState === WsConnectionState.AUTHENTICATED ? (
-                <>
-                  <Wifi className="h-3.5 w-3.5" />
-                  <span>En línea</span>
-                </>
-              ) : wsState === WsConnectionState.CONNECTING ? (
-                <>
-                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                  <span>Conectando</span>
-                </>
-              ) : (
-                <>
-                  <WifiOff className="h-3.5 w-3.5" />
-                  <span>Sin conexión</span>
-                </>
-              )}
-              {typeof wsRttMs === 'number' && wsState === WsConnectionState.AUTHENTICATED ? (
-                <span className="ml-1">{Math.max(0, Math.round(wsRttMs))}ms</span>
-              ) : null}
-            </div>
-
+            {wsLabel ? (
+              <Badge className={`${wsLabel.className} text-[10px] sm:text-xs`}>{wsLabel.label}</Badge>
+            ) : null}
             {typeof participantCount === 'number' ? (
-              <div className="flex items-center gap-1 text-xs text-gray-600">
-                <Users className="h-3.5 w-3.5" />
-                <span>{participantCount}</span>
-              </div>
+              <Badge className="bg-gray-50 text-gray-700 border-gray-200 text-[10px] sm:text-xs">
+                {participantCount} participantes
+              </Badge>
+            ) : null}
+            {typeof wsRttMs === 'number' ? (
+              <Badge className="bg-gray-50 text-gray-700 border-gray-200 text-[10px] sm:text-xs">
+                RTT {Math.round(wsRttMs)}ms
+              </Badge>
             ) : null}
           </div>
         ) : null}
