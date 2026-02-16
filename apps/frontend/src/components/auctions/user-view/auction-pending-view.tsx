@@ -158,6 +158,7 @@ export function AuctionPendingView({
           isConnected={isConnected}
           isJoined={isJoined}
           participantCount={participantCount}
+        rttMs={serverRttMs}
         />
       </div>
 

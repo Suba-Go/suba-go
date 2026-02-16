@@ -64,6 +64,9 @@ interface AuctionItemDetailModalProps {
   bidHistory?: SimpleBidHistory[] | BidDto[];
   showBidHistory?: boolean;
 
+  /** When false (offline / reconnecting), bidding UI is disabled and shows a friendly message. */
+  canBid?: boolean;
+
   /**
    * Client requirement:
    * - AUCTION_MANAGER/ADMIN must see real bidder names
@@ -93,6 +96,7 @@ export function AuctionItemDetailModal({
   bidHistory = [],
   showBidHistory = true,
   showBidderRealNames = false,
+  canBid = true,
   onPrevItem,
   onNextItem,
   hasPrevItem,
@@ -663,7 +667,7 @@ export function AuctionItemDetailModal({
                 />
                 <Button
                   onClick={handlePlaceBid}
-                  disabled={bidAmount < currentHighestBid + bidIncrement}
+                  disabled={!canBid || bidAmount < currentHighestBid + bidIncrement}
                   className="whitespace-nowrap text-white"
                   style={
                     primaryColor
@@ -690,6 +694,11 @@ export function AuctionItemDetailModal({
                   Pujar {formatPrice(bidAmount)}
                 </Button>
               </div>
+              {!canBid && (
+                <p className="text-xs text-amber-700">
+                  Sin conexión o reconectando… no es posible pujar en este momento.
+                </p>
+              )}
               <p className="text-xs text-gray-500">
                 Incremento mínimo: {formatPrice(bidIncrement)}
               </p>

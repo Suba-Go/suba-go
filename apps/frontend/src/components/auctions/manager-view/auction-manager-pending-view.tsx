@@ -215,6 +215,7 @@ export function AuctionManagerPendingView({
         isConnected={isConnected}
         isJoined={isJoined}
         participantCount={participantCount}
+        rttMs={serverRttMs}
       />
       {/* Header */}
       <div className="flex flex-col gap-4 md:flex-row md:items-start md:gap-6">

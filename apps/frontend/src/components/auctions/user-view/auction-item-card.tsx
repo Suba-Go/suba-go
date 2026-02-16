@@ -42,6 +42,8 @@ interface AuctionItemCardProps {
   };
   autoBidSetting?: AutoBidSetting;
   isJoined: boolean;
+  /** When false (offline / reconnecting), bidding should be disabled and the UI should explain why. */
+  canBid?: boolean;
   bidHistory?: Array<{
     id: string;
     amount: number;
@@ -82,6 +84,7 @@ export function AuctionItemCard({
   bidState,
   autoBidSetting,
   isJoined,
+  canBid = true,
   bidHistory = [],
   userId,
   onBidAmountChange,
@@ -97,7 +100,7 @@ export function AuctionItemCard({
 
   const photoUrl = getPrimaryPhotoUrl((auctionItem.item as any)?.photos ?? null);
 
-  const disableBidding = !isJoined || !isItemActive;
+  const disableBidding = !canBid || !isJoined || !isItemActive;
 
   return (
     <Card className="overflow-hidden">
@@ -202,6 +205,12 @@ export function AuctionItemCard({
           onChange={onBidAmountChange}
           onSubmit={onPlaceBid}
         />
+
+        {!canBid && (
+          <p className="text-xs text-amber-700">
+            Sin conexión o reconectando… no es posible pujar en este momento.
+          </p>
+        )}
 
         {!isItemActive && (
           <p className="text-xs text-gray-600">
