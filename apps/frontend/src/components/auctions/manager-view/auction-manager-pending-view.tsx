@@ -102,6 +102,7 @@ export function AuctionManagerPendingView({
     isJoined,
     participantCount,
     serverOffsetMs: wsServerOffsetMs,
+    serverRttMs,
   } = useAuctionWebSocketBidding({
     auctionId: auction.id,
     tenantId,

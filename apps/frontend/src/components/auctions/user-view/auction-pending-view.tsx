@@ -52,6 +52,7 @@ export function AuctionPendingView({
     isJoined,
     participantCount,
     connectionState,
+    serverRttMs,
   } = useAuctionWebSocketBidding({
     auctionId: auction.id,
     tenantId,
@@ -158,7 +159,7 @@ export function AuctionPendingView({
           isConnected={isConnected}
           isJoined={isJoined}
           participantCount={participantCount}
-        rttMs={serverRttMs}
+          rttMs={serverRttMs}
         />
       </div>
 
