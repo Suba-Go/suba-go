@@ -116,3 +116,135 @@ html, body {
 .company-ring {
   --tw-ring-color: rgba(var(--company-primary-rgb), 0.45);
 }
+
+/* ====== Landing Page Styles ====== */
+
+/* Scanlines overlay */
+.landing-scanlines::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: 9000;
+  background: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 3px,
+    rgba(0, 0, 0, 0.07) 3px,
+    rgba(0, 0, 0, 0.07) 4px
+  );
+  pointer-events: none;
+}
+
+/* Hero grid background */
+.hero-grid-bg {
+  background-image: linear-gradient(
+      rgba(236, 194, 24, 0.04) 1px,
+      transparent 1px
+    ),
+    linear-gradient(90deg, rgba(236, 194, 24, 0.04) 1px, transparent 1px);
+  background-size: 64px 64px;
+  mask-image: radial-gradient(
+    ellipse 80% 70% at 30% 40%,
+    black 0%,
+    transparent 80%
+  );
+  -webkit-mask-image: radial-gradient(
+    ellipse 80% 70% at 30% 40%,
+    black 0%,
+    transparent 80%
+  );
+}
+
+/* Hero title L3 stroke effect */
+.text-stroke-yellow {
+  color: transparent;
+  -webkit-text-stroke: 2px #ECC218;
+  filter: drop-shadow(0 0 20px rgba(236, 194, 24, 0.3));
+}
+
+/* Feature card top bar animation */
+.feat-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: #ECC218;
+  transform: scaleX(0);
+  transform-origin: left;
+  transition: transform 0.4s ease;
+}
+.feat-card:hover::before {
+  transform: scaleX(1);
+}
+
+/* CTA section striped background */
+.cta-stripes::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: repeating-linear-gradient(
+    -45deg,
+    transparent,
+    transparent 18px,
+    rgba(0, 0, 0, 0.025) 18px,
+    rgba(0, 0, 0, 0.025) 36px
+  );
+}
+
+/* CTA watermark text */
+.cta-watermark::after {
+  content: 'SUBA&GO';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-size: clamp(120px, 20vw, 260px);
+  font-weight: 900;
+  color: rgba(0, 0, 0, 0.045);
+  white-space: nowrap;
+  letter-spacing: 12px;
+  pointer-events: none;
+}
+
+/* Button shadow effect */
+.btn-shadow::after {
+  content: '';
+  position: absolute;
+  right: -5px;
+  bottom: -5px;
+  width: 100%;
+  height: 100%;
+  border: 1px solid rgba(236, 194, 24, 0.4);
+  transition: all 0.2s;
+}
+.btn-shadow:hover::after {
+  opacity: 0;
+}
+
+/* ====== Flying background objects ====== */
+@keyframes fly-across {
+  0% {
+    left: -60px;
+    opacity: 0;
+  }
+  5% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 1;
+  }
+  95% {
+    opacity: 1;
+  }
+  100% {
+    left: calc(100vw + 60px);
+    opacity: 0;
+  }
+}
+
+.flying-object {
+  animation: fly-across linear infinite;
+  will-change: left;
+}

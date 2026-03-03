@@ -150,6 +150,16 @@ export default function ConditionalLayout({
     );
   }
 
+  // Landing page has its own navbar (LandingNavigator), skip the old one
+  if (pathname === '/') {
+    return (
+      <>
+        <ProgressBar color="#FCD34D" height="5px" />
+        {children}
+      </>
+    );
+  }
+
   return (
     <>
       <ProgressBar color="#FCD34D" height="5px" />
