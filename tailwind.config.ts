@@ -56,9 +56,14 @@ module.exports = {
           foreground: '#16191b', // dark
         },
         // Colores personalizados de Suba&Go
-        dark: '#16191b', // Negro
+        dark: {
+          DEFAULT: '#16191b', // Negro
+          secondary: '#1a1a24', // Panel oscuro
+          panel: '#10101C', // Panel terminal
+        },
         'soft-white': '#f8fafc', // Soft white
         yellow: '#ECC218', // Amarillo
+        muted: '#555555', // Texto muted
       },
       borderRadius: {
         lg: '1rem',
@@ -74,10 +79,52 @@ module.exports = {
           from: { height: 'var(--radix-accordion-content-height)' },
           to: { height: '0' },
         },
+        'grid-scroll': {
+          '0%': { backgroundPosition: '0 0' },
+          '100%': { backgroundPosition: '64px 64px' },
+        },
+        'glow-pulse': {
+          '0%, 100%': { opacity: '1', transform: 'scale(1)' },
+          '50%': { opacity: '0.6', transform: 'scale(1.08)' },
+        },
+        blink: {
+          '0%, 100%': { opacity: '1' },
+          '50%': { opacity: '0.15' },
+        },
+        'cursor-blink': {
+          '0%, 100%': { opacity: '1' },
+          '50%': { opacity: '0' },
+        },
+        glitch: {
+          '0%, 94%, 100%': { transform: 'none', opacity: '1' },
+          '95%': { transform: 'translateX(-2px) skewX(-1deg)', opacity: '0.85' },
+          '96%': { transform: 'translateX(2px) skewX(1deg)', opacity: '0.9' },
+          '97%': { transform: 'none', opacity: '1' },
+        },
+        ticker: {
+          '0%': { transform: 'translateX(0)' },
+          '100%': { transform: 'translateX(-50%)' },
+        },
+        'fade-up': {
+          from: { opacity: '0', transform: 'translateY(16px)' },
+          to: { opacity: '1', transform: 'translateY(0)' },
+        },
+        'fade-in': {
+          from: { opacity: '0' },
+          to: { opacity: '1' },
+        },
       },
       animation: {
         'accordion-down': 'accordion-down 0.2s ease-out',
         'accordion-up': 'accordion-up 0.2s ease-out',
+        'grid-scroll': 'grid-scroll 30s linear infinite',
+        'glow-pulse': 'glow-pulse 5s ease-in-out infinite',
+        blink: 'blink 1.4s ease-in-out infinite',
+        'cursor-blink': 'cursor-blink 1s step-end infinite',
+        glitch: 'glitch 7s infinite',
+        ticker: 'ticker 28s linear infinite',
+        'fade-up': 'fade-up 0.3s ease both',
+        'fade-in': 'fade-in 0.4s ease both',
       },
       zIndex: {
         'over-everything': '9999',

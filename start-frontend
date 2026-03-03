@@ -1,0 +1,49 @@
+#!/bin/bash
+
+# Quick launcher para Suba&Go Frontend - Versión optimizada
+# Este script inicia el frontend de forma rápida y eficiente
+
+PROJECT_DIR="/Users/juanito/Desktop/Suba&Go/suba-go"
+
+# Cargar nvm
+export NVM_DIR="$HOME/.nvm"
+[ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+
+cd "$PROJECT_DIR" 2>/dev/null || {
+    echo "❌ No se pudo acceder al directorio del proyecto"
+    echo "   Verifica que existe: $PROJECT_DIR"
+    exit 1
+}
+
+# Usar versión de Node correcta
+nvm use > /dev/null 2>&1 || {
+    echo "❌ No se pudo cargar nvm"
+    echo "   Instala nvm o configura manualmente Node 20.19.2"
+    exit 1
+}
+
+# Detener procesos previos de frontend que puedan interferir
+pkill -f "next dev" 2>/dev/null
+pkill -f "nx run frontend" 2>/dev/null
+sleep 1
+
+clear
+echo "╔════════════════════════════════════════════════════════════╗"
+echo "║           🚀 SUBA&GO FRONTEND LAUNCHER 🚀                  ║"
+echo "╚════════════════════════════════════════════════════════════╝"
+echo ""
+echo "📦 Versiones:"
+echo "   Node:  $(node --version)"
+echo "   pnpm:  $(pnpm --version)"
+echo ""
+echo "🔗 URL: http://localhost:3000"
+echo ""
+echo "📁 Proyecto: $PROJECT_DIR"
+echo ""
+echo "⏳ Iniciando servidor Next.js..."
+echo "════════════════════════════════════════════════════════════"
+echo ""
+
+# Iniciar Next.js directamente (más rápido que Nx)
+cd "$PROJECT_DIR/apps/frontend"
+npx next dev --port 3000
