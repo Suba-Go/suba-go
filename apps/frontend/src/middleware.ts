@@ -59,6 +59,7 @@ export default async function middleware(request: NextRequest) {
     '/login',
     '/invite',
     '/company-invite',
+    '/register',
   ];
 
   if (subdomain) {

@@ -148,18 +148,19 @@ export default function GlobalLoginForm() {
           {isLoading ? 'Buscando empresa...' : 'Continuar'}
         </Button>
       </form>
+      {/* SE COMENTA POR EL MOMENTO
       <div className="mt-6 text-center p-3">
         <p className="text-sm text-gray-600">
           ¿No tienes una cuenta?{' '}
           <Link
-            href="/#formulario"
+            href="/register"
             className="text-primary hover:underline font-medium"
           >
             Crear empresa
           </Link>
         </p>
       </div>
-
+       */}
       <div className="border-t border-gray-200 pt-3">
         <div>
           <Link
