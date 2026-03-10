@@ -9,6 +9,7 @@ import ServiciosSection from './servicios-section';
 import ProcesoSection from './proceso-section';
 import NosotrosSection from './nosotros-section';
 import CtaSection from './cta-section';
+import Link from 'next/link';
 
 interface Section {
   id: string;
@@ -38,34 +39,42 @@ export default function LandingNavigator() {
           SUBA&amp;GO
         </span>
 
-        {/* Section links */}
-        <div className="flex items-center gap-1">
-          {sections.map((s) => (
-            <button
-              key={s.id}
-              onClick={() => navigateTo(s.id)}
-              className={`
-                font-mono text-[11px] tracking-[2px] uppercase px-4 py-2
-                transition-all duration-200 cursor-pointer font-semibold
-                ${
-                  activeId === s.id
-                    ? 'text-yellow border-b-2 border-yellow'
-                    : 'text-[#AAAABB] hover:text-white border-b-2 border-transparent'
-                }
-              `}
-            >
-              {s.label}
-            </button>
-          ))}
+        {/* Right side: section links + login button */}
+        <div className="flex items-center gap-4">
+          {/* Section links (incluye Demo como antes) */}
+          <div className="flex items-center gap-1">
+            {sections.map((s) => (
+              <button
+                key={s.id}
+                onClick={() => navigateTo(s.id)}
+                className={`
+                  font-mono text-[11px] tracking-[2px] uppercase px-4 py-2
+                  transition-all duration-200 cursor-pointer font-semibold
+                  ${
+                    activeId === s.id
+                      ? 'text-yellow border-b-2 border-yellow'
+                      : 'text-[#AAAABB] hover:text-white border-b-2 border-transparent'
+                  }
+                `}
+              >
+                {s.label}
+              </button>
+            ))}
+          </div>
+
+          {/* Botón "Iniciar sesión" (mismo estilo del botón amarillo) */}
+          <Link
+            href="/login"
+            className="btn-shadow relative font-mono bg-yellow text-dark py-2 px-5 text-[11px] font-bold tracking-[2px] uppercase transition-all hover:bg-[#FFD740] hover:translate-x-[-2px] hover:translate-y-[-2px] cursor-pointer"
+          >
+            Iniciar sesión
+          </Link>
         </div>
       </nav>
 
       {/* ── Active section ── */}
       <div className="flex-1 overflow-hidden">
-        <div
-          key={activeId}
-          className="h-full overflow-y-auto animate-fade-in"
-        >
+        <div key={activeId} className="h-full overflow-y-auto animate-fade-in">
           {activeSection?.component}
         </div>
       </div>

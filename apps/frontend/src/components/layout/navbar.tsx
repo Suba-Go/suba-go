@@ -16,7 +16,8 @@ export default function Navbar() {
     setIsMobileMenuOpen(false);
   }, [pathname]);
 
-  const shouldShowNavbar = !pathname.includes('/login');
+  const shouldShowNavbar =
+  !pathname.includes('/login') && !pathname.includes('/register');
 
   if (!shouldShowNavbar) {
     return null;
@@ -68,6 +69,13 @@ export default function Navbar() {
         >
           Demo
         </button>
+
+        <Link
+          href="/login"
+          className="btn-shadow relative font-mono bg-yellow text-dark py-2 px-5 text-[11px] font-bold tracking-[2px] uppercase transition-all hover:bg-[#FFD740] hover:translate-x-[-2px] hover:translate-y-[-2px] cursor-pointer"
+        >
+          Iniciar sesión
+        </Link>
       </nav>
 
       {/* Mobile Menu Button */}
