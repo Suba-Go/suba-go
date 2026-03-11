@@ -8,6 +8,8 @@ import { getSubdomainFromHost, getNodeEnv } from '@suba-go/shared-components';
 import { CompanyProvider } from '@/contexts/company-context';
 import ProgressBar from '@suba-go/shared-components/components/suba-go/atoms/progress-bar';
 import { useCompanyContextOptional } from '@/contexts/company-context';
+import Navbar from '@/components/layout/navbar';
+import { LandingNavProvider } from '@/contexts/landing-nav-context';
 
 interface Company {
   id: string;
@@ -102,7 +104,6 @@ export default function ConditionalLayout({
         setCompany(data);
       } catch (err) {
         setCompanyError(err instanceof Error ? err.message : 'Error desconocido');
-        // eslint-disable-next-line no-console
         console.error('Error loading company:', err);
       } finally {
         setIsLoadingCompany(false);
@@ -113,15 +114,9 @@ export default function ConditionalLayout({
   }, [isSubdomain, session?.user?.company?.id]);
 
   // Global client-side trap to keep user in onboarding if profile is incomplete
-  // Only applies when inside a subdomain (not on root domain)
   useEffect(() => {
     if (status === 'loading' || isLoading) return;
-
-    // Only enforce onboarding guard when inside a subdomain
     if (!isSubdomain) return;
-
-    // Only redirect to onboarding if user is logged in but profile is incomplete
-    // If user is not logged in, let middleware handle redirect to /login
     if (!session) return;
 
     const user = session.user;
@@ -145,10 +140,8 @@ export default function ConditionalLayout({
     );
   }
 
-  // Get primary color for progress bar
   const primaryColor = company?.principal_color || '#FCD34D';
 
-  // Tenants sin navbar/footer; root domain con navbar
   if (isSubdomain) {
     return (
       <CompanyProvider
@@ -164,17 +157,19 @@ export default function ConditionalLayout({
     );
   }
 
-  // Landing page has its own navbar (LandingNavigator), skip the old one
+  // ✅ Landing: provider arriba para que Navbar y Landing compartan el mismo contexto
   if (pathname === '/') {
     return (
       <>
         <ProgressBar color="#FCD34D" height="5px" />
-        {children}
+        <LandingNavProvider>
+          <Navbar />
+          {children}
+        </LandingNavProvider>
       </>
     );
   }
 
-  // Auth pages without navbar (login/register)
   if (hideNavbar) {
     return (
       <>
@@ -192,7 +187,6 @@ export default function ConditionalLayout({
   );
 }
 
-// Wrapper component to access company context inside CompanyProvider
 function ProgressBarWrapper({
   color: colorProp,
   height,
