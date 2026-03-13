@@ -409,7 +409,7 @@ export function ItemCreateModal({
               </Label>
               <FileUpload
                 acceptedTypes={['image/*']}
-                maxFiles={10}
+                maxFiles={20}
                 maxSizeInMB={5}
                 onFilesChange={setPhotoUrls}
                 onUploadStatusChange={setIsUploadingPhotos}
