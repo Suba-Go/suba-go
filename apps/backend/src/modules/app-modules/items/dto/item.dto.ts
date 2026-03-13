@@ -68,7 +68,10 @@ export class CreateItemDto {
   @Transform(({ value }) => Number(value))
   basePrice: number;
 
-  @ApiPropertyOptional({ description: 'URLs de fotos separadas por comas' })
+  @ApiPropertyOptional({
+    description:
+      'URLs de fotos (máx. 20). Se aceptan separadas por comas o como string de JSON array.',
+  })
   @IsOptional()
   @IsString()
   photos?: string;
@@ -143,7 +146,10 @@ export class UpdateItemDto {
   @Transform(({ value }) => Number(value))
   basePrice?: number;
 
-  @ApiPropertyOptional({ description: 'URLs de fotos separadas por comas' })
+  @ApiPropertyOptional({
+    description:
+      'URLs de fotos (máx. 20). Se aceptan separadas por comas o como string de JSON array.',
+  })
   @IsOptional()
   @IsString()
   photos?: string;
