@@ -24,6 +24,9 @@ type ItemWithRelations = Item & {
 export class ItemsService {
   constructor(private readonly itemRepository: ItemPrismaRepository) {}
 
+  /** Max amount of photo URLs allowed per item (enforced server-side). */
+  private readonly MAX_ITEM_PHOTOS = 20;
+
   private normalizePhotoUrl(url: string): string {
     let u = String(url).trim();
     if (!u) return u;
@@ -79,6 +82,45 @@ export class ItemsService {
     return JSON.stringify(parts);
   }
 
+  /**
+   * Parses the incoming "photos" field into an array of urls.
+   * Accepts either JSON array string ("[\"url\", ...]") or CSV ("url1,url2").
+   * Does NOT normalize URLs; it's meant for validation only.
+   */
+  private parsePhotosToArray(photos?: string | null): string[] {
+    if (!photos) return [];
+    const raw = String(photos).trim();
+    if (!raw) return [];
+
+    if (raw.startsWith('[')) {
+      try {
+        const arr = JSON.parse(raw);
+        if (Array.isArray(arr)) {
+          return arr
+            .filter((x) => typeof x === 'string')
+            .map((x) => String(x).trim())
+            .filter(Boolean);
+        }
+      } catch {
+        // fallthrough to CSV parsing
+      }
+    }
+
+    return raw
+      .split(',')
+      .map((p) => p.trim())
+      .filter(Boolean);
+  }
+
+  private assertMaxPhotos(photos?: string | null): void {
+    const count = this.parsePhotosToArray(photos).length;
+    if (count > this.MAX_ITEM_PHOTOS) {
+      throw new BadRequestException(
+        `Máximo ${this.MAX_ITEM_PHOTOS} fotos permitidas por producto (recibidas: ${count}).`
+      );
+    }
+  }
+
   async createItem(
     createItemDto: CreateItemDto,
     tenantId: string
@@ -98,6 +140,9 @@ export class ItemsService {
       createItemDto as CreateItemDto & {
         tenantId?: string;
       };
+
+    // Server-side validation: max amount of photos
+    this.assertMaxPhotos(itemData.photos);
 
     // Convert string enums to Prisma enums
     let state: ItemStateEnum = ItemStateEnum.DISPONIBLE;
@@ -252,7 +297,11 @@ export class ItemsService {
     const normalizedUpdate: UpdateItemDto = {
       ...updateItemDto,
       ...(updateItemDto.photos !== undefined
-        ? { photos: this.normalizePhotosField(updateItemDto.photos) }
+        ? (() => {
+            // Server-side validation: max amount of photos
+            this.assertMaxPhotos(updateItemDto.photos);
+            return { photos: this.normalizePhotosField(updateItemDto.photos) };
+          })()
         : {}),
     };
 
