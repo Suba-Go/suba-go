@@ -131,6 +131,16 @@ export default async function middleware(request: NextRequest) {
 
     // Tus callbacks meten user/tokens en el JWT
     const t: any = token;
+    const userRole = t?.user?.role;
+
+    // Bloquear zonas globales desde tenant
+    if (
+      pathname.startsWith('/admin') ||
+      pathname.startsWith('/auth') ||
+      pathname.startsWith('/register')
+    ) {
+      return NextResponse.redirect(new URL('/', request.url));
+    }
 
     const userCompanyNameRaw = t?.user?.company?.name ?? '';
     const userCompanyName = normalizeCompanyName(userCompanyNameRaw);
@@ -143,17 +153,7 @@ export default async function middleware(request: NextRequest) {
       return NextResponse.redirect(new URL('/onboarding', request.url));
     }
 
-    const userRole = t?.user?.role;
     if (!isAllowedTenantPathForRole(userRole as any, pathname)) {
-      return NextResponse.redirect(new URL('/', request.url));
-    }
-
-    // Bloquear zonas globales desde tenant
-    if (
-      pathname.startsWith('/admin') ||
-      pathname.startsWith('/auth') ||
-      pathname.startsWith('/register')
-    ) {
       return NextResponse.redirect(new URL('/', request.url));
     }
   }
