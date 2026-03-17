@@ -201,19 +201,38 @@ export default function CompanyLoginForm({
           user.rut.trim().length > 0;
 
         // Role-based landing:
-        // - AUCTION_MANAGER / ADMIN -> Estadisticas
+        // - ADMIN -> /admin/login (dedicated root-domain admin login, avoids subdomain cookie issues)
+        // - AUCTION_MANAGER -> Estadisticas
         // - USER -> Home
         const role = user?.role;
-        const landingPath =
-          role === 'AUCTION_MANAGER' || role === 'ADMIN'
-            ? '/estadisticas'
-            : '/';
 
         // Keep loading state true during redirect to show clear feedback
         if (onLoginSuccess) {
           onLoginSuccess();
           // Don't set isLoading to false - let it stay loading during redirect
         } else {
+          if (role === 'ADMIN') {
+            // ADMIN must log in at root domain so the session cookie lands on
+            // localhost (not subago.localhost), allowing /admin to work correctly.
+            const nodeEnv = getNodeEnv();
+            let adminLoginUrl: string;
+            if (nodeEnv === 'local') {
+              adminLoginUrl = 'http://localhost:3000/admin/login';
+            } else if (nodeEnv === 'development') {
+              adminLoginUrl = 'https://development.subago.cl/admin/login';
+            } else {
+              const rootDomain = process.env.NEXT_PUBLIC_ROOT_DOMAIN || 'subago.cl';
+              adminLoginUrl = `https://${rootDomain}/admin/login`;
+            }
+            window.location.href = adminLoginUrl + `?email=${encodeURIComponent(formData.email.trim().toLowerCase())}`;
+            return;
+          }
+
+          const landingPath =
+            role === 'AUCTION_MANAGER'
+              ? '/estadisticas'
+              : '/';
+
           // Redirect based on profile completion status
           // Keep isLoading true to show loading state during redirect
           if (isProfileComplete) {

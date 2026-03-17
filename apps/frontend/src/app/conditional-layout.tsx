@@ -68,6 +68,13 @@ export default function ConditionalLayout({
       return;
     }
 
+    // Admin dashboard and login have their own layout — treat as root domain
+    if (pathname.startsWith('/admin')) {
+      setIsSubdomain(false);
+      setIsLoading(false);
+      return;
+    }
+
     const host = window.location.host; // includes port if present
     let domain = ROOT_DOMAIN;
 
@@ -177,6 +184,11 @@ export default function ConditionalLayout({
         {children}
       </>
     );
+  }
+
+  // Admin dashboard has its own layout (sidebar), no root navbar
+  if (pathname.startsWith('/admin')) {
+    return <>{children}</>;
   }
 
   return (
