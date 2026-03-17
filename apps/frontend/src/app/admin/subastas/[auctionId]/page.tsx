@@ -5,6 +5,12 @@ import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { ArrowLeft, Car, Clock, User as UserIcon, DollarSign, Trophy } from 'lucide-react';
 
+type DashboardUser = {
+  id: string;
+  name?: string | null;
+  email?: string | null;
+};
+
 function formatCLP(n: number) {
   return new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP', maximumFractionDigits: 0 }).format(n);
 }
@@ -54,7 +60,9 @@ export default function AdminSubastaDetallePage() {
 
   const { auction, company, bids, users } = data;
   const auctionItems = auction.items || [];
-  const userMap = new Map(users.map((u: any) => [u.id, u]));
+  const userMap = new Map<string, DashboardUser>(
+    users.map((u: any) => [u.id as string, u as DashboardUser])
+  );
 
   // Find winner for each item
   const itemResults = auctionItems.map((ai: any) => {

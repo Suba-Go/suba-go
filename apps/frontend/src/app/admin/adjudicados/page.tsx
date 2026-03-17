@@ -3,6 +3,12 @@
 import { useEffect, useState, useMemo } from 'react';
 import { Car, DollarSign, Download, CheckCircle, Clock, Search, X } from 'lucide-react';
 
+type DashboardUser = {
+  id: string;
+  name?: string | null;
+  email?: string | null;
+};
+
 function formatCLP(n: number) {
   return new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP', maximumFractionDigits: 0 }).format(n);
 }
@@ -46,7 +52,9 @@ export default function AdminAdjudicadosPage() {
     const companies = data.companies || [];
     const companyMap = new Map(companies.map((c: any) => [c.tenantId, c.name]));
     const users = data.users || [];
-    const userMap = new Map(users.map((u: any) => [u.id, u]));
+    const userMap = new Map<string, DashboardUser>(
+      users.map((u: any) => [u.id as string, u as DashboardUser])
+    );
 
     return soldItems.map((item: any) => {
       const companyName = companyMap.get(item._tenantId) || 'Sin empresa';

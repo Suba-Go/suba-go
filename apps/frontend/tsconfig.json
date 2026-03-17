@@ -36,8 +36,6 @@
     "**/*.tsx",
     "**/*.js",
     "**/*.jsx",
-    "../../apps/frontend/.next/types/**/*.ts",
-    "../../dist/apps/frontend/.next/types/**/*.ts",
     "next-env.d.ts",
     ".next/types/**/*.ts",
     "../../libs/shared-components/src/**/*.ts",
@@ -45,5 +43,11 @@
     "src/types/env.d.ts",
     "../../libs/shared-components/src/types/env.d.ts"
   ],
-  "exclude": ["node_modules", "**/*.spec.ts", "**/*.test.ts", ".next/**/*"]
+  "exclude": [
+    "node_modules",
+    "**/*.spec.ts",
+    "**/*.test.ts",
+    ".next/**/*",
+    "../../dist/**/*"
+  ]
 }
