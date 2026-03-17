@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import { useSession } from 'next-auth/react';
 import NavbarLayout from './navbar-layout';
@@ -8,6 +8,8 @@ import { getSubdomainFromHost, getNodeEnv } from '@suba-go/shared-components';
 import { CompanyProvider } from '@/contexts/company-context';
 import ProgressBar from '@suba-go/shared-components/components/suba-go/atoms/progress-bar';
 import { useCompanyContextOptional } from '@/contexts/company-context';
+import Navbar from '@/components/layout/navbar';
+import { LandingNavProvider } from '@/contexts/landing-nav-context';
 
 interface Company {
   id: string;
@@ -37,9 +39,12 @@ export default function ConditionalLayout({
 }) {
   const [isSubdomain, setIsSubdomain] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [hideNavbar, setHideNavbar] = useState(false);
+
   const [company, setCompany] = useState<Company | null>(null);
   const [isLoadingCompany, setIsLoadingCompany] = useState(false);
   const [companyError, setCompanyError] = useState<string | null>(null);
+
   const pathname = usePathname();
   const router = useRouter();
   const { data: session, status } = useSession();
@@ -47,8 +52,17 @@ export default function ConditionalLayout({
   useEffect(() => {
     if (typeof window === 'undefined') return;
 
-    // Hide navbar on any login page (global or tenant-specific)
-    if (pathname === '/login' || pathname.endsWith('/login')) {
+    // Hide navbar on auth pages (global or tenant-specific)
+    const isAuthPage =
+      pathname === '/login' ||
+      pathname.endsWith('/login') ||
+      pathname === '/register' ||
+      pathname.endsWith('/register');
+
+    setHideNavbar(isAuthPage);
+
+    // If it's an auth page, treat as root-domain and stop here
+    if (isAuthPage) {
       setIsSubdomain(false);
       setIsLoading(false);
       return;
@@ -63,9 +77,12 @@ export default function ConditionalLayout({
 
     const host = window.location.host; // includes port if present
     let domain = ROOT_DOMAIN;
+
+    // Ensure correct root domain when in development env under that host
     if (host.includes('development.subago.cl')) {
       domain = 'development.subago.cl';
     }
+
     const subdomain = getSubdomainFromHost(host, domain);
     setIsSubdomain(subdomain !== null);
     setIsLoading(false);
@@ -84,9 +101,7 @@ export default function ConditionalLayout({
         setIsLoadingCompany(true);
         setCompanyError(null);
 
-        const response = await fetch(
-          `/api/companies/${session.user.company.id}`
-        );
+        const response = await fetch(`/api/companies/${session.user.company.id}`);
 
         if (!response.ok) {
           throw new Error('Error al cargar la empresa');
@@ -95,9 +110,7 @@ export default function ConditionalLayout({
         const data = await response.json();
         setCompany(data);
       } catch (err) {
-        setCompanyError(
-          err instanceof Error ? err.message : 'Error desconocido'
-        );
+        setCompanyError(err instanceof Error ? err.message : 'Error desconocido');
         console.error('Error loading company:', err);
       } finally {
         setIsLoadingCompany(false);
@@ -108,14 +121,9 @@ export default function ConditionalLayout({
   }, [isSubdomain, session?.user?.company?.id]);
 
   // Global client-side trap to keep user in onboarding if profile is incomplete
-  // Only applies when inside a subdomain (not on root domain)
   useEffect(() => {
     if (status === 'loading' || isLoading) return;
-    // Only enforce onboarding guard when inside a subdomain
     if (!isSubdomain) return;
-
-    // Only redirect to onboarding if user is logged in but profile is incomplete
-    // If user is not logged in, let middleware handle redirect to /login
     if (!session) return;
 
     const user = session.user;
@@ -125,6 +133,7 @@ export default function ConditionalLayout({
       user.name.trim().length < 3 ||
       !user.phone ||
       !user.rut;
+
     if (isIncomplete && pathname !== '/onboarding' && pathname !== '/login') {
       router.replace('/onboarding');
     }
@@ -138,10 +147,8 @@ export default function ConditionalLayout({
     );
   }
 
-  // Get primary color for progress bar
   const primaryColor = company?.principal_color || '#FCD34D';
 
-  // Tenants sin navbar/footer; root domain con navbar
   if (isSubdomain) {
     return (
       <CompanyProvider
@@ -157,8 +164,20 @@ export default function ConditionalLayout({
     );
   }
 
-  // Landing page has its own navbar (LandingNavigator), skip the old one
+  // ✅ Landing: provider arriba para que Navbar y Landing compartan el mismo contexto
   if (pathname === '/') {
+    return (
+      <>
+        <ProgressBar color="#FCD34D" height="5px" />
+        <LandingNavProvider>
+          <Navbar />
+          {children}
+        </LandingNavProvider>
+      </>
+    );
+  }
+
+  if (hideNavbar) {
     return (
       <>
         <ProgressBar color="#FCD34D" height="5px" />
@@ -180,7 +199,6 @@ export default function ConditionalLayout({
   );
 }
 
-// Wrapper component to access company context inside CompanyProvider
 function ProgressBarWrapper({
   color: colorProp,
   height,

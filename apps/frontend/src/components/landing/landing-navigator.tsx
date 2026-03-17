@@ -25,49 +25,19 @@ const sections: Section[] = [
 ];
 
 export default function LandingNavigator() {
-  const { activeId, navigateTo } = useLandingNav();
-
+  const { activeId } = useLandingNav();
   const activeSection = sections.find((s) => s.id === activeId);
 
   return (
-    <div className="h-screen flex flex-col overflow-hidden">
-      {/* ── Navbar ── */}
-      <nav className="shrink-0 z-50 flex items-center justify-between px-6 md:px-10 py-3 border-b border-yellow/10 bg-dark/95 backdrop-blur-md">
-        {/* Logo / Brand */}
-        <span className="font-black text-lg tracking-[2px] text-yellow select-none">
-          SUBA&amp;GO
-        </span>
-
-        {/* Section links */}
-        <div className="flex items-center gap-1">
-          {sections.map((s) => (
-            <button
-              key={s.id}
-              onClick={() => navigateTo(s.id)}
-              className={`
-                font-mono text-[11px] tracking-[2px] uppercase px-4 py-2
-                transition-all duration-200 cursor-pointer font-semibold
-                ${
-                  activeId === s.id
-                    ? 'text-yellow border-b-2 border-yellow'
-                    : 'text-[#AAAABB] hover:text-white border-b-2 border-transparent'
-                }
-              `}
-            >
-              {s.label}
-            </button>
-          ))}
-        </div>
-      </nav>
-
-      {/* ── Active section ── */}
-      <div className="flex-1 overflow-hidden">
-        <div
+    // Navbar is fixed (h-16), dejamos espacio arriba
+    <div className="h-[calc(100vh-4rem)] mt-16 overflow-hidden">
+      <div
           key={activeId}
-          className="h-full overflow-y-auto animate-fade-in"
+          className={`h-full animate-fade-in ${
+            activeId === 'inicio' ? 'overflow-hidden' : 'overflow-y-auto'
+          }`}
         >
           {activeSection?.component}
-        </div>
       </div>
     </div>
   );

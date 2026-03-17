@@ -660,9 +660,9 @@ export function ItemEditModal({
           <div>
             <FileUpload
               label="Agregar Nuevas Fotos"
-              description="Sube fotos adicionales del producto (máximo 10 archivos)"
+              description="Sube fotos adicionales del producto (máximo 20 archivos)"
               acceptedTypes={['image/*']}
-              maxFiles={10}
+              maxFiles={20}
               maxSizeInMB={5}
               onFilesChange={setNewPhotoUrls}
             />

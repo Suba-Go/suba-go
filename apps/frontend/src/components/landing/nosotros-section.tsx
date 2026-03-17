@@ -48,7 +48,7 @@ export default function NosotrosSection() {
               {/* Photo */}
               <div className="relative inline-block mb-5 z-[9001]">
                 <Image
-                  src="/uploads/nicodev/juan-aspillaga.jpg"
+                  src="/uploads/nicodev/juan-aspillaga-new.jpg"
                   alt="Juan Aspillaga"
                   width={140}
                   height={140}
