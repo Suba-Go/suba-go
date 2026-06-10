@@ -9,8 +9,18 @@ export class PrismaService implements OnModuleInit, OnModuleDestroy {
 
   constructor() {
     // Use PRISMA_DATABASE_URL for Accelerate, fallback to DATABASE_URL for standard connection
-    const databaseUrl =
+    const rawDatabaseUrl =
       process.env.PRISMA_DATABASE_URL || process.env.DATABASE_URL;
+
+    // Append connection pool parameters to standard PostgreSQL URLs.
+    // Prisma Accelerate URLs (prisma://...) manage pooling externally, so we
+    // skip this for those. Parameters:
+    //   connection_limit=20  – handle concurrent HTTP + WebSocket load
+    //   pool_timeout=10      – fail fast instead of hanging when pool is full
+    //   statement_cache_size=0 – disable prepared-statement cache to reduce
+    //                            memory pressure and avoid "cached plan must
+    //                            not change result type" errors after migrations
+    const databaseUrl = this.appendPoolParams(rawDatabaseUrl);
 
     this.prisma = new PrismaClient({
       datasourceUrl: databaseUrl,
@@ -25,6 +35,19 @@ export class PrismaService implements OnModuleInit, OnModuleDestroy {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       this.prismaWithAccelerate = this.prisma as any;
     }
+  }
+
+  private appendPoolParams(url: string | undefined): string | undefined {
+    if (!url || url.startsWith('prisma')) {
+      // No URL provided, or it's a Prisma Accelerate URL — leave untouched.
+      return url;
+    }
+
+    const separator = url.includes('?') ? '&' : '?';
+    return (
+      url +
+      `${separator}connection_limit=20&pool_timeout=10&statement_cache_size=0`
+    );
   }
 
   private createAcceleratedClient() {
