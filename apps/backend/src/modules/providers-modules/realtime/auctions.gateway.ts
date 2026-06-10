@@ -345,27 +345,24 @@ export class AuctionsGateway
         return;
       }
 
-      // Auto-register user if not already registered
-      const registration = await this.prisma.auctionRegistration.findUnique({
+      // Auto-register user if not already registered (upsert is idempotent —
+      // concurrent or repeated JOIN_AUCTION messages won't cause P2002 errors)
+      this.logger.log(
+        `Auto-registering user ${meta.email} for auction ${auctionId}`
+      );
+      await this.prisma.auctionRegistration.upsert({
         where: {
           userId_auctionId: {
             userId: meta.userId,
             auctionId,
           },
         },
+        update: {},
+        create: {
+          userId: meta.userId,
+          auctionId,
+        },
       });
-
-      if (!registration) {
-        this.logger.log(
-          `Auto-registering user ${meta.email} for auction ${auctionId}`
-        );
-        await this.prisma.auctionRegistration.create({
-          data: {
-            userId: meta.userId,
-            auctionId,
-          },
-        });
-      }
     } else if (isAuctionManager && meta.tenantId !== tenantId) {
       // Auction managers can only access their own tenant's auctions
       this.sendError(client, WsErrorCode.FORBIDDEN, 'No tienes acceso a esta subasta');
