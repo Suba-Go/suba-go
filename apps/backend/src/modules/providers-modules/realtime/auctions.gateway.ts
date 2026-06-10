@@ -345,27 +345,21 @@ export class AuctionsGateway
         return;
       }
 
-      // Auto-register user if not already registered
-      const registration = await this.prisma.auctionRegistration.findUnique({
-        where: {
-          userId_auctionId: {
-            userId: meta.userId,
-            auctionId,
-          },
+      // Auto-register user if not already registered.
+      // createOrIgnore() is used instead of findUnique + create to avoid a
+      // TOCTOU race that caused P2002 unique constraint violations when a user
+      // joined the same auction concurrently (e.g. duplicate WS messages,
+      // reconnects, or multiple tabs). createOrIgnore() is a single atomic
+      // operation that silently no-ops when the record already exists.
+      this.logger.log(
+        `Auto-registering user ${meta.email} for auction ${auctionId}`
+      );
+      await this.prisma.auctionRegistration.createOrIgnore({
+        data: {
+          userId: meta.userId,
+          auctionId,
         },
       });
-
-      if (!registration) {
-        this.logger.log(
-          `Auto-registering user ${meta.email} for auction ${auctionId}`
-        );
-        await this.prisma.auctionRegistration.create({
-          data: {
-            userId: meta.userId,
-            auctionId,
-          },
-        });
-      }
     } else if (isAuctionManager && meta.tenantId !== tenantId) {
       // Auction managers can only access their own tenant's auctions
       this.sendError(client, WsErrorCode.FORBIDDEN, 'No tienes acceso a esta subasta');
