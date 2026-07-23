@@ -40,10 +40,8 @@ export function AddParticipantModal({
   );
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-
-    if (selectedParticipants.length === 0) {
+  const registerParticipants = async (userIds: string[]) => {
+    if (userIds.length === 0) {
       toast({
         title: 'Error',
         description: 'Debes seleccionar al menos un participante',
@@ -56,7 +54,7 @@ export function AddParticipantModal({
     setIsSubmitting(true);
     try {
       // Register each participant
-      const promises = selectedParticipants.map((userId) =>
+      const promises = userIds.map((userId) =>
         apiFetch(`/api/auctions/${auction.id}/register`, {
           method: 'POST',
           headers: {
@@ -79,7 +77,7 @@ export function AddParticipantModal({
 
       toast({
         title: 'Éxito',
-        description: `${selectedParticipants.length} participante(s) registrado(s) exitosamente`,
+        description: `${userIds.length} participante(s) registrado(s) exitosamente`,
         duration: 2000,
       });
 
@@ -101,6 +99,11 @@ export function AddParticipantModal({
     } finally {
       setIsSubmitting(false);
     }
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    await registerParticipants(selectedParticipants);
   };
 
   const handleClose = () => {
@@ -127,6 +130,7 @@ export function AddParticipantModal({
             onParticipantsChange={setSelectedParticipants}
             existingParticipantIds={existingParticipantIds}
             primaryColor={primaryColor}
+            isSubmitting={isSubmitting}
           />
 
           <DialogFooter>
