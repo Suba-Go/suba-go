@@ -1,7 +1,14 @@
 'use client';
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { Users, Check, Search, ChevronLeft, ChevronRight } from 'lucide-react';
+import {
+  Users,
+  UserCheck,
+  Check,
+  Search,
+  ChevronLeft,
+  ChevronRight,
+} from 'lucide-react';
 import { Button } from '@suba-go/shared-components/components/ui/button';
 import { Input } from '@suba-go/shared-components/components/ui/input';
 import { Spinner } from '@suba-go/shared-components/components/ui/spinner';
@@ -23,6 +30,7 @@ interface ParticipantSelectorProps {
   onParticipantsChange: (participants: string[]) => void;
   existingParticipantIds?: string[];
   primaryColor?: string;
+  isSubmitting?: boolean;
 }
 
 const USERS_PER_PAGE = 5;
@@ -32,6 +40,7 @@ export function ParticipantSelector({
   onParticipantsChange,
   existingParticipantIds = [],
   primaryColor,
+  isSubmitting = false,
 }: ParticipantSelectorProps) {
   const { toast } = useToast();
   const [users, setUsers] = useState<User[]>([]);
@@ -130,15 +139,45 @@ export function ParticipantSelector({
   }
 
   const showPagination = filteredUsers.length > USERS_PER_PAGE;
+  const allSelected =
+    filteredUsers.length > 0 &&
+    filteredUsers.every((u) => selectedParticipants.includes(u.id));
+  const remainingCount = filteredUsers.filter(
+    (u) => !selectedParticipants.includes(u.id)
+  ).length;
 
   return (
     <div className="border rounded-lg p-4 bg-gray-50 space-y-3">
       {/* Header with count */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
         <p className="text-sm text-gray-600">
           Participantes seleccionados: {selectedParticipants.length} de{' '}
           {filteredUsers.length} disponibles
         </p>
+        {filteredUsers.length > 0 && (
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="gap-2 shrink-0"
+            disabled={isSubmitting}
+            style={
+              primaryColor
+                ? { borderColor: primaryColor, color: primaryColor }
+                : undefined
+            }
+            onClick={() =>
+              onParticipantsChange(
+                allSelected ? [] : filteredUsers.map((u) => u.id)
+              )
+            }
+          >
+            <UserCheck className="h-4 w-4" />
+            {allSelected
+              ? 'Deseleccionar todos'
+              : `Seleccionar a todos los participantes (${remainingCount})`}
+          </Button>
+        )}
       </div>
 
       {/* Search Input */}
