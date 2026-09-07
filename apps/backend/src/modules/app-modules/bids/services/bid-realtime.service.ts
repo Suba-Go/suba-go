@@ -14,20 +14,49 @@ import { randomUUID } from 'crypto';
 import { BidPrismaService } from './bid-prisma.service';
 import { AuctionsGateway } from '../../../providers-modules/realtime/auctions.gateway';
 import { PrismaService } from '../../../providers-modules/prisma/prisma.service';
-import type { Bid, AuctionItem, Auction, Item, User } from '@prisma/client';
+import type {
+  Bid,
+  AuctionItem,
+  Auction,
+  Item,
+  User,
+  Vehicle,
+} from '@prisma/client';
 import {
   BidPlacedData,
   computeBidConstraints,
   validateBidAmount,
 } from '@suba-go/shared-validation';
 
+type ItemWithVehicles = Item & { vehicles?: Vehicle[] };
+
 type BidWithRelations = Bid & {
   user: User;
   auctionItem: AuctionItem & {
     auction: Auction;
-    item: Item;
+    item: ItemWithVehicles;
   };
 };
+
+/**
+ * Builds the compact item summary used in realtime bid payloads. Keeps the
+ * legacy single-vehicle fields (derived from the primary vehicle) for
+ * backward-compatible display, and adds the full `vehicles` array for lots.
+ */
+function buildItemSummary(item: ItemWithVehicles): BidPlacedData['item'] {
+  const primary = item.vehicles?.[0];
+  return {
+    id: item.id,
+    plate: primary?.plate || undefined,
+    brand: primary?.brand || undefined,
+    model: primary?.model || undefined,
+    vehicles: (item.vehicles ?? []).map((v) => ({
+      plate: v.plate,
+      brand: v.brand,
+      model: v.model ?? undefined,
+    })),
+  };
+}
 
 type PlaceBidResult = {
   bid: BidWithRelations;
@@ -95,7 +124,9 @@ export class BidRealtimeService {
         where: { requestId },
         include: {
           user: true,
-          auctionItem: { include: { auction: true, item: true } },
+          auctionItem: {
+            include: { auction: true, item: { include: { vehicles: true } } },
+          },
         },
       });
       if (existing) {
@@ -120,12 +151,7 @@ export class BidRealtimeService {
             existing.user.email,
           timestamp: existing.bid_time.getTime(),
           requestId,
-          item: {
-            id: existing.auctionItem.item.id,
-            plate: existing.auctionItem.item.plate || undefined,
-            brand: existing.auctionItem.item.brand || undefined,
-            model: existing.auctionItem.item.model || undefined,
-          },
+          item: buildItemSummary(existing.auctionItem.item),
         };
 
         return {
@@ -150,9 +176,6 @@ export class BidRealtimeService {
           auctionEnd: Date;
           bidIncrement: number;
           itemId: string;
-          plate: string | null;
-          brand: string | null;
-          model: string | null;
         }>
       >`
         SELECT
@@ -166,10 +189,7 @@ export class BidRealtimeService {
           a."startTime"    AS "auctionStart",
           a."endTime"      AS "auctionEnd",
           a."bidIncrement" AS "bidIncrement",
-          i.id             AS "itemId",
-          i."plate"        AS "plate",
-          i."brand"        AS "brand",
-          i."model"        AS "model"
+          i.id             AS "itemId"
         FROM "public"."auction_item" ai
         JOIN "public"."auction" a ON a.id = ai."auctionId"
         JOIN "public"."item" i ON i.id = ai."itemId"
@@ -300,7 +320,7 @@ export class BidRealtimeService {
         include: {
           user: true,
           auctionItem: {
-            include: { auction: true, item: true },
+            include: { auction: true, item: { include: { vehicles: true } } },
           },
         },
       });
@@ -319,12 +339,7 @@ export class BidRealtimeService {
         userName: bid.user.public_name || bid.user.name || bid.user.email,
         timestamp: bid.bid_time.getTime(),
         requestId,
-        item: {
-          id: bid.auctionItem.item.id,
-          plate: bid.auctionItem.item.plate || undefined,
-          brand: bid.auctionItem.item.brand || undefined,
-          model: bid.auctionItem.item.model || undefined,
-        },
+        item: buildItemSummary(bid.auctionItem.item),
       };
 
       return {
@@ -344,7 +359,9 @@ export class BidRealtimeService {
       this.logger.log(
         `Bid placed [req=${requestId}]: ${amount} by ${
           txResult.bid.user.email
-        } on item ${txResult.bid.auctionItem.item.plate || auctionItemId}`
+        } on item ${
+          txResult.bid.auctionItem.item.vehicles?.[0]?.plate || auctionItemId
+        }`
       );
 
       // Client requirement:

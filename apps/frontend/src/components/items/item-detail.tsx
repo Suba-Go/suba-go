@@ -25,6 +25,7 @@ import {
   getAuctionStatusLabel,
 } from '@/lib/auction-badge-colors';
 import { parsePhotos } from '@/lib/auction-utils';
+import { getVehicles } from '@/lib/vehicle-utils';
 import { Button } from '@suba-go/shared-components/components/ui/button';
 import { Badge } from '@suba-go/shared-components/components/ui/badge';
 import {
@@ -411,92 +412,131 @@ export function ItemDetail({ itemId, userRole }: ItemDetailProps) {
           )}
         </div>
 
-        {/* Product Details */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {item.plate && (
-            <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
-              <Tag className="h-5 w-5 text-gray-600" />
-              <div>
-                <p className="text-sm text-gray-600">Patente</p>
-                <p className="font-semibold">{formatPlate(item.plate)}</p>
-              </div>
-            </div>
-          )}
+        {/* Vehicles */}
+        {(() => {
+          const vehicles = getVehicles(item);
+          const isLot = vehicles.length > 1;
+          return (
+            <div className="space-y-4">
+              {isLot && (
+                <div className="flex items-center gap-2 text-gray-700">
+                  <Car className="h-5 w-5" />
+                  <h2 className="text-lg font-semibold">
+                    Lote · {vehicles.length} vehículos
+                  </h2>
+                </div>
+              )}
+              {vehicles.map((vehicle: any, vIndex: number) => (
+                <div
+                  key={vehicle.id ?? vIndex}
+                  className={
+                    isLot ? 'rounded-lg border p-4' : 'space-y-0'
+                  }
+                >
+                  {isLot && (
+                    <p className="mb-3 text-sm font-semibold text-gray-900">
+                      Vehículo {vIndex + 1}
+                    </p>
+                  )}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {vehicle.plate && (
+                      <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
+                        <Tag className="h-5 w-5 text-gray-600" />
+                        <div>
+                          <p className="text-sm text-gray-600">Patente</p>
+                          <p className="font-semibold">
+                            {formatPlate(vehicle.plate)}
+                          </p>
+                        </div>
+                      </div>
+                    )}
 
-          {item.brand && (
-            <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
-              <Car className="h-5 w-5 text-gray-600" />
-              <div>
-                <p className="text-sm text-gray-600">Marca</p>
-                <p className="font-semibold">{item.brand}</p>
-              </div>
-            </div>
-          )}
+                    {vehicle.brand && (
+                      <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
+                        <Car className="h-5 w-5 text-gray-600" />
+                        <div>
+                          <p className="text-sm text-gray-600">Marca</p>
+                          <p className="font-semibold">{vehicle.brand}</p>
+                        </div>
+                      </div>
+                    )}
 
-          {item.model && (
-            <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
-              <Car className="h-5 w-5 text-gray-600" />
-              <div>
-                <p className="text-sm text-gray-600">Modelo</p>
-                <p className="font-semibold">{item.model}</p>
-              </div>
-            </div>
-          )}
+                    {vehicle.model && (
+                      <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
+                        <Car className="h-5 w-5 text-gray-600" />
+                        <div>
+                          <p className="text-sm text-gray-600">Modelo</p>
+                          <p className="font-semibold">{vehicle.model}</p>
+                        </div>
+                      </div>
+                    )}
 
-          {item.year && (
-            <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
-              <Calendar className="h-5 w-5 text-gray-600" />
-              <div>
-                <p className="text-sm text-gray-600">Año</p>
-                <p className="font-semibold">{item.year}</p>
-              </div>
-            </div>
-          )}
+                    {vehicle.year && (
+                      <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
+                        <Calendar className="h-5 w-5 text-gray-600" />
+                        <div>
+                          <p className="text-sm text-gray-600">Año</p>
+                          <p className="font-semibold">{vehicle.year}</p>
+                        </div>
+                      </div>
+                    )}
 
-          {item.version && (
-            <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
-              <Package className="h-5 w-5 text-gray-600" />
-              <div>
-                <p className="text-sm text-gray-600">Versión</p>
-                <p className="font-semibold">{item.version}</p>
-              </div>
-            </div>
-          )}
+                    {vehicle.version && (
+                      <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
+                        <Package className="h-5 w-5 text-gray-600" />
+                        <div>
+                          <p className="text-sm text-gray-600">Versión</p>
+                          <p className="font-semibold">{vehicle.version}</p>
+                        </div>
+                      </div>
+                    )}
 
-          {item.kilometraje && (
-            <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
-              <Gauge className="h-5 w-5 text-gray-600" />
-              <div>
-                <p className="text-sm text-gray-600">Kilometraje</p>
-                <p className="font-semibold">
-                  {item.kilometraje.toLocaleString()} km
-                </p>
-              </div>
-            </div>
-          )}
+                    {vehicle.kilometraje && (
+                      <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
+                        <Gauge className="h-5 w-5 text-gray-600" />
+                        <div>
+                          <p className="text-sm text-gray-600">Kilometraje</p>
+                          <p className="font-semibold">
+                            {vehicle.kilometraje.toLocaleString()} km
+                          </p>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ))}
 
-          {item.legal_status && (
-            <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
-              <Shield className="h-5 w-5 text-gray-600" />
-              <div>
-                <p className="text-sm text-gray-600">Estado Legal</p>
-                <p className="font-semibold">
-                  {getLegalStatusLabel(item.legal_status)}
-                </p>
-              </div>
-            </div>
-          )}
+              {/* Lot-level fields */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {item.legal_status && (
+                  <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
+                    <Shield className="h-5 w-5 text-gray-600" />
+                    <div>
+                      <p className="text-sm text-gray-600">Estado Legal</p>
+                      <p className="font-semibold">
+                        {getLegalStatusLabel(item.legal_status)}
+                      </p>
+                    </div>
+                  </div>
+                )}
 
-          {isAuctionManager && item.basePrice && (
-            <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
-              <DollarSign className="h-5 w-5 text-gray-600" />
-              <div>
-                <p className="text-sm text-gray-600">Precio Inicial</p>
-                <p className="font-semibold">{formatPrice(item.basePrice)}</p>
+                {isAuctionManager && item.basePrice && (
+                  <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
+                    <DollarSign className="h-5 w-5 text-gray-600" />
+                    <div>
+                      <p className="text-sm text-gray-600">
+                        Precio Inicial{isLot ? ' (Lote)' : ''}
+                      </p>
+                      <p className="font-semibold">
+                        {formatPrice(item.basePrice)}
+                      </p>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
-          )}
-        </div>
+          );
+        })()}
 
         {/* Documents */}
         <div className="space-y-3">

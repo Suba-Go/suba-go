@@ -6,10 +6,11 @@ import {
 } from '@nestjs/common';
 import { ItemPrismaRepository } from './item-prisma-repository.service';
 import { CreateItemDto, UpdateItemDto, ItemStatsDto } from '../dto/item.dto';
-import type { Item, AuctionItem, Auction, Prisma } from '@prisma/client';
+import type { Item, AuctionItem, Auction, Vehicle, Prisma } from '@prisma/client';
 import { ItemStateEnum, LegalStatusEnum } from '@prisma/client';
 
 type ItemWithRelations = Item & {
+  vehicles?: Vehicle[];
   auctionItems?: (AuctionItem & {
     auction?: Auction;
   })[];
@@ -121,25 +122,76 @@ export class ItemsService {
     }
   }
 
+  /**
+   * Normalizes and validates the vehicles of a lot:
+   * - trims/uppercases plates
+   * - ensures each vehicle has a plate and a brand
+   * - rejects duplicate plates within the same lot
+   * - rejects plates already used by another lot in the tenant
+   *
+   * @param excludeItemId when updating, the lot whose own vehicles should be
+   *                      ignored during the tenant-uniqueness check.
+   */
+  private async validateVehicles(
+    vehicles: CreateItemDto['vehicles'],
+    tenantId: string,
+    excludeItemId?: string
+  ): Promise<CreateItemDto['vehicles']> {
+    if (!vehicles || vehicles.length === 0) {
+      throw new BadRequestException('El lote debe tener al menos un vehículo');
+    }
+
+    const normalized = vehicles.map((v) => ({
+      ...v,
+      plate: String(v.plate ?? '').trim().toUpperCase(),
+    }));
+
+    for (const v of normalized) {
+      if (!v.plate) {
+        throw new BadRequestException('Cada vehículo debe tener una patente');
+      }
+      if (!v.brand || !String(v.brand).trim()) {
+        throw new BadRequestException(
+          `La marca es requerida (patente ${v.plate})`
+        );
+      }
+    }
+
+    // Duplicates within the payload
+    const seen = new Set<string>();
+    for (const v of normalized) {
+      if (seen.has(v.plate)) {
+        throw new BadRequestException(
+          `La patente ${v.plate} está repetida en el lote`
+        );
+      }
+      seen.add(v.plate);
+    }
+
+    // Uniqueness across the tenant (another lot cannot own the same plate)
+    for (const v of normalized) {
+      const owner = await this.itemRepository.findByPlate(v.plate, tenantId);
+      if (owner && owner.id !== excludeItemId) {
+        throw new BadRequestException(
+          `Ya existe un vehículo con la patente ${v.plate} en el tenant`
+        );
+      }
+    }
+
+    return normalized;
+  }
+
   async createItem(
     createItemDto: CreateItemDto,
     tenantId: string
   ): Promise<Item> {
-    // Validate that plate is unique within tenant
-    const existingItem = await this.itemRepository.findByPlate(
-      createItemDto.plate
-    );
-    if (existingItem && existingItem.tenantId === tenantId) {
-      throw new BadRequestException(
-        'Ya existe un item con esta placa en el tenant'
-      );
-    }
-
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const { tenantId: dtoTenantId, ...itemData } =
+    const { tenantId: dtoTenantId, vehicles, ...itemData } =
       createItemDto as CreateItemDto & {
         tenantId?: string;
       };
+
+    const normalizedVehicles = await this.validateVehicles(vehicles, tenantId);
 
     // Server-side validation: max amount of photos
     this.assertMaxPhotos(itemData.photos);
@@ -176,25 +228,14 @@ export class ItemsService {
       legalStatus = LegalStatusEnum.OTRO;
     }
 
-    // Ensure required fields are present (TypeScript should catch this, but we validate at runtime too)
-    if (!itemData.plate) {
-      throw new BadRequestException('La patente es requerida');
-    }
-    if (!itemData.brand) {
-      throw new BadRequestException('La marca es requerida');
-    }
     if (!itemData.basePrice || itemData.basePrice <= 0) {
-      throw new BadRequestException('El precio base es requerido y debe ser positivo');
+      throw new BadRequestException(
+        'El precio base es requerido y debe ser positivo'
+      );
     }
 
-    // Build the create input with all required fields explicitly typed
+    // Build the create input, creating all vehicles atomically with the lot.
     const createInput: Prisma.ItemCreateInput = {
-      plate: itemData.plate,
-      brand: itemData.brand,
-      model: itemData.model,
-      year: itemData.year,
-      version: itemData.version,
-      kilometraje: itemData.kilometraje,
       basePrice: itemData.basePrice,
       // Normalize photos to avoid broken Vercel Blob URLs (case sensitivity, missing scheme, CSV vs JSON)
       photos: this.normalizePhotosField(itemData.photos),
@@ -203,6 +244,17 @@ export class ItemsService {
       legal_status: legalStatus,
       tenant: {
         connect: { id: tenantId },
+      },
+      vehicles: {
+        create: normalizedVehicles.map((v) => ({
+          plate: v.plate,
+          brand: v.brand,
+          model: v.model,
+          year: v.year,
+          version: v.version,
+          kilometraje: v.kilometraje,
+          tenantId,
+        })),
       },
     };
 
@@ -276,36 +328,42 @@ export class ItemsService {
     updateItemDto: UpdateItemDto,
     tenantId: string
   ): Promise<Item> {
-    const existingItem = await this.getItemById(id, tenantId);
+    // Validates access / existence (throws if not found or wrong tenant)
+    await this.getItemById(id, tenantId);
 
-    // Validate plate uniqueness if it's being updated
-    if (updateItemDto.plate && updateItemDto.plate !== existingItem.plate) {
-      const itemWithPlate = await this.itemRepository.findByPlate(
-        updateItemDto.plate
-      );
-      if (
-        itemWithPlate &&
-        itemWithPlate.tenantId === tenantId &&
-        itemWithPlate.id !== id
-      ) {
-        throw new BadRequestException(
-          'Ya existe un item con esta placa en el tenant'
-        );
-      }
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { vehicles, photos, ...rest } = updateItemDto;
+
+    const data: Prisma.ItemUpdateInput = { ...rest };
+
+    if (photos !== undefined) {
+      // Server-side validation: max amount of photos
+      this.assertMaxPhotos(photos);
+      data.photos = this.normalizePhotosField(photos);
     }
 
-    const normalizedUpdate: UpdateItemDto = {
-      ...updateItemDto,
-      ...(updateItemDto.photos !== undefined
-        ? (() => {
-            // Server-side validation: max amount of photos
-            this.assertMaxPhotos(updateItemDto.photos);
-            return { photos: this.normalizePhotosField(updateItemDto.photos) };
-          })()
-        : {}),
-    };
+    // When vehicles are provided, fully replace the lot's vehicles.
+    if (vehicles !== undefined) {
+      const normalizedVehicles = await this.validateVehicles(
+        vehicles,
+        tenantId,
+        id
+      );
+      data.vehicles = {
+        deleteMany: {},
+        create: normalizedVehicles.map((v) => ({
+          plate: v.plate,
+          brand: v.brand,
+          model: v.model,
+          year: v.year,
+          version: v.version,
+          kilometraje: v.kilometraje,
+          tenantId,
+        })),
+      };
+    }
 
-    return this.itemRepository.update(id, normalizedUpdate);
+    return this.itemRepository.update(id, data);
   }
 
   async deleteItem(id: string, tenantId: string): Promise<void> {

@@ -134,21 +134,73 @@ async function main() {
   for (const a of autoItems) {
     const item = await prisma.item.create({
       data: {
-        plate: a.plate,
-        brand: a.brand,
-        model: a.model,
-        year: a.year,
-        kilometraje: a.km,
         basePrice: a.price,
         description: a.desc,
         legal_status: a.legal,
         state: ItemStateEnum.DISPONIBLE,
         tenantId: tenantAuto.id,
+        vehicles: {
+          create: [
+            {
+              plate: a.plate,
+              brand: a.brand,
+              model: a.model,
+              year: a.year,
+              kilometraje: a.km,
+              tenantId: tenantAuto.id,
+            },
+          ],
+        },
       },
     });
     createdItems.push(item);
   }
   console.log(`✅ ${createdItems.length} autos creados`);
+
+  // --- LOTE de ejemplo: varios vehículos bajo un único precio ---
+  const lote = await prisma.item.create({
+    data: {
+      basePrice: 42000000,
+      description:
+        'Lote de flota corporativa: 3 vehículos utilitarios vendidos en conjunto.',
+      legal_status: LegalStatusEnum.TRANSFERIBLE,
+      state: ItemStateEnum.DISPONIBLE,
+      tenantId: tenantAuto.id,
+      vehicles: {
+        create: [
+          {
+            plate: 'LOTE01',
+            brand: 'Toyota',
+            model: 'Hilux SR 4x2',
+            year: 2021,
+            kilometraje: 62000,
+            tenantId: tenantAuto.id,
+          },
+          {
+            plate: 'LOTE02',
+            brand: 'Toyota',
+            model: 'Hilux SR 4x2',
+            year: 2021,
+            kilometraje: 58000,
+            tenantId: tenantAuto.id,
+          },
+          {
+            plate: 'LOTE03',
+            brand: 'Chevrolet',
+            model: 'N400 Max',
+            year: 2020,
+            kilometraje: 74000,
+            tenantId: tenantAuto.id,
+          },
+        ],
+      },
+    },
+    include: { vehicles: true },
+  });
+  createdItems.push(lote);
+  console.log(
+    `✅ 1 lote de ejemplo creado con ${lote.vehicles.length} vehículos (patentes LOTE01-03)`
+  );
 
   // ============================================================
   // 4. SUBASTAS

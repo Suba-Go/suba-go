@@ -29,6 +29,7 @@ export class ItemPrismaRepository {
       data,
       include: {
         tenant: true,
+        vehicles: true,
         auctionItems: true,
       },
     });
@@ -39,6 +40,7 @@ export class ItemPrismaRepository {
       where: { id },
       include: {
         tenant: true,
+        vehicles: true,
         auctionItems: {
           include: {
             auction: true,
@@ -57,6 +59,7 @@ export class ItemPrismaRepository {
       },
       include: {
         tenant: true,
+        vehicles: true,
         auctionItems: true,
       },
     });
@@ -76,22 +79,36 @@ export class ItemPrismaRepository {
       where,
       include: {
         tenant: true,
+        vehicles: true,
         auctionItems: true,
       },
     });
   }
 
-  async findByPlate(plate: string): Promise<Item | null> {
-    return this.prisma.item.findFirst({
+  /**
+   * Finds the item (lot) that contains a vehicle with the given plate within a
+   * tenant. Plate uniqueness now lives on the vehicle, so we resolve the parent
+   * item through the vehicle relation.
+   */
+  async findByPlate(plate: string, tenantId?: string): Promise<Item | null> {
+    const vehicle = await this.prisma.vehicle.findFirst({
       where: {
         plate,
         isDeleted: false,
+        ...(tenantId ? { tenantId } : {}),
+        item: { isDeleted: false },
       },
       include: {
-        tenant: true,
-        auctionItems: true,
+        item: {
+          include: {
+            tenant: true,
+            vehicles: true,
+            auctionItems: true,
+          },
+        },
       },
     });
+    return vehicle?.item ?? null;
   }
 
   async update(id: string, data: Prisma.ItemUpdateInput): Promise<Item> {
@@ -100,6 +117,7 @@ export class ItemPrismaRepository {
       data,
       include: {
         tenant: true,
+        vehicles: true,
         auctionItems: true,
       },
     });
@@ -151,6 +169,7 @@ export class ItemPrismaRepository {
       },
       include: {
         tenant: true,
+        vehicles: true,
       },
     });
   }
@@ -165,6 +184,7 @@ export class ItemPrismaRepository {
       },
       include: {
         tenant: true,
+        vehicles: true,
         soldToUser: {
           select: {
             id: true,

@@ -17,6 +17,7 @@ import { AuctionHeader } from './auction-header';
 import { AuctionFinalizingOverlay } from '../auction-finalizing-overlay';
 import { ConnectionStatus } from './connection-status';
 import { AuctionItemCard } from './auction-item-card';
+import { getPrimaryVehicle, getVehicleCount } from '@/lib/vehicle-utils';
 import { SelfBidWarningDialog, AutoBidConfirmDialog } from './bidding-dialogs';
 import { useAuctionWebSocketBidding } from '@/hooks/use-auction-websocket-bidding';
 import { useLiveFallbackSnapshot } from '@/hooks/use-live-fallback-snapshot';
@@ -597,12 +598,19 @@ useEffect(() => {
       const winnerId = history[0]?.userId ?? getHighestBidderFromApi(ai);
 
       if (winnerId && winnerId === userId) {
-        const plate = ai.item?.plate;
-        const brand = ai.item?.brand;
-        const model = ai.item?.model;
+        const primary = getPrimaryVehicle(ai.item);
+        const plate = primary?.plate;
+        const brand = primary?.brand;
+        const model = primary?.model;
 
         const nameModel = [brand, model].filter(Boolean).join(' ');
-        const itemLabel = [nameModel, plate].filter(Boolean).join(' - ') || 'este ítem';
+        const lotSuffix =
+          getVehicleCount(ai.item) > 1
+            ? ` (lote de ${getVehicleCount(ai.item)})`
+            : '';
+        const itemLabel =
+          ([nameModel, plate].filter(Boolean).join(' - ') || 'este ítem') +
+          lotSuffix;
         toast({
           title: '¡Felicitaciones! 🎉',
           description: `Ganaste el ítem ${itemLabel}.`,

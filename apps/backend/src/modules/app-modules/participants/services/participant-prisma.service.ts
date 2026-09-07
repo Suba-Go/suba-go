@@ -217,7 +217,7 @@ export class ParticipantPrismaService {
         auctionItem: {
           include: {
             auction: true,
-            item: true,
+            item: { include: { vehicles: true } },
           },
         },
       },

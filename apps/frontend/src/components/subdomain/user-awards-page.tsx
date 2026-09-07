@@ -17,6 +17,12 @@ import { useFetchData } from '@/hooks/use-fetch-data';
 import { useCompanyContextOptional } from '@/contexts/company-context';
 import { darkenColor } from '@/utils/color-utils';
 import { getPrimaryPhotoUrl } from '@/lib/auction-utils';
+import {
+  getVehicles,
+  getPrimaryVehicle,
+  getVehicleCount,
+  getItemTitle,
+} from '@/lib/vehicle-utils';
 
 import { Button } from '@suba-go/shared-components/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@suba-go/shared-components/components/ui/card';
@@ -280,7 +286,7 @@ export default function UserAwardsPage() {
               <div className="aspect-video relative bg-gray-100">
                 <SafeImage
                   src={getPrimaryPhotoUrl(item.photos)}
-                  alt={`${item.brand} ${item.model}`}
+                  alt={getItemTitle(item)}
                   fill
                   className="object-cover"
                   sizes="(max-width: 768px) 100vw, (max-width: 1024px) 50vw, 33vw"
@@ -289,14 +295,47 @@ export default function UserAwardsPage() {
               </div>
               <CardHeader className="pb-2">
                 <CardTitle className="text-lg">
-                  {item.brand} {item.model} {item.year}
+                  {getVehicleCount(item) > 1
+                    ? getItemTitle(item)
+                    : `${getPrimaryVehicle(item)?.brand ?? ''} ${
+                        getPrimaryVehicle(item)?.model ?? ''
+                      } ${getPrimaryVehicle(item)?.year ?? ''}`.trim()}
                 </CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="text-sm text-gray-600 space-y-1">
-                  <p>Patente: <span className="font-medium text-gray-900">{item.plate}</span></p>
-                  {item.version ? <p>Versión: {item.version}</p> : null}
-                  {typeof item.kilometraje === 'number' ? <p>Kilometraje: {item.kilometraje.toLocaleString('es-CL')}</p> : null}
+                  {getVehicleCount(item) > 1 ? (
+                    getVehicles(item).map((v: any, i: number) => (
+                      <p key={v.id ?? i}>
+                        <span className="font-medium text-gray-900">
+                          {v.plate}
+                        </span>
+                        {(v.brand || v.model) &&
+                          ` · ${[v.brand, v.model].filter(Boolean).join(' ')}`}
+                      </p>
+                    ))
+                  ) : (
+                    <>
+                      <p>
+                        Patente:{' '}
+                        <span className="font-medium text-gray-900">
+                          {getPrimaryVehicle(item)?.plate}
+                        </span>
+                      </p>
+                      {getPrimaryVehicle(item)?.version ? (
+                        <p>Versión: {getPrimaryVehicle(item)?.version}</p>
+                      ) : null}
+                      {typeof getPrimaryVehicle(item)?.kilometraje ===
+                      'number' ? (
+                        <p>
+                          Kilometraje:{' '}
+                          {getPrimaryVehicle(item)?.kilometraje?.toLocaleString(
+                            'es-CL'
+                          )}
+                        </p>
+                      ) : null}
+                    </>
+                  )}
                 </div>
                 <p className="text-sm font-medium text-gray-900 mt-3">
                   Adjudicado por: ${Number(item.soldPrice || 0).toLocaleString('es-CL')}

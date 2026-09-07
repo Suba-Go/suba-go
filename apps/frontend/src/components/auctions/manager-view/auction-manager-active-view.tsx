@@ -2,6 +2,11 @@
 
 import { SafeImage } from '@/components/ui/safe-image';
 import { getPrimaryPhotoUrl } from '@/lib/auction-utils';
+import {
+  getItemTitle,
+  getPrimaryVehicle,
+  getVehicleCount,
+} from '@/lib/vehicle-utils';
 import { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { ArrowLeft, Clock, Wifi, WifiOff, Trophy } from 'lucide-react';
@@ -272,7 +277,7 @@ export function AuctionManagerActiveView({
       // Find the item details from the auctionItems list
       const item = auctionItems.find((i) => String(i.id) === normalizedItemId)?.item;
       const itemDescription = item
-        ? `${item.brand} ${item.model || ''} - ${item.plate}`.trim()
+        ? getItemTitle(item)
         : `Item #${normalizedItemId.slice(-4)}`;
 
       toast({
@@ -759,7 +764,7 @@ export function AuctionManagerActiveView({
                         <div className="relative h-48 overflow-hidden rounded-t-lg bg-gray-100">
                           <SafeImage
                             src={getPrimaryPhotoUrl(auctionItem.item.photos)}
-                            alt={`${auctionItem.item.brand} ${auctionItem.item.model}`}
+                            alt={getItemTitle(auctionItem.item)}
                             fill
                             className="object-cover"
                             // This view is rendered as 1 column on <lg and 2 columns on >=lg.
@@ -775,7 +780,7 @@ export function AuctionManagerActiveView({
                         <div className="space-y-2">
                           <div className="flex items-start justify-between gap-3">
                             <h3 className="font-semibold text-lg">
-                              {auctionItem.item?.plate || 'Sin Patente'}
+                              {getItemTitle(auctionItem.item)}
                             </h3>
                             <CountdownTimer
                               status={auction.status}
@@ -788,8 +793,18 @@ export function AuctionManagerActiveView({
                             />
                           </div>
                           <p className="text-sm text-gray-600">
-                            {auctionItem.item?.brand} {auctionItem.item?.model}{' '}
-                            {auctionItem.item?.year}
+                            {getVehicleCount(auctionItem.item) > 1 ? (
+                              <>
+                                {getVehicleCount(auctionItem.item)} vehículos en
+                                el lote
+                              </>
+                            ) : (
+                              <>
+                                {getPrimaryVehicle(auctionItem.item)?.brand}{' '}
+                                {getPrimaryVehicle(auctionItem.item)?.model}{' '}
+                                {getPrimaryVehicle(auctionItem.item)?.year}
+                              </>
+                            )}
                           </p>
 
                           <div className="flex justify-between items-center pt-2">

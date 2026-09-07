@@ -1,10 +1,9 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
+import { useState, useEffect, useRef } from 'react';
 import { SafeImage } from '@/components/ui/safe-image';
 import { parsePhotos } from '@/lib/auction-utils';
+import { getVehicles } from '@/lib/vehicle-utils';
 import {
   Car,
   X,
@@ -12,6 +11,8 @@ import {
   FileText,
   ChevronLeft,
   ChevronRight,
+  Plus,
+  Trash2,
 } from 'lucide-react';
 import {
   Dialog,
@@ -21,7 +22,6 @@ import {
   DialogTitle,
 } from '@suba-go/shared-components/components/ui/dialog';
 import { Button } from '@suba-go/shared-components/components/ui/button';
-import { Input } from '@suba-go/shared-components/components/ui/input';
 import { Label } from '@suba-go/shared-components/components/ui/label';
 import {
   Select,
@@ -36,8 +36,8 @@ import { FileUpload } from '@/components/ui/file-upload';
 import { FormattedInput } from '@/components/ui/formatted-input';
 import {
   ItemDto,
-  ItemEditDto,
   itemEditSchema,
+  LegalStatusEnum,
 } from '@suba-go/shared-validation';
 import Image from 'next/image';
 
@@ -47,6 +47,26 @@ interface ItemEditModalProps {
   onSuccess: () => void;
   item: ItemDto | null;
 }
+
+interface VehicleRow {
+  _key: number;
+  plate: string;
+  brand: string;
+  model: string;
+  year: number | '';
+  version: string;
+  kilometraje: number | '';
+}
+
+const emptyVehicle = (key: number): VehicleRow => ({
+  _key: key,
+  plate: '',
+  brand: '',
+  model: '',
+  year: '',
+  version: '',
+  kilometraje: '',
+});
 
 export function ItemEditModal({
   isOpen,
@@ -60,6 +80,15 @@ export function ItemEditModal({
   const [newPhotoUrls, setNewPhotoUrls] = useState<string[]>([]);
   const [newDocUrls, setNewDocUrls] = useState<string[]>([]);
   const [photoCarouselIndex, setPhotoCarouselIndex] = useState(0);
+
+  const keyCounter = useRef(1);
+  const [vehicles, setVehicles] = useState<VehicleRow[]>([emptyVehicle(0)]);
+  const [basePrice, setBasePrice] = useState<number>(0);
+  const [legalStatus, setLegalStatus] = useState<string>(
+    LegalStatusEnum.TRANSFERIBLE
+  );
+  const [errors, setErrors] = useState<Record<string, string>>({});
+
   const { toast } = useToast();
 
   const allPhotoUrls = [...photoUrls, ...newPhotoUrls];
@@ -85,62 +114,71 @@ export function ItemEditModal({
     }
   };
 
-  const {
-    register,
-    handleSubmit,
-    formState: { errors },
-    reset,
-    setValue,
-    watch,
-  } = useForm<ItemEditDto>({
-    resolver: zodResolver(itemEditSchema),
-  });
-
   // Load item data when modal opens
   useEffect(() => {
     if (item && isOpen) {
-      const formData: ItemEditDto = {
-        plate: item.plate || '',
-        brand: item.brand || '',
-        model: item.model || '',
-        year: item.year || undefined,
-        version: item.version || '',
-        kilometraje: item.kilometraje || undefined,
-        legal_status: item.legal_status as any,
-        basePrice: item.basePrice || undefined,
-      };
-
-      reset(formData);
-
-      // Explicitly set legal_status if it exists
-      if (item.legal_status) {
-        setValue('legal_status', item.legal_status as any, {
-          shouldValidate: true,
-          shouldDirty: false,
-        });
-      }
+      const loaded = getVehicles(item);
+      keyCounter.current = Math.max(loaded.length, 1);
+      setVehicles(
+        loaded.length > 0
+          ? loaded.map((v, i) => ({
+              _key: i,
+              plate: v.plate || '',
+              brand: v.brand || '',
+              model: v.model || '',
+              year: (v.year as number) || '',
+              version: v.version || '',
+              kilometraje: (v.kilometraje as number) || '',
+            }))
+          : [emptyVehicle(0)]
+      );
+      setBasePrice((item.basePrice as number) || 0);
+      setLegalStatus(
+        (item.legal_status as string) || LegalStatusEnum.TRANSFERIBLE
+      );
+      setErrors({});
 
       // Load existing photos and docs
       if (item.photos) {
-        const photos = parsePhotos(item.photos);
-        setPhotoUrls(photos);
+        setPhotoUrls(parsePhotos(item.photos));
       } else {
         setPhotoUrls([]);
       }
 
       if (item.docs) {
-        const docs = item.docs.split(',').map((url) => url.trim());
-        setDocUrls(docs);
+        setDocUrls(item.docs.split(',').map((url) => url.trim()));
       } else {
         setDocUrls([]);
       }
 
-      // Reset new uploads
       setNewPhotoUrls([]);
       setNewDocUrls([]);
       setPhotoCarouselIndex(0);
     }
-  }, [item, isOpen, reset, setValue]);
+  }, [item, isOpen]);
+
+  const updateVehicle = (
+    index: number,
+    field: keyof Omit<VehicleRow, '_key'>,
+    value: string | number | undefined
+  ) => {
+    setVehicles((prev) =>
+      prev.map((v, i) => (i === index ? { ...v, [field]: value ?? '' } : v))
+    );
+  };
+
+  const addVehicle = () =>
+    setVehicles((prev) => [...prev, emptyVehicle(keyCounter.current++)]);
+
+  const removeVehicle = (index: number) => {
+    setVehicles((prev) =>
+      prev.length <= 1 ? prev : prev.filter((_, i) => i !== index)
+    );
+    setErrors({});
+  };
+
+  const errorClass = (key: string) =>
+    errors[key] ? 'border-red-500 focus-visible:ring-red-500' : '';
 
   const removePhoto = (index: number) => {
     setPhotoUrls((prev) => prev.filter((_, i) => i !== index));
@@ -168,10 +206,6 @@ export function ItemEditModal({
     });
   };
 
-  /**
-   * Sets the current carousel photo as cover.
-   * The cover is defined as the first photo in the final `photos` list.
-   */
   const setCurrentAsCover = (e?: any) => {
     e?.preventDefault();
     e?.stopPropagation();
@@ -180,19 +214,15 @@ export function ItemEditModal({
     const idx = Math.min(photoCarouselIndex, allPhotoUrls.length - 1);
     if (idx === 0) return;
 
-    // If cover is from existing photos, reorder inside `photoUrls`.
     if (idx < photoUrls.length) {
       setPhotoUrls((prev) => {
         const picked = prev[idx];
-        const next = [picked, ...prev.slice(0, idx), ...prev.slice(idx + 1)];
-        return next;
+        return [picked, ...prev.slice(0, idx), ...prev.slice(idx + 1)];
       });
       setPhotoCarouselIndex(0);
       return;
     }
 
-    // If cover is from newly uploaded photos, move it to the front of `photoUrls`
-    // so it becomes the first element in the final merged list.
     const newIdx = idx - photoUrls.length;
     const pickedNew = newPhotoUrls[newIdx];
     if (!pickedNew) return;
@@ -206,20 +236,53 @@ export function ItemEditModal({
     setDocUrls((prev) => prev.filter((_, i) => i !== index));
   };
 
-  const onSubmit = async (data: ItemEditDto) => {
-    if (!item) {
+  const onSubmit = async () => {
+    if (!item) return;
+
+    const vehiclesPayload = vehicles.map((v) => ({
+      plate: v.plate,
+      brand: v.brand,
+      model: v.model || undefined,
+      year: v.year === '' ? undefined : Number(v.year),
+      version: v.version || undefined,
+      kilometraje: v.kilometraje === '' ? undefined : Number(v.kilometraje),
+    }));
+
+    const parsePayload = {
+      vehicles: vehiclesPayload,
+      legal_status: legalStatus as LegalStatusEnum,
+      basePrice,
+    };
+
+    const parsed = itemEditSchema.safeParse(parsePayload);
+    if (!parsed.success) {
+      const nextErrors: Record<string, string> = {};
+      for (const issue of parsed.error.issues) {
+        const key = issue.path.join('.');
+        if (!nextErrors[key]) nextErrors[key] = issue.message;
+      }
+      setErrors(nextErrors);
+      toast({
+        title: 'Revisa los datos',
+        description: 'Hay campos incompletos o inválidos en el lote.',
+        variant: 'destructive',
+        duration: 1800,
+      });
       return;
     }
+
+    setErrors({});
     setIsLoading(true);
 
     try {
-      // Combine existing and new URLs
-      const allPhotoUrls = [...photoUrls, ...newPhotoUrls];
+      const mergedPhotoUrls = [...photoUrls, ...newPhotoUrls];
       const allDocUrls = [...docUrls, ...newDocUrls];
 
       const requestBody = {
-        ...data,
-        photos: allPhotoUrls.length > 0 ? allPhotoUrls.join(', ') : null,
+        vehicles: vehiclesPayload,
+        legal_status: legalStatus,
+        basePrice,
+        photos: mergedPhotoUrls.length > 0 ? mergedPhotoUrls.join(', ') : null,
         docs: allDocUrls.length > 0 ? allDocUrls.join(', ') : null,
       };
 
@@ -232,17 +295,10 @@ export function ItemEditModal({
       });
 
       if (!response.ok) {
-        console.error('\n❌ Response NOT OK - Attempting to parse error...');
         let errorData;
         try {
           errorData = await response.json();
-          console.error(
-            '❌ Error Response Data:',
-            JSON.stringify(errorData, null, 2)
-          );
-        } catch (parseError) {
-          console.error('❌ Could not parse error response as JSON');
-          console.error('❌ Parse error:', parseError);
+        } catch {
           errorData = { error: 'Unknown error' };
         }
         throw new Error(
@@ -274,7 +330,10 @@ export function ItemEditModal({
 
   const handleClose = (open: boolean) => {
     if (!open) {
-      reset();
+      setVehicles([emptyVehicle(0)]);
+      setBasePrice(0);
+      setLegalStatus(LegalStatusEnum.TRANSFERIBLE);
+      setErrors({});
       setPhotoUrls([]);
       setDocUrls([]);
       setNewPhotoUrls([]);
@@ -294,16 +353,12 @@ export function ItemEditModal({
     <Dialog
       open={isOpen}
       onOpenChange={(open) => {
-        // Only close when the dialog is actually being closed.
-        // This avoids accidental closes when Radix fires focus-outside events
-        // (e.g. when the native file picker opens).
         if (!open) handleClose(false);
       }}
     >
       <DialogContent
         className="max-w-2xl max-h-[90vh] overflow-y-auto"
         onFocusOutside={(e) => {
-          // Prevent the dialog from closing when the browser opens the native file picker.
           e.preventDefault();
         }}
       >
@@ -312,161 +367,183 @@ export function ItemEditModal({
             <Car className="h-5 w-5" />
             Editar Item
           </DialogTitle>
-          <DialogDescription>Modifica los detalles del item</DialogDescription>
+          <DialogDescription>
+            Modifica los vehículos y datos del lote
+          </DialogDescription>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
-          {/* Basic Info */}
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            onSubmit();
+          }}
+          className="space-y-6"
+        >
+          {/* Vehicles */}
+          <div className="space-y-4">
+            {vehicles.map((vehicle, index) => (
+              <div
+                key={vehicle._key}
+                className="rounded-xl border bg-gray-50/60 p-4"
+              >
+                <div className="mb-3 flex items-center justify-between">
+                  <p className="text-sm font-semibold text-gray-900">
+                    {vehicles.length > 1 ? `Vehículo ${index + 1}` : 'Vehículo'}
+                  </p>
+                  {vehicles.length > 1 && (
+                    <button
+                      type="button"
+                      onClick={() => removeVehicle(index)}
+                      className="inline-flex items-center gap-1 text-sm text-red-600 hover:text-red-700"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                      Quitar
+                    </button>
+                  )}
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <Label>Patente (6 caracteres) *</Label>
+                    <FormattedInput
+                      formatType="plate"
+                      placeholder="Ej: ABC123"
+                      maxLength={6}
+                      value={vehicle.plate}
+                      className={errorClass(`vehicles.${index}.plate`)}
+                      onChange={(value) =>
+                        updateVehicle(index, 'plate', value as string)
+                      }
+                    />
+                    {errors[`vehicles.${index}.plate`] && (
+                      <p className="text-sm text-red-600 mt-1">
+                        {errors[`vehicles.${index}.plate`]}
+                      </p>
+                    )}
+                  </div>
+
+                  <div>
+                    <Label>Marca *</Label>
+                    <FormattedInput
+                      formatType="capitalize"
+                      placeholder="Ej: Toyota"
+                      value={vehicle.brand}
+                      className={errorClass(`vehicles.${index}.brand`)}
+                      onChange={(value) =>
+                        updateVehicle(index, 'brand', value as string)
+                      }
+                    />
+                    {errors[`vehicles.${index}.brand`] && (
+                      <p className="text-sm text-red-600 mt-1">
+                        {errors[`vehicles.${index}.brand`]}
+                      </p>
+                    )}
+                  </div>
+
+                  <div>
+                    <Label>Modelo</Label>
+                    <FormattedInput
+                      formatType="capitalize"
+                      placeholder="Ej: Corolla"
+                      value={vehicle.model}
+                      onChange={(value) =>
+                        updateVehicle(index, 'model', value as string)
+                      }
+                    />
+                  </div>
+
+                  <div>
+                    <Label>Año</Label>
+                    <FormattedInput
+                      formatType="simple-number"
+                      placeholder="Ej: 2020"
+                      value={vehicle.year}
+                      className={errorClass(`vehicles.${index}.year`)}
+                      onChange={(value) =>
+                        updateVehicle(index, 'year', value as number)
+                      }
+                    />
+                    {errors[`vehicles.${index}.year`] && (
+                      <p className="text-sm text-red-600 mt-1">
+                        {errors[`vehicles.${index}.year`]}
+                      </p>
+                    )}
+                  </div>
+
+                  <div>
+                    <Label>Versión</Label>
+                    <FormattedInput
+                      formatType="capitalize"
+                      placeholder="Ej: XEI 1.8"
+                      value={vehicle.version}
+                      onChange={(value) =>
+                        updateVehicle(index, 'version', value as string)
+                      }
+                    />
+                  </div>
+
+                  <div>
+                    <Label>Kilometraje</Label>
+                    <FormattedInput
+                      formatType="number"
+                      placeholder="Ej: 50.000"
+                      inputMode="numeric"
+                      maxLength={7}
+                      value={vehicle.kilometraje}
+                      onChange={(value) => {
+                        const digits = String(value ?? '')
+                          .replace(/\D/g, '')
+                          .slice(0, 7);
+                        updateVehicle(
+                          index,
+                          'kilometraje',
+                          digits ? Number(digits) : ''
+                        );
+                      }}
+                    />
+                  </div>
+                </div>
+              </div>
+            ))}
+
+            <Button
+              type="button"
+              variant="outline"
+              className="w-full border-dashed"
+              onClick={addVehicle}
+            >
+              <Plus className="h-4 w-4 mr-2" />
+              Agregar vehículo
+            </Button>
+          </div>
+
+          {/* Lot-level fields */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <Label htmlFor="plate">Placa</Label>
-              <Input
-                id="plate"
-                placeholder="ABC123"
-                {...register('plate')}
-                className={errors.plate ? 'border-red-500' : ''}
-              />
-              {errors.plate && (
-                <p className="text-sm text-red-600 mt-1">
-                  {errors.plate.message}
-                </p>
-              )}
-            </div>
-
-            <div>
-              <Label htmlFor="brand">Marca</Label>
-              <Input
-                id="brand"
-                placeholder="Toyota"
-                {...register('brand')}
-                className={errors.brand ? 'border-red-500' : ''}
-              />
-              {errors.brand && (
-                <p className="text-sm text-red-600 mt-1">
-                  {errors.brand.message}
-                </p>
-              )}
-            </div>
-
-            <div>
-              <Label htmlFor="model">Modelo</Label>
-              <Input
-                id="model"
-                placeholder="Corolla"
-                {...register('model')}
-                className={errors.model ? 'border-red-500' : ''}
-              />
-              {errors.model && (
-                <p className="text-sm text-red-600 mt-1">
-                  {errors.model.message}
-                </p>
-              )}
-            </div>
-
-            <div>
-              <Label htmlFor="year">Año</Label>
-              <Input
-                id="year"
-                type="number"
-                placeholder="2020"
-                {...register('year', { valueAsNumber: true })}
-                className={errors.year ? 'border-red-500' : ''}
-              />
-              {errors.year && (
-                <p className="text-sm text-red-600 mt-1">
-                  {errors.year.message}
-                </p>
-              )}
-            </div>
-
-            <div>
-              <Label htmlFor="version">Versión</Label>
-              <Input
-                id="version"
-                placeholder="XEI 1.8"
-                {...register('version')}
-                className={errors.version ? 'border-red-500' : ''}
-              />
-              {errors.version && (
-                <p className="text-sm text-red-600 mt-1">
-                  {errors.version.message}
-                </p>
-              )}
-            </div>
-            <div>
-              <Label htmlFor="kilometraje">Kilometraje</Label>
-              <FormattedInput
-                id="kilometraje"
-                formatType="number"
-                placeholder="50.000"
-                value={watch('kilometraje')}
-                inputMode="numeric"
-                onKeyDown={(e) => {
-                  const allowed = ['Backspace', 'Delete', 'ArrowLeft', 'ArrowRight', 'Tab', 'Home', 'End'];
-                  if (allowed.includes(e.key)) return;
-
-                  // solo permitir dígitos
-                  if (!/^\d$/.test(e.key)) {
-                    e.preventDefault();
-                    return;
-                  }
-
-                  // contar dígitos actuales (sin puntos/espacios)
-                  const currentDigits = (e.currentTarget as HTMLInputElement).value.replace(/\D/g, '').length;
-                  if (currentDigits >= 7) e.preventDefault(); // 👈 bloquea el 7º dígito
-                }}
-                onPaste={(e) => {
-                  const pasted = e.clipboardData.getData('text');
-                  const digits = pasted.replace(/\D/g, '');
-                  const currentDigits = (e.currentTarget as HTMLInputElement).value.replace(/\D/g, '');
-                  if ((currentDigits + digits).length > 7) {
-                    e.preventDefault(); // 👈 bloquea pegado que exceda 6 dígitos
-                  }
-                }}
-                onChange={(value) => {
-                  // respaldo: asegura que el valor guardado tampoco supere 6 dígitos
-                  const digits = String(value ?? '').replace(/\D/g, '').slice(0, 7);
-                  const next = digits ? Number(digits) : 0;
-                  setValue('kilometraje', next, { shouldValidate: true, shouldDirty: true });
-                }}
-                className={errors.kilometraje ? 'border-red-500' : ''}
-              />
-              {errors.kilometraje && (
-                <p className="text-sm text-red-600 mt-1">
-                  {errors.kilometraje.message}
-                </p>
-              )}
-            </div>
-
-
-            <div>
-              <Label htmlFor="basePrice">Precio Base</Label>
+              <Label htmlFor="basePrice">Precio Base del Lote *</Label>
               <FormattedInput
                 id="basePrice"
                 formatType="number"
                 placeholder="15.000.000"
-                value={watch('basePrice')}
-                onChange={(value) => setValue('basePrice', value as number)}
-                className={errors.basePrice ? 'border-red-500' : ''}
+                value={basePrice || ''}
+                onChange={(value) => {
+                  const num = typeof value === 'number' ? value : Number(value);
+                  setBasePrice(Number.isNaN(num) ? 0 : num);
+                }}
+                className={errorClass('basePrice')}
               />
               {errors.basePrice && (
-                <p className="text-sm text-red-600 mt-1">
-                  {errors.basePrice.message}
-                </p>
+                <p className="text-sm text-red-600 mt-1">{errors.basePrice}</p>
               )}
             </div>
 
             <div>
               <Label htmlFor="legal_status">Estado Legal</Label>
               <Select
-                value={watch('legal_status') || item?.legal_status || ''}
-                onValueChange={(value) =>
-                  setValue('legal_status', value as any)
-                }
+                value={legalStatus}
+                onValueChange={(value) => setLegalStatus(value)}
               >
-                <SelectTrigger
-                  className={errors.legal_status ? 'border-red-500' : ''}
-                >
+                <SelectTrigger>
                   <SelectValue placeholder="Seleccionar estado legal" />
                 </SelectTrigger>
                 <SelectContent className="z-dropdown">
@@ -479,11 +556,6 @@ export function ItemEditModal({
                   <SelectItem value="OTRO">Otro</SelectItem>
                 </SelectContent>
               </Select>
-              {errors.legal_status && (
-                <p className="text-sm text-red-600 mt-1">
-                  {errors.legal_status.message}
-                </p>
-              )}
             </div>
           </div>
 
@@ -514,7 +586,6 @@ export function ItemEditModal({
 
               <div className="rounded-xl border bg-white p-3">
                 <div className="relative overflow-hidden rounded-lg bg-gray-50">
-                  {/* Cover badge */}
                   {photoCarouselIndex === 0 && (
                     <div className="absolute left-2 top-2 z-10 rounded-full bg-black/70 px-2 py-1 text-[11px] font-medium text-white">
                       Portada
@@ -563,9 +634,7 @@ export function ItemEditModal({
                           setPhotoCarouselIndex(i);
                         }}
                         className={`h-2.5 w-2.5 rounded-full ${
-                          i === photoCarouselIndex
-                            ? 'bg-blue-500'
-                            : 'bg-gray-300'
+                          i === photoCarouselIndex ? 'bg-blue-500' : 'bg-gray-300'
                         }`}
                         aria-label={`Ir a foto ${i + 1}`}
                       />

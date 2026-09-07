@@ -48,10 +48,14 @@ export class UserStatisticsService {
       },
       select: {
         id: true,
-        plate: true,
-        brand: true,
-        model: true,
         soldPrice: true,
+        vehicles: {
+          select: {
+            plate: true,
+            brand: true,
+            model: true,
+          },
+        },
         auctionItems: {
           select: {
             auctionId: true,
@@ -122,12 +126,19 @@ export class UserStatisticsService {
       averageBidsPerItem: Number(averageBidsPerItem.toFixed(1)),
       winRate: Number(winRate.toFixed(1)),
       secondPlaceRate: Number(secondPlaceRate.toFixed(1)),
-      wonItems: wonItems.map((item) => ({
-        id: item.id,
-        name: `${item.brand} ${item.model || ''} - ${item.plate}`,
-        price: item.soldPrice,
-        auctionId: item.auctionItems[0]?.auctionId,
-      })),
+      wonItems: wonItems.map((item) => {
+        const v = item.vehicles[0];
+        const extra =
+          item.vehicles.length > 1 ? ` (+${item.vehicles.length - 1})` : '';
+        return {
+          id: item.id,
+          name: v
+            ? `${v.brand} ${v.model || ''} - ${v.plate}${extra}`
+            : 'Lote sin vehículos',
+          price: item.soldPrice,
+          auctionId: item.auctionItems[0]?.auctionId,
+        };
+      }),
       biddingTrend,
     };
   }

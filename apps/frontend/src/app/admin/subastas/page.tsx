@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState, useMemo } from 'react';
+import { getItemAutoLabel } from '@/lib/vehicle-utils';
 import Link from 'next/link';
 import { Search, Download, Filter, Eye, ChevronDown, X } from 'lucide-react';
 
@@ -127,7 +128,7 @@ export default function AdminSubastasPage() {
             auctionId: auction.id,
             fecha: auction.startTime,
             automotora: companyName,
-            auto: item ? `${item.brand} ${item.model || ''}` : '-',
+            auto: item ? getItemAutoLabel(item) : '-',
             precioBase: item?.basePrice || ai.startingBid,
             precioFinal: finalPrice,
             huboPuja: itemBids.length > 0 ? 'Sí' : 'No',
