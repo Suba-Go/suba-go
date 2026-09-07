@@ -61,6 +61,28 @@ CREATE INDEX "vehicle_itemId_idx" ON "vehicle"("itemId");
 -- CreateIndex
 CREATE INDEX "vehicle_tenantId_idx" ON "vehicle"("tenantId");
 
+-- Self-heal: the old system allowed a soft-deleted item and an active item to
+-- share a plate within a tenant (uniqueness was only enforced among non-deleted
+-- items). Before building the unique index, rename the plate of the SOFT-DELETED
+-- duplicates so it can be created. Active listings are never touched. If two
+-- ACTIVE items still share a plate, the index will (correctly) fail and require
+-- manual resolution.
+WITH ranked AS (
+    SELECT
+        "id",
+        ROW_NUMBER() OVER (
+            PARTITION BY "tenantId", "plate"
+            ORDER BY "isDeleted" ASC, "createdAt" DESC
+        ) AS rn
+    FROM "vehicle"
+)
+UPDATE "vehicle" v
+SET "plate" = v."plate" || '-OLD' || r.rn
+FROM ranked r
+WHERE v."id" = r."id"
+  AND r.rn > 1
+  AND v."isDeleted" = true;
+
 -- CreateIndex
 CREATE UNIQUE INDEX "IDX_vehicle_plate_tenant_unique" ON "vehicle"("plate", "tenantId");
 
