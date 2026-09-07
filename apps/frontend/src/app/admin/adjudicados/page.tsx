@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState, useMemo } from 'react';
+import { getItemAutoLabel, getPrimaryPlate } from '@/lib/vehicle-utils';
 import { Car, DollarSign, Download, CheckCircle, Clock, Search, X } from 'lucide-react';
 
 type DashboardUser = {
@@ -65,8 +66,8 @@ export default function AdminAdjudicadosPage() {
       return {
         fecha: item.soldAt,
         automotora: companyName,
-        auto: `${item.brand} ${item.model || ''}`,
-        plate: item.plate,
+        auto: getItemAutoLabel(item),
+        plate: getPrimaryPlate(item),
         precioBase: item.basePrice,
         precioFinal: item.soldPrice || 0,
         ganador: buyer?.name || buyer?.email || '-',

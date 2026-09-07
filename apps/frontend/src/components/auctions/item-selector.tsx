@@ -2,6 +2,13 @@
 
 import { SafeImage } from '@/components/ui/safe-image';
 import { parsePhotos } from '@/lib/auction-utils';
+import {
+  getVehicles,
+  getPrimaryVehicle,
+  getVehicleCount,
+  getItemTitle,
+  getItemSearchText,
+} from '@/lib/vehicle-utils';
 import { useState, useMemo, useEffect } from 'react';
 import {
   Car,
@@ -156,7 +163,7 @@ export function ItemSelector({
     if (!searchPlate.trim()) return items;
     const searchLower = searchPlate.toLowerCase().trim();
     return items.filter((item) =>
-      item.plate?.toLowerCase().includes(searchLower)
+      getItemSearchText(item).includes(searchLower)
     );
   }, [items, searchPlate]);
 
@@ -395,8 +402,15 @@ export function ItemSelector({
                   >
                     <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2 mb-1">
                       <h4 className="font-medium text-xs sm:text-sm truncate">
-                        {item.plate || 'Sin patente'} -{' '}
-                        {item.brand || 'Sin marca'} {item.model || ''}
+                        {getVehicleCount(item) > 1 ? (
+                          `${getItemTitle(item)} (${getVehicleCount(item)} autos)`
+                        ) : (
+                          <>
+                            {getPrimaryVehicle(item)?.plate || 'Sin patente'} -{' '}
+                            {getPrimaryVehicle(item)?.brand || 'Sin marca'}{' '}
+                            {getPrimaryVehicle(item)?.model || ''}
+                          </>
+                        )}
                       </h4>
                       <Badge
                         className={`text-xs w-fit ${getStateColor(item.state)}`}
@@ -416,9 +430,22 @@ export function ItemSelector({
                       </Badge>
                     </div>
                     <div className="flex flex-wrap items-center gap-2 sm:gap-4 text-xs text-gray-500">
-                      {item.year && <span>Año: {item.year}</span>}
-                      {item.kilometraje && (
-                        <span>KM: {item.kilometraje.toLocaleString()}</span>
+                      {getVehicleCount(item) > 1 ? (
+                        <span>{getVehicleCount(item)} vehículos</span>
+                      ) : (
+                        <>
+                          {getPrimaryVehicle(item)?.year && (
+                            <span>Año: {getPrimaryVehicle(item)?.year}</span>
+                          )}
+                          {getPrimaryVehicle(item)?.kilometraje && (
+                            <span>
+                              KM:{' '}
+                              {getPrimaryVehicle(
+                                item
+                              )?.kilometraje?.toLocaleString()}
+                            </span>
+                          )}
+                        </>
                       )}
                       <span className="font-medium text-gray-700">
                         {formatPrice(item.basePrice)}
@@ -541,30 +568,39 @@ export function ItemSelector({
 
               {/* Item Details */}
               <div className="grid grid-cols-2 gap-4 text-sm">
-                <div>
-                  <span className="font-medium">Patente:</span>
-                  <span className="ml-2">{previewItem.plate || 'N/A'}</span>
-                </div>
-                <div>
-                  <span className="font-medium">Marca:</span>
-                  <span className="ml-2">{previewItem.brand || 'N/A'}</span>
-                </div>
-                <div>
-                  <span className="font-medium">Modelo:</span>
-                  <span className="ml-2">{previewItem.model || 'N/A'}</span>
-                </div>
-                <div>
-                  <span className="font-medium">Año:</span>
-                  <span className="ml-2">{previewItem.year || 'N/A'}</span>
-                </div>
-                {previewItem.kilometraje && (
-                  <div>
-                    <span className="font-medium">Kilometraje:</span>
-                    <span className="ml-2">
-                      {previewItem.kilometraje.toLocaleString()} km
-                    </span>
+                {getVehicles(previewItem).map((v: any, i: number) => (
+                  <div key={v.id ?? i} className="col-span-2 grid grid-cols-2 gap-4">
+                    {getVehicleCount(previewItem) > 1 && (
+                      <div className="col-span-2 font-semibold text-gray-900">
+                        Vehículo {i + 1}
+                      </div>
+                    )}
+                    <div>
+                      <span className="font-medium">Patente:</span>
+                      <span className="ml-2">{v.plate || 'N/A'}</span>
+                    </div>
+                    <div>
+                      <span className="font-medium">Marca:</span>
+                      <span className="ml-2">{v.brand || 'N/A'}</span>
+                    </div>
+                    <div>
+                      <span className="font-medium">Modelo:</span>
+                      <span className="ml-2">{v.model || 'N/A'}</span>
+                    </div>
+                    <div>
+                      <span className="font-medium">Año:</span>
+                      <span className="ml-2">{v.year || 'N/A'}</span>
+                    </div>
+                    {v.kilometraje && (
+                      <div>
+                        <span className="font-medium">Kilometraje:</span>
+                        <span className="ml-2">
+                          {v.kilometraje.toLocaleString()} km
+                        </span>
+                      </div>
+                    )}
                   </div>
-                )}
+                ))}
                 <div>
                   <span className="font-medium">Precio Base:</span>
                   <span className="ml-2">

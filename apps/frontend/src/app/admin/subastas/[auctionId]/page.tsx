@@ -1,6 +1,12 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import {
+  getVehicles,
+  getPrimaryVehicle,
+  getVehicleCount,
+  getItemTitle,
+} from '@/lib/vehicle-utils';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { ArrowLeft, Car, Clock, User as UserIcon, DollarSign, Trophy } from 'lucide-react';
@@ -114,10 +120,20 @@ export default function AdminSubastaDetallePage() {
               <div className="flex items-start justify-between">
                 <div>
                   <p className="font-semibold text-stone-100">
-                    {ai.item?.brand} {ai.item?.model || ''}
+                    {getVehicleCount(ai.item) > 1
+                      ? getItemTitle(ai.item)
+                      : `${getPrimaryVehicle(ai.item)?.brand ?? ''} ${
+                          getPrimaryVehicle(ai.item)?.model ?? ''
+                        }`.trim()}
                   </p>
                   <p className="text-xs text-stone-500">
-                    {ai.item?.year} • {ai.item?.plate}
+                    {getVehicleCount(ai.item) > 1
+                      ? getVehicles(ai.item)
+                          .map((v: any) => v.plate)
+                          .join(', ')
+                      : `${getPrimaryVehicle(ai.item)?.year ?? ''} • ${
+                          getPrimaryVehicle(ai.item)?.plate ?? ''
+                        }`}
                   </p>
                 </div>
                 {ai.sold ? (

@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState, useMemo, useCallback } from 'react';
+import { getItemAutoLabel } from '@/lib/vehicle-utils';
 import { FileSpreadsheet, Download, BarChart3, TrendingUp, Calendar, Filter } from 'lucide-react';
 
 function formatCLP(n: number) {
@@ -69,7 +70,7 @@ export default function AdminReportesPage() {
           return {
             fecha: formatDate(item.updatedAt || item.createdAt),
             automotora: company?.name || '-',
-            auto: `${item.brand} ${item.model} ${item.year}`,
+            auto: getItemAutoLabel(item),
             precioBase: formatCLP(item.basePrice || 0),
             precioVenta: formatCLP(item.soldPrice || 0),
             comision: formatCLP(commission),
@@ -122,7 +123,7 @@ export default function AdminReportesPage() {
           const company = companies.find((c: any) => c.tenantId === item._tenantId);
           const auction = auctions.find((a: any) => a.id === item.auctionId);
           return {
-            auto: `${item.brand} ${item.model} ${item.year}`,
+            auto: getItemAutoLabel(item),
             automotora: company?.name || '-',
             subasta: auction?.title || '-',
             precioBase: formatCLP(item.basePrice || 0),

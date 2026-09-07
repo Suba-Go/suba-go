@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState, useMemo } from 'react';
+import { getItemAutoLabel } from '@/lib/vehicle-utils';
 import { Building2, Search, Eye, X } from 'lucide-react';
 
 function formatCLP(n: number) {
@@ -150,7 +151,7 @@ export default function AdminClientesPage() {
                           <div className="space-y-1.5">
                             {r.soldItems.map((item: any, i: number) => (
                               <div key={i} className="flex items-center justify-between rounded-md bg-stone-800/50 px-3 py-1.5 text-xs">
-                                <span className="text-stone-200">{item.brand} {item.model}</span>
+                                <span className="text-stone-200">{getItemAutoLabel(item)}</span>
                                 <span className="font-medium tabular-nums text-green-400">{formatCLP(item.soldPrice || 0)}</span>
                               </div>
                             ))}

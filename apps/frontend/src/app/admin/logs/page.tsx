@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState, useMemo } from 'react';
+import { getItemAutoLabel } from '@/lib/vehicle-utils';
 import { Search, Filter, Clock, Gavel, UserCheck, AlertTriangle, Plus, Eye, ShieldCheck } from 'lucide-react';
 
 function formatDate(d: string) {
@@ -116,7 +117,7 @@ export default function AdminLogsPage() {
         user: winner?.name || winner?.email || 'Usuario',
         auctionId: item.auctionId,
         auctionTitle: auction?.title,
-        detail: `${item.brand} ${item.model} ${item.year} por ${formatCLP(item.soldPrice || 0)}`,
+        detail: `${getItemAutoLabel(item)} por ${formatCLP(item.soldPrice || 0)}`,
       });
     });
 

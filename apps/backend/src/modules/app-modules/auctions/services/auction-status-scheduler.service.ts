@@ -364,7 +364,7 @@ await this.prisma.auctionItem.updateMany({
     const auctionItems = await this.prisma.auctionItem.findMany({
       where: { auctionId },
       include: {
-        item: true,
+        item: { include: { vehicles: true } },
         bids: {
           orderBy: { offered_price: 'desc' },
           take: 1,
@@ -389,7 +389,9 @@ await this.prisma.auctionItem.updateMany({
         });
 
         this.logger.log(
-          `💰 Item ${auctionItem.item.plate || auctionItem.itemId} sold to ${
+          `💰 Item ${
+            auctionItem.item.vehicles?.[0]?.plate || auctionItem.itemId
+          } sold to ${
             highestBid.user.email
           } for $${Number(highestBid.offered_price).toLocaleString()}`
         );
@@ -414,9 +416,12 @@ await this.prisma.auctionItem.updateMany({
               },
               item: {
                 id: auctionItem.item.id,
-                plate: auctionItem.item.plate,
-                brand: auctionItem.item.brand,
-                model: auctionItem.item.model,
+                vehicles: auctionItem.item.vehicles?.map((v) => ({
+                  id: v.id,
+                  plate: v.plate,
+                  brand: v.brand,
+                  model: v.model,
+                })),
               },
             },
           },
@@ -430,7 +435,7 @@ await this.prisma.auctionItem.updateMany({
 
         this.logger.log(
           `📦 Item ${
-            auctionItem.item.plate || auctionItem.itemId
+            auctionItem.item.vehicles?.[0]?.plate || auctionItem.itemId
           } had no bids - released to DISPONIBLE`
         );
       }

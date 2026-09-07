@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState, useMemo, useCallback } from 'react';
+import { getItemAutoLabel } from '@/lib/vehicle-utils';
 import { CreditCard, CheckCircle2, AlertCircle, Clock, Download, Search, ChevronDown } from 'lucide-react';
 
 function formatCLP(n: number) {
@@ -42,7 +43,7 @@ export default function AdminCobrosPage() {
         const status: PaymentStatus = i < Math.floor(cSold.length * 0.5) ? 'pagado' : i < Math.floor(cSold.length * 0.8) ? 'pendiente' : 'vencido';
         return {
           id: item.id,
-          auto: `${item.brand} ${item.model} ${item.year}`,
+          auto: getItemAutoLabel(item),
           precioVenta: item.soldPrice || 0,
           comision,
           status,

@@ -23,6 +23,12 @@ import { Button } from '@suba-go/shared-components/components/ui/button';
 import { darkenColor } from '@/utils/color-utils';
 import { getPrimaryPhotoUrl } from '@/lib/auction-utils';
 import {
+  getVehicles,
+  getPrimaryVehicle,
+  getVehicleCount,
+  getItemTitle,
+} from '@/lib/vehicle-utils';
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -557,7 +563,7 @@ useEffect(() => {
                     {item.photos ? (
                       <SafeImage
                         src={getPrimaryPhotoUrl(item.photos)}
-                        alt={`${item.brand} ${item.model}`}
+                        alt={getItemTitle(item)}
                         fill
                         className="object-cover"
                         sizes="(max-width: 768px) 100vw, (max-width: 1280px) 50vw, 33vw"
@@ -573,15 +579,27 @@ useEffect(() => {
                   </div>
                   <CardHeader className="pb-2">
                     <CardTitle className="text-lg">
-                      {item.brand} {item.model} {item.year}
+                      {getVehicleCount(item) > 1
+                        ? getItemTitle(item)
+                        : `${getPrimaryVehicle(item)?.brand ?? ''} ${
+                            getPrimaryVehicle(item)?.model ?? ''
+                          } ${getPrimaryVehicle(item)?.year ?? ''}`.trim()}
                     </CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <p className="text-sm text-gray-600 mb-2">{item.version}</p>
+                    <p className="text-sm text-gray-600 mb-2">
+                      {getVehicleCount(item) > 1
+                        ? `${getVehicleCount(item)} vehículos`
+                        : getPrimaryVehicle(item)?.version}
+                    </p>
                     <p className="text-sm text-gray-600 mb-2">
                       Patente:{' '}
                       <span className="font-semibold text-gray-900">
-                        {item.plate || 'Sin patente'}
+                        {getVehicleCount(item) > 1
+                          ? getVehicles(item)
+                              .map((v: any) => v.plate)
+                              .join(', ')
+                          : getPrimaryVehicle(item)?.plate || 'Sin patente'}
                       </span>
                     </p>
                     <p className="text-sm font-medium text-gray-900">

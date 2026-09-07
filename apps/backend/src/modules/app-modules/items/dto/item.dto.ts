@@ -7,12 +7,19 @@ import {
   IsInt,
   MinLength,
   MaxLength,
+  ValidateNested,
+  ArrayMinSize,
+  IsArray,
 } from 'class-validator';
-import { Transform } from 'class-transformer';
+import { Transform, Type } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { LegalStatusEnum, ItemStateEnum } from '@prisma/client';
 
-export class CreateItemDto {
+/**
+ * A single vehicle within a lot (Item). The lot groups one or more vehicles
+ * under a single base price; these are the per-vehicle identity fields.
+ */
+export class VehicleDto {
   @ApiProperty({
     description: 'Patente del vehículo',
     minLength: 6,
@@ -53,16 +60,28 @@ export class CreateItemDto {
   @IsInt({ message: 'El kilometraje debe ser un número entero' })
   @Transform(({ value }) => Number(value))
   kilometraje?: number;
+}
+
+export class CreateItemDto {
+  @ApiProperty({
+    description: 'Vehículos del lote (mínimo 1)',
+    type: [VehicleDto],
+  })
+  @IsArray()
+  @ArrayMinSize(1, { message: 'El lote debe tener al menos un vehículo' })
+  @ValidateNested({ each: true })
+  @Type(() => VehicleDto)
+  vehicles: VehicleDto[];
 
   @ApiPropertyOptional({
-    description: 'Estado legal del vehículo',
+    description: 'Estado legal del lote',
     enum: LegalStatusEnum,
   })
   @IsOptional()
   @IsEnum(LegalStatusEnum, { message: 'Estado legal inválido' })
   legal_status?: LegalStatusEnum;
 
-  @ApiProperty({ description: 'Precio base del item' })
+  @ApiProperty({ description: 'Precio base del lote' })
   @IsNumber({}, { message: 'El precio base debe ser un número' })
   @IsPositive({ message: 'El precio base debe ser positivo' })
   @Transform(({ value }) => Number(value))
@@ -84,7 +103,7 @@ export class CreateItemDto {
   docs?: string;
 
   @ApiProperty({
-    description: 'Estado del item',
+    description: 'Estado del lote',
     enum: ItemStateEnum,
     default: ItemStateEnum.DISPONIBLE,
   })
@@ -94,52 +113,26 @@ export class CreateItemDto {
 
 export class UpdateItemDto {
   @ApiPropertyOptional({
-    description: 'Placa del vehículo',
-    minLength: 6,
-    maxLength: 6,
+    description:
+      'Vehículos del lote. Si se envía, reemplaza por completo la lista de vehículos.',
+    type: [VehicleDto],
   })
   @IsOptional()
-  @IsString()
-  @MinLength(6, { message: 'La placa es requerida' })
-  @MaxLength(6, { message: 'La placa no puede exceder 6 caracteres' })
-  plate?: string;
-
-  @ApiPropertyOptional({ description: 'Marca del vehículo' })
-  @IsOptional()
-  @IsString()
-  brand?: string;
-
-  @ApiPropertyOptional({ description: 'Modelo del vehículo' })
-  @IsOptional()
-  @IsString()
-  model?: string;
-
-  @ApiPropertyOptional({ description: 'Año del vehículo' })
-  @IsOptional()
-  @IsNumber({}, { message: 'El año debe ser un número' })
-  @Transform(({ value }) => Number(value))
-  year?: number;
-
-  @ApiPropertyOptional({ description: 'Versión del vehículo' })
-  @IsOptional()
-  @IsString()
-  version?: string;
-
-  @ApiPropertyOptional({ description: 'Kilometraje del vehículo' })
-  @IsOptional()
-  @IsInt({ message: 'El kilometraje debe ser un número entero' })
-  @Transform(({ value }) => Number(value))
-  kilometraje?: number;
+  @IsArray()
+  @ArrayMinSize(1, { message: 'El lote debe tener al menos un vehículo' })
+  @ValidateNested({ each: true })
+  @Type(() => VehicleDto)
+  vehicles?: VehicleDto[];
 
   @ApiPropertyOptional({
-    description: 'Estado legal del vehículo',
+    description: 'Estado legal del lote',
     enum: LegalStatusEnum,
   })
   @IsOptional()
   @IsEnum(LegalStatusEnum, { message: 'Estado legal inválido' })
   legal_status?: LegalStatusEnum;
 
-  @ApiPropertyOptional({ description: 'Precio base del item' })
+  @ApiPropertyOptional({ description: 'Precio base del lote' })
   @IsOptional()
   @IsNumber({}, { message: 'El precio base debe ser un número' })
   @IsPositive({ message: 'El precio base debe ser positivo' })
@@ -161,7 +154,7 @@ export class UpdateItemDto {
   @IsString()
   docs?: string;
 
-  @ApiPropertyOptional({ description: 'Estado del item', enum: ItemStateEnum })
+  @ApiPropertyOptional({ description: 'Estado del lote', enum: ItemStateEnum })
   @IsOptional()
   @IsEnum(ItemStateEnum, { message: 'Estado inválido' })
   state?: ItemStateEnum;
@@ -181,11 +174,11 @@ export class ItemStatsDto {
   soldItems: number;
 }
 
-export class ItemResponseDto {
-  @ApiProperty({ description: 'ID del item' })
+export class VehicleResponseDto {
+  @ApiProperty({ description: 'ID del vehículo' })
   id: string;
 
-  @ApiProperty({ description: 'Placa del vehículo' })
+  @ApiProperty({ description: 'Patente del vehículo' })
   plate: string;
 
   @ApiPropertyOptional({ description: 'Marca del vehículo' })
@@ -197,10 +190,24 @@ export class ItemResponseDto {
   @ApiPropertyOptional({ description: 'Año del vehículo' })
   year?: number;
 
-  @ApiPropertyOptional({ description: 'Precio base del item' })
+  @ApiPropertyOptional({ description: 'Versión del vehículo' })
+  version?: string;
+
+  @ApiPropertyOptional({ description: 'Kilometraje del vehículo' })
+  kilometraje?: number;
+}
+
+export class ItemResponseDto {
+  @ApiProperty({ description: 'ID del lote' })
+  id: string;
+
+  @ApiProperty({ description: 'Vehículos del lote', type: [VehicleResponseDto] })
+  vehicles: VehicleResponseDto[];
+
+  @ApiPropertyOptional({ description: 'Precio base del lote' })
   basePrice?: number;
 
-  @ApiProperty({ description: 'Estado del item' })
+  @ApiProperty({ description: 'Estado del lote' })
   state: string;
 
   @ApiPropertyOptional({ description: 'URLs de fotos separadas por comas' })
@@ -211,14 +218,8 @@ export class ItemResponseDto {
   })
   docs?: string;
 
-  @ApiPropertyOptional({ description: 'Versión del vehículo' })
-  version?: string;
-
-  @ApiPropertyOptional({ description: 'Kilometraje del vehículo' })
-  kilometraje?: number;
-
   @ApiPropertyOptional({
-    description: 'Estado legal del vehículo',
+    description: 'Estado legal del lote',
     enum: LegalStatusEnum,
   })
   legal_status?: LegalStatusEnum;

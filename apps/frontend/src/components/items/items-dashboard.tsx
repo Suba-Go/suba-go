@@ -37,6 +37,14 @@ import {
 import { useToast } from '@suba-go/shared-components/components/ui/toaster';
 import { apiFetch } from '@/lib/api/api-fetch';
 import { getPrimaryPhotoUrl, parsePhotos } from '@/lib/auction-utils';
+import {
+  getVehicles,
+  getPrimaryVehicle,
+  getPrimaryPlate,
+  getItemTitle,
+  getItemSearchText,
+  getVehicleCount,
+} from '@/lib/vehicle-utils';
 import { ItemCreateModal } from './item-create-modal';
 import { ItemEditModal } from './item-edit-modal';
 import { ItemsDashboardSkeleton } from './items-dashboard-skeleton';
@@ -185,11 +193,7 @@ export function ItemsDashboard({ subdomain }: ItemsDashboardProps) {
     const term = searchTerm.trim().toLowerCase();
 
     const filtered = items.filter((item) => {
-      const matchesSearch =
-        !term ||
-        item.plate?.toLowerCase().includes(term) ||
-        item.brand?.toLowerCase().includes(term) ||
-        item.model?.toLowerCase().includes(term);
+      const matchesSearch = !term || getItemSearchText(item).includes(term);
 
       const matchesFilter = filterState === 'all' || item.state === filterState;
 
@@ -232,9 +236,9 @@ export function ItemsDashboard({ subdomain }: ItemsDashboardProps) {
         case 'price_asc':
           return aPrice - bPrice;
         case 'plate_desc':
-          return (b.plate ?? '').localeCompare(a.plate ?? '');
+          return getPrimaryPlate(b).localeCompare(getPrimaryPlate(a));
         case 'plate_asc':
-          return (a.plate ?? '').localeCompare(b.plate ?? '');
+          return getPrimaryPlate(a).localeCompare(getPrimaryPlate(b));
         case 'newest':
         default:
           return bCreated - aCreated;
@@ -491,7 +495,7 @@ export function ItemsDashboard({ subdomain }: ItemsDashboardProps) {
                       <>
                   <SafeImage
                     src={primary}
-                    alt={`${item.brand} ${item.model}`}
+                    alt={getItemTitle(item)}
                     fill
                     sizes="(max-width: 768px) 100vw, (max-width: 1024px) 50vw, 33vw"
                     quality={82}
@@ -527,10 +531,17 @@ export function ItemsDashboard({ subdomain }: ItemsDashboardProps) {
             </div>
 
             <CardHeader className="pb-3">
-              <div className="flex justify-between items-start">
-                <CardTitle className="text-lg">
-                  {item.plate || 'Sin Patente'}
-                </CardTitle>
+              <div className="flex justify-between items-start gap-2">
+                <div className="flex items-center gap-2">
+                  <CardTitle className="text-lg">
+                    {getItemTitle(item)}
+                  </CardTitle>
+                  {getVehicleCount(item) > 1 && (
+                    <Badge variant="secondary" className="rounded-full">
+                      {getVehicleCount(item)} autos
+                    </Badge>
+                  )}
+                </div>
                 <Badge className={getStateColor(item.state)}>
                   {stateLabel(item.state)}
                 </Badge>
@@ -538,26 +549,60 @@ export function ItemsDashboard({ subdomain }: ItemsDashboardProps) {
             </CardHeader>
             <CardContent className="space-y-3">
               <div className="space-y-1">
-                <p className="text-sm text-gray-600">
-                  <span className="font-medium">Patente:</span>{' '}
-                  {item.plate || 'N/A'}
-                </p>
-                <p className="text-sm text-gray-600">
-                  <span className="font-medium">Marca:</span>{' '}
-                  {item.brand || 'N/A'}
-                </p>
-                <p className="text-sm text-gray-600">
-                  <span className="font-medium">Modelo:</span>{' '}
-                  {item.model || 'N/A'}
-                </p>
-                <p className="text-sm text-gray-600">
-                  <span className="font-medium">Año:</span> {item.year || 'N/A'}
-                </p>
-                {item.kilometraje && (
-                  <p className="text-sm text-gray-600">
-                    <span className="font-medium">Kilometraje:</span>{' '}
-                    {item.kilometraje.toLocaleString()} km
-                  </p>
+                {getVehicleCount(item) > 1 ? (
+                  <div className="space-y-1">
+                    {getVehicles(item)
+                      .slice(0, 3)
+                      .map((v, i) => (
+                        <p
+                          key={v.id ?? i}
+                          className="text-sm text-gray-600 truncate"
+                        >
+                          <span className="font-medium">{v.plate}</span>
+                          {(v.brand || v.model) && (
+                            <>
+                              {' · '}
+                              {[v.brand, v.model].filter(Boolean).join(' ')}
+                            </>
+                          )}
+                        </p>
+                      ))}
+                    {getVehicleCount(item) > 3 && (
+                      <p className="text-xs text-gray-500">
+                        +{getVehicleCount(item) - 3} vehículo(s) más
+                      </p>
+                    )}
+                  </div>
+                ) : (
+                  (() => {
+                    const v = getPrimaryVehicle(item);
+                    return (
+                      <>
+                        <p className="text-sm text-gray-600">
+                          <span className="font-medium">Patente:</span>{' '}
+                          {v?.plate || 'N/A'}
+                        </p>
+                        <p className="text-sm text-gray-600">
+                          <span className="font-medium">Marca:</span>{' '}
+                          {v?.brand || 'N/A'}
+                        </p>
+                        <p className="text-sm text-gray-600">
+                          <span className="font-medium">Modelo:</span>{' '}
+                          {v?.model || 'N/A'}
+                        </p>
+                        <p className="text-sm text-gray-600">
+                          <span className="font-medium">Año:</span>{' '}
+                          {v?.year || 'N/A'}
+                        </p>
+                        {!!v?.kilometraje && (
+                          <p className="text-sm text-gray-600">
+                            <span className="font-medium">Kilometraje:</span>{' '}
+                            {v.kilometraje.toLocaleString()} km
+                          </p>
+                        )}
+                      </>
+                    );
+                  })()
                 )}
                 {item.basePrice && (
                   <p className="text-sm font-semibold text-black-600">
