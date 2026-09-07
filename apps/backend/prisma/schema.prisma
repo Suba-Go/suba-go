@@ -8,7 +8,6 @@ generator client {
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
-
 }
 
 // Enums matching TypeORM enums
@@ -110,16 +109,16 @@ model Tenant {
   deletedAt DateTime?
 
   // ADMIN can block a tenant (users should be denied access when blocked)
-  isBlocked Boolean   @default(false)
+  isBlocked Boolean @default(false)
 
   // Relations
-  users        User[]
-  companies    Company[]
-  items        Item[]
-  auctions     Auction[]
-  bids         Bid[]
-  feedback     Feedback[]
-  invitations  Invitation[]
+  users       User[]
+  companies   Company[]
+  items       Item[]
+  auctions    Auction[]
+  bids        Bid[]
+  feedback    Feedback[]
+  invitations Invitation[]
 
   @@map("tenant")
 }
@@ -143,9 +142,9 @@ model Company {
   secondary_color3        String?
 
   // Relations
-  tenantId String
-  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  users    User[]
+  tenantId    String
+  tenant      Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  users       User[]
   invitations Invitation[]
 
   // Unique constraint matching TypeORM index
@@ -153,6 +152,9 @@ model Company {
   @@map("company")
 }
 
+// An Item represents a "lote" (lot): a group of one or more vehicles sold
+// together under a single base price. A lot with exactly one vehicle behaves
+// like a regular single-car listing.
 model Item {
   id        String    @id @default(uuid())
   createdAt DateTime  @default(now())
@@ -160,18 +162,12 @@ model Item {
   isDeleted Boolean   @default(false)
   deletedAt DateTime?
 
-  // Item-specific fields matching TypeORM entity
-  plate        String
-  brand        String
-  model        String?
-  year         Int?
-  version      String?
+  // Lot-level fields (shared by all vehicles in the lot)
   photos       String?
   docs         String?
-  kilometraje  Int?
   legal_status LegalStatusEnum @default(TRANSFERIBLE)
-  state        ItemStateEnum @default(DISPONIBLE)
-  basePrice    Int 
+  state        ItemStateEnum   @default(DISPONIBLE)
+  basePrice    Int
   description  String?
 
   // Sale tracking fields
@@ -183,10 +179,43 @@ model Item {
   // Relations
   tenantId     String
   tenant       Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  vehicles     Vehicle[]
   auctionItems AuctionItem[]
 
   @@index([soldToUserId])
   @@map("item")
+}
+
+// A Vehicle is a single car that belongs to an Item (lot). The vehicle-identity
+// fields (plate, brand, model, year, version, kilometraje) live here so a single
+// lot can contain multiple vehicles under one price.
+model Vehicle {
+  id        String    @id @default(uuid())
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  isDeleted Boolean   @default(false)
+  deletedAt DateTime?
+
+  // Vehicle-identity fields
+  plate       String
+  brand       String
+  model       String?
+  year        Int?
+  version     String?
+  kilometraje Int?
+
+  // Relations
+  itemId String
+  item   Item   @relation(fields: [itemId], references: [id], onDelete: Cascade)
+
+  // Denormalized tenant id used to scope plate uniqueness (mirrors item.tenantId)
+  tenantId String
+
+  // Plate must be unique per tenant (previously enforced on item in service logic)
+  @@unique([plate, tenantId], map: "IDX_vehicle_plate_tenant_unique")
+  @@index([itemId])
+  @@index([tenantId])
+  @@map("vehicle")
 }
 
 model Auction {
@@ -205,7 +234,7 @@ model Auction {
   type        AuctionTypeEnum   @default(REAL)
 
   // Global per-auction bid increment (applies to all items in this auction)
-  bidIncrement Int @default(50000)
+  bidIncrement Int      @default(50000)
   itemIds      String[] @default([])
 
   // Relations
@@ -242,7 +271,6 @@ model AuctionItem {
 
   // Prevent duplicate associations inside the same auction.
   @@unique([auctionId, itemId])
-
   @@map("auction_item")
 }
 
@@ -347,38 +375,39 @@ model Invitation {
   id        String   @id @default(uuid())
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-  
+
   email     String
-  token     String   @unique
+  token     String       @unique
   expiresAt DateTime
   role      UserRoleEnum @default(USER)
-  
+
   // Relations
   invitedByUserId String
   invitedByUser   User   @relation("SentInvitations", fields: [invitedByUserId], references: [id])
-  
+
   tenantId  String?
   tenant    Tenant?  @relation(fields: [tenantId], references: [id])
   companyId String?
   company   Company? @relation(fields: [companyId], references: [id])
 
-  isUsed    Boolean  @default(false)
-  usedAt    DateTime?
+  isUsed Boolean   @default(false)
+  usedAt DateTime?
 
   @@index([email])
   @@index([token])
   @@map("invitation")
 }
+
 model RefreshToken {
   id        String   @id @default(uuid())
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   // Security fields
-  hashedToken        String
-  expiresAt          DateTime
-  revokedAt          DateTime?
-  replacedByTokenId  String?  @unique
+  hashedToken       String
+  expiresAt         DateTime
+  revokedAt         DateTime?
+  replacedByTokenId String?   @unique
 
   // Optional client metadata (useful for audits and multi-device sessions)
   userAgent String?

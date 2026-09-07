@@ -2,6 +2,12 @@
 
 import { SafeImage } from '@/components/ui/safe-image';
 import { parsePhotos } from '@/lib/auction-utils';
+import {
+  getVehicles,
+  getPrimaryVehicle,
+  getVehicleCount,
+  getItemTitle,
+} from '@/lib/vehicle-utils';
 import { useState, useEffect, useMemo } from 'react';
 import {
   Car,
@@ -385,7 +391,11 @@ export function AuctionItemDetailModal({
         <DialogHeader>
           <DialogTitle className="text-2xl flex items-center justify-between">
             <span className="min-w-0 truncate">
-              {item.brand} {item.model} {item.year}
+              {getVehicleCount(item) > 1
+                ? getItemTitle(item)
+                : `${getPrimaryVehicle(item)?.brand ?? ''} ${
+                    getPrimaryVehicle(item)?.model ?? ''
+                  } ${getPrimaryVehicle(item)?.year ?? ''}`.trim()}
             </span>
 
             <span className="flex items-center gap-2">
@@ -424,10 +434,19 @@ export function AuctionItemDetailModal({
                 </span>
               )}
 
-              {item.plate && (
+              {getVehicleCount(item) > 1 ? (
                 <Badge variant="outline" className="text-lg whitespace-nowrap">
-                  {item.plate}
+                  {getVehicleCount(item)} autos
                 </Badge>
+              ) : (
+                getPrimaryVehicle(item)?.plate && (
+                  <Badge
+                    variant="outline"
+                    className="text-lg whitespace-nowrap"
+                  >
+                    {getPrimaryVehicle(item)?.plate}
+                  </Badge>
+                )
               )}
             </span>
           </DialogTitle>
@@ -497,64 +516,78 @@ export function AuctionItemDetailModal({
           )}
 
           {/* Product Details */}
+          {getVehicles(item).map((vehicle: any, vIndex: number) => (
+            <div key={vehicle.id ?? vIndex} className="space-y-2">
+              {getVehicleCount(item) > 1 && (
+                <p className="text-sm font-semibold text-gray-900">
+                  Vehículo {vIndex + 1}
+                </p>
+              )}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {vehicle.brand && (
+                  <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
+                    <Car className="h-5 w-5 text-gray-600" />
+                    <div>
+                      <p className="text-sm text-gray-600">Marca</p>
+                      <p className="font-semibold">{vehicle.brand}</p>
+                    </div>
+                  </div>
+                )}
+
+                {vehicle.model && (
+                  <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
+                    <Car className="h-5 w-5 text-gray-600" />
+                    <div>
+                      <p className="text-sm text-gray-600">Modelo</p>
+                      <p className="font-semibold">{vehicle.model}</p>
+                    </div>
+                  </div>
+                )}
+
+                {vehicle.plate && (
+                  <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
+                    <Car className="h-5 w-5 text-gray-600" />
+                    <div>
+                      <p className="text-sm text-gray-600">Patente</p>
+                      <p className="font-semibold">{vehicle.plate}</p>
+                    </div>
+                  </div>
+                )}
+
+                {vehicle.year && (
+                  <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
+                    <Calendar className="h-5 w-5 text-gray-600" />
+                    <div>
+                      <p className="text-sm text-gray-600">Año</p>
+                      <p className="font-semibold">{vehicle.year}</p>
+                    </div>
+                  </div>
+                )}
+
+                {vehicle.kilometraje && (
+                  <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
+                    <Gauge className="h-5 w-5 text-gray-600" />
+                    <div>
+                      <p className="text-sm text-gray-600">Kilometraje</p>
+                      <p className="font-semibold">
+                        {vehicle.kilometraje.toLocaleString()} km
+                      </p>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          ))}
+
+          {/* Lot-level details */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {item.brand && (
-              <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
-                <Car className="h-5 w-5 text-gray-600" />
-                <div>
-                  <p className="text-sm text-gray-600">Marca</p>
-                  <p className="font-semibold">{item.brand}</p>
-                </div>
-              </div>
-            )}
-
-            {item.model && (
-              <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
-                <Car className="h-5 w-5 text-gray-600" />
-                <div>
-                  <p className="text-sm text-gray-600">Modelo</p>
-                  <p className="font-semibold">{item.model}</p>
-                </div>
-              </div>
-            )}
-
-           {item.plate && (
-              <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
-                <Car className="h-5 w-5 text-gray-600" />
-                <div>
-                  <p className="text-sm text-gray-600">Patente</p>
-                  <p className="font-semibold">{item.plate}</p>
-                </div>
-              </div>
-            )}
-
-            {item.year && (
-              <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
-                <Calendar className="h-5 w-5 text-gray-600" />
-                <div>
-                  <p className="text-sm text-gray-600">Año</p>
-                  <p className="font-semibold">{item.year}</p>
-                </div>
-              </div>
-            )}
-
-            {item.kilometraje && (
-              <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
-                <Gauge className="h-5 w-5 text-gray-600" />
-                <div>
-                  <p className="text-sm text-gray-600">Kilometraje</p>
-                  <p className="font-semibold">
-                    {item.kilometraje.toLocaleString()} km
-                  </p>
-                </div>
-              </div>
-            )}
-
             {item.basePrice && (
               <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
                 <DollarSign className="h-5 w-5 text-gray-600" />
                 <div>
-                  <p className="text-sm text-gray-600">Precio Base</p>
+                  <p className="text-sm text-gray-600">
+                    Precio Base{getVehicleCount(item) > 1 ? ' (Lote)' : ''}
+                  </p>
                   <p className="font-semibold">{formatPrice(item.basePrice)}</p>
                 </div>
               </div>

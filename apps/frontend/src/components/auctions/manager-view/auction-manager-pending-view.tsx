@@ -2,6 +2,11 @@
 
 import { SafeImage } from '@/components/ui/safe-image';
 import { getPrimaryPhotoUrl } from '@/lib/auction-utils';
+import {
+  getItemTitle,
+  getPrimaryVehicle,
+  getVehicleCount,
+} from '@/lib/vehicle-utils';
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { AlertTriangle, ArrowLeft, Calendar, Edit, Trophy } from 'lucide-react';
@@ -471,7 +476,7 @@ export function AuctionManagerPendingView({
                         <div className="relative h-48 overflow-hidden rounded-t-lg bg-gray-100">
                           <SafeImage
                             src={getPrimaryPhotoUrl(auctionItem.item.photos)}
-                            alt={`${auctionItem.item.brand} ${auctionItem.item.model}`}
+                            alt={getItemTitle(auctionItem.item)}
                             fill
                             className="object-cover"
                             // 1 column on <lg and 2 columns on >=lg.
@@ -485,11 +490,21 @@ export function AuctionManagerPendingView({
                       <CardContent className="p-4">
                         <div className="space-y-2">
                           <h3 className="font-semibold text-lg">
-                            {auctionItem.item?.plate || 'Sin Patente'}
+                            {getItemTitle(auctionItem.item)}
                           </h3>
                           <p className="text-sm text-gray-600">
-                            {auctionItem.item?.brand} {auctionItem.item?.model}{' '}
-                            {auctionItem.item?.year}
+                            {getVehicleCount(auctionItem.item) > 1 ? (
+                              <>
+                                {getVehicleCount(auctionItem.item)} vehículos en
+                                el lote
+                              </>
+                            ) : (
+                              <>
+                                {getPrimaryVehicle(auctionItem.item)?.brand}{' '}
+                                {getPrimaryVehicle(auctionItem.item)?.model}{' '}
+                                {getPrimaryVehicle(auctionItem.item)?.year}
+                              </>
+                            )}
                           </p>
 
                           <div className="flex justify-between items-center pt-2">

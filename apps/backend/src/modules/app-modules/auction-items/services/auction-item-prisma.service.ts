@@ -23,14 +23,8 @@ const auctionItemWithDetailsArgs =
       item: {
         select: {
           id: true,
-          plate: true,
-          brand: true,
-          model: true,
-          year: true,
-          version: true,
           photos: true,
           docs: true,
-          kilometraje: true,
           legal_status: true,
           state: true,
           basePrice: true,
@@ -43,6 +37,19 @@ const auctionItemWithDetailsArgs =
           updatedAt: true,
           deletedAt: true,
           isDeleted: true,
+          vehicles: {
+            select: {
+              id: true,
+              plate: true,
+              brand: true,
+              model: true,
+              year: true,
+              version: true,
+              kilometraje: true,
+              itemId: true,
+              tenantId: true,
+            },
+          },
           soldToUser: {
             select: {
               id: true,

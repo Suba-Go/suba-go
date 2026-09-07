@@ -11,6 +11,7 @@ import {
 } from 'lucide-react';
 import { ItemDto, ItemStateEnum } from '@suba-go/shared-validation';
 import { parsePhotos } from '@/lib/auction-utils';
+import { getVehicles, getItemTitle, vehicleName } from '@/lib/vehicle-utils';
 import {
   Dialog,
   DialogContent,
@@ -104,11 +105,9 @@ export function ItemDetailModal({
           {/* Header with state */}
           <div className="flex justify-between items-start">
             <div>
-              <h2 className="text-2xl font-bold">
-                {item.plate || 'Sin Patente'}
-              </h2>
+              <h2 className="text-2xl font-bold">{getItemTitle(item)}</h2>
               <p className="text-gray-600">
-                {item.brand} {item.model} {item.year}
+                {vehicleName(getVehicles(item)[0])}
               </p>
             </div>
             <Badge className={getStateColor(item.state)}>{item.state}</Badge>
@@ -119,39 +118,57 @@ export function ItemDetailModal({
             <div className="space-y-4">
               <h3 className="text-lg font-semibold flex items-center gap-2">
                 <Car className="h-5 w-5" />
-                Información del Vehículo
+                {getVehicles(item).length > 1
+                  ? `Vehículos del lote (${getVehicles(item).length})`
+                  : 'Información del Vehículo'}
               </h3>
 
-              <div className="space-y-3">
-                <div className="flex justify-between">
-                  <span className="font-medium">Patente:</span>
-                  <span>{item.plate || 'N/A'}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="font-medium">Marca:</span>
-                  <span>{item.brand || 'N/A'}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="font-medium">Modelo:</span>
-                  <span>{item.model || 'N/A'}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="font-medium">Año:</span>
-                  <span>{item.year || 'N/A'}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="font-medium">Versión:</span>
-                  <span>{item.version || 'N/A'}</span>
-                </div>
-                {item.kilometraje && (
-                  <div className="flex justify-between">
-                    <span className="font-medium flex items-center gap-1">
-                      <Gauge className="h-4 w-4" />
-                      Kilometraje:
-                    </span>
-                    <span>{item.kilometraje.toLocaleString()} km</span>
+              <div className="space-y-4">
+                {getVehicles(item).map((vehicle: any, vIndex: number) => (
+                  <div
+                    key={vehicle.id ?? vIndex}
+                    className={
+                      getVehicles(item).length > 1
+                        ? 'space-y-3 rounded-lg border p-3'
+                        : 'space-y-3'
+                    }
+                  >
+                    {getVehicles(item).length > 1 && (
+                      <p className="text-sm font-semibold text-gray-900">
+                        Vehículo {vIndex + 1}
+                      </p>
+                    )}
+                    <div className="flex justify-between">
+                      <span className="font-medium">Patente:</span>
+                      <span>{vehicle.plate || 'N/A'}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="font-medium">Marca:</span>
+                      <span>{vehicle.brand || 'N/A'}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="font-medium">Modelo:</span>
+                      <span>{vehicle.model || 'N/A'}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="font-medium">Año:</span>
+                      <span>{vehicle.year || 'N/A'}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="font-medium">Versión:</span>
+                      <span>{vehicle.version || 'N/A'}</span>
+                    </div>
+                    {vehicle.kilometraje && (
+                      <div className="flex justify-between">
+                        <span className="font-medium flex items-center gap-1">
+                          <Gauge className="h-4 w-4" />
+                          Kilometraje:
+                        </span>
+                        <span>{vehicle.kilometraje.toLocaleString()} km</span>
+                      </div>
+                    )}
                   </div>
-                )}
+                ))}
               </div>
             </div>
 

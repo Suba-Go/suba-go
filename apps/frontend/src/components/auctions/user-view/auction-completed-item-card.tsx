@@ -16,6 +16,11 @@ import { Button } from '@suba-go/shared-components/components/ui/button';
 import { Trophy, Eye, XCircle } from 'lucide-react';
 import { AuctionItemWithItmeAndBidsDto } from '@suba-go/shared-validation';
 import { getPrimaryPhotoUrl } from '@/lib/auction-utils';
+import {
+  getItemTitle,
+  getPrimaryVehicle,
+  getVehicleCount,
+} from '@/lib/vehicle-utils';
 
 interface AuctionCompletedItemCardProps {
   auctionItem: AuctionItemWithItmeAndBidsDto;
@@ -59,11 +64,18 @@ export function AuctionCompletedItemCard({
         <div className="flex items-start justify-between">
           <div className="flex-1">
             <CardTitle className="text-xl">
-              {auctionItem.item?.plate || 'Sin Patente'}
+              {getItemTitle(auctionItem.item)}
             </CardTitle>
             <p className="text-sm text-gray-600 mt-1">
-              {auctionItem.item?.brand} {auctionItem.item?.model}{' '}
-              {auctionItem.item?.year}
+              {getVehicleCount(auctionItem.item) > 1 ? (
+                <>{getVehicleCount(auctionItem.item)} vehículos en el lote</>
+              ) : (
+                <>
+                  {getPrimaryVehicle(auctionItem.item)?.brand}{' '}
+                  {getPrimaryVehicle(auctionItem.item)?.model}{' '}
+                  {getPrimaryVehicle(auctionItem.item)?.year}
+                </>
+              )}
             </p>
           </div>
           {isWon ? (
@@ -84,7 +96,7 @@ export function AuctionCompletedItemCard({
       <div className="relative h-44 sm:h-52 w-full overflow-hidden bg-gray-100">
         <SafeImage
           src={photoUrl || FALLBACK_IMAGE_DATA_URL}
-          alt={`${auctionItem.item?.brand ?? 'Producto'} ${auctionItem.item?.model ?? ''}`.trim()}
+          alt={getItemTitle(auctionItem.item)}
           fill
           className={photoUrl ? 'object-cover' : 'object-contain p-8 opacity-80'}
           sizes="(max-width: 1024px) 100vw, 50vw"

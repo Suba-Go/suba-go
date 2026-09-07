@@ -89,6 +89,10 @@ export class PrismaService implements OnModuleInit, OnModuleDestroy {
     return this.prisma.item;
   }
 
+  get vehicle() {
+    return this.prisma.vehicle;
+  }
+
   get auction() {
     return this.prisma.auction;
   }

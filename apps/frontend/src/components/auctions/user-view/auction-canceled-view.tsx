@@ -14,6 +14,12 @@ import {
   CardTitle,
 } from '@suba-go/shared-components/components/ui/card';
 import { AuctionHeader } from './auction-header';
+import {
+  getVehicles,
+  getPrimaryVehicle,
+  getVehicleCount,
+  getItemTitle,
+} from '@/lib/vehicle-utils';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 
@@ -108,17 +114,32 @@ export function AuctionCanceledView({ auction }: AuctionCanceledViewProps) {
                   className="p-4 border rounded-lg bg-gray-50 opacity-60"
                 >
                   <p className="font-semibold text-gray-900">
-                    {auctionItem.item.brand} {auctionItem.item.model}
+                    {getVehicleCount(auctionItem.item) > 1
+                      ? getItemTitle(auctionItem.item)
+                      : `${getPrimaryVehicle(auctionItem.item)?.brand ?? ''} ${
+                          getPrimaryVehicle(auctionItem.item)?.model ?? ''
+                        }`.trim()}
                   </p>
-                  {auctionItem.item.year && (
+                  {getVehicleCount(auctionItem.item) > 1 ? (
                     <p className="text-sm text-gray-600">
-                      Año: {auctionItem.item.year}
+                      Patentes:{' '}
+                      {getVehicles(auctionItem.item)
+                        .map((v: any) => v.plate)
+                        .join(', ')}
                     </p>
-                  )}
-                  {auctionItem.item.plate && (
-                    <p className="text-sm text-gray-600">
-                      Patente: {auctionItem.item.plate}
-                    </p>
+                  ) : (
+                    <>
+                      {getPrimaryVehicle(auctionItem.item)?.year && (
+                        <p className="text-sm text-gray-600">
+                          Año: {getPrimaryVehicle(auctionItem.item)?.year}
+                        </p>
+                      )}
+                      {getPrimaryVehicle(auctionItem.item)?.plate && (
+                        <p className="text-sm text-gray-600">
+                          Patente: {getPrimaryVehicle(auctionItem.item)?.plate}
+                        </p>
+                      )}
+                    </>
                   )}
                 </div>
               ))}

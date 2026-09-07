@@ -144,9 +144,16 @@ export interface BidPlacedData {
   requestId: string; // echo back for client correlation
   item?: {
     id: string;
+    /** Primary vehicle (vehicles[0]) — kept for backward-compatible display. */
     plate?: string;
     brand?: string;
     model?: string;
+    /** All vehicles in the lot. */
+    vehicles?: Array<{
+      plate: string;
+      brand: string;
+      model?: string;
+    }>;
   };
 }
 

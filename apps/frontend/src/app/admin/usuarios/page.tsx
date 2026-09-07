@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState, useMemo } from 'react';
+import { getItemAutoLabel } from '@/lib/vehicle-utils';
 import { Search, Download, Eye, X, User as UserIcon } from 'lucide-react';
 
 function formatDate(d: string) {
@@ -187,7 +188,7 @@ export default function AdminUsuariosPage() {
                           <div className="space-y-1.5">
                             {r.wonItems.map((item: any, i: number) => (
                               <div key={i} className="flex items-center justify-between rounded-md bg-stone-800/50 px-3 py-1.5 text-xs">
-                                <span className="text-stone-200">{item.brand} {item.model}</span>
+                                <span className="text-stone-200">{getItemAutoLabel(item)}</span>
                                 <span className="font-medium tabular-nums text-green-400">
                                   {new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP', maximumFractionDigits: 0 }).format(item.soldPrice || 0)}
                                 </span>

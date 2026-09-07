@@ -25,6 +25,12 @@ import { useAuctionWebSocketBidding } from '@/hooks/use-auction-websocket-biddin
 import { useLiveFallbackSnapshot } from '@/hooks/use-live-fallback-snapshot';
 import { useAuctionStatus } from '@/hooks/use-auction-status';
 import { useLiveAccessToken } from '@/hooks/use-live-access-token';
+import {
+  getPrimaryVehicle,
+  getVehicleCount,
+  getItemTitle,
+  getItemSearchText,
+} from '@/lib/vehicle-utils';
 
 interface AuctionPendingViewProps {
   auction: AuctionDto;
@@ -102,14 +108,7 @@ export function AuctionPendingView({
 
     return auctionItems.filter((ai) => {
       const item = ai.item as any;
-      const haystack = [
-        item?.title,
-        item?.plate,
-        item?.brand,
-        item?.model,
-        String(item?.year ?? ''),
-        item?.description,
-      ]
+      const haystack = [item?.title, getItemSearchText(item), item?.description]
         .filter(Boolean)
         .join(' ')
         .toLowerCase();
@@ -233,7 +232,7 @@ export function AuctionPendingView({
                   {coverUrl ? (
                     <SafeImage
                       src={coverUrl}
-                      alt={item?.title || item?.plate || 'Producto'}
+                      alt={item?.title || getItemTitle(item)}
                       fill
                       className="object-cover"
                       sizes="(max-width: 1024px) 100vw, 33vw"
@@ -250,12 +249,18 @@ export function AuctionPendingView({
                 <div className="p-4 flex-1 flex flex-col gap-2">
                   <div className="min-w-0">
                     <h3 className="text-lg font-semibold truncate">
-                      {item?.plate ? `${item.plate}` : item?.title || 'Producto'}
+                      {item?.title || getItemTitle(item)}
                     </h3>
                     <p className="text-sm text-gray-600 truncate">
-                      {[item?.brand, item?.model, item?.year]
-                        .filter(Boolean)
-                        .join(' ')}
+                      {getVehicleCount(item) > 1
+                        ? `${getVehicleCount(item)} vehículos en el lote`
+                        : [
+                            getPrimaryVehicle(item)?.brand,
+                            getPrimaryVehicle(item)?.model,
+                            getPrimaryVehicle(item)?.year,
+                          ]
+                            .filter(Boolean)
+                            .join(' ')}
                     </p>
                   </div>
 
