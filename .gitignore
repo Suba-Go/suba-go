@@ -51,3 +51,18 @@ out
 .github/instructions/nx.instructions.md
 .cursor
 .augment
+
+# Secretos / credenciales — NUNCA commitear
+*secreto*
+*secrets*
+*.secrets
+*.pem
+*.key
+*.p12
+*.pfx
+credentials.json
+service-account*.json
+.vercel
+.env*
+!.env.example
+!.env.*.example
