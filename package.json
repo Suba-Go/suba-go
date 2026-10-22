@@ -4,7 +4,7 @@
   "license": "MIT",
   "packageManager": "pnpm@10.12.1",
   "engines": {
-    "node": "20.19.2"
+    "node": ">=20"
   },
   "scripts": {
     "start": "nx run-many --target=serve",
